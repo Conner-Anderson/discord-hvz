@@ -1,0 +1,38 @@
+{
+   "registration":
+   [
+      {
+         "name":"Name",
+         "query":"What is your name?",
+         "valid_regex":"\\D*",
+         "rejection_response":"No numbers allowed in names."
+      },
+      {
+         "name":"CPO",
+         "query":"What is your CPO?",
+         "valid_regex":"\\d*",
+         "rejection_response":"I'm looking for a single number here, nothing else."
+      }
+   ],
+   "tag_logging":
+   [
+      {
+         "name":"Tag_Code",
+         "query":"What is the tag code of the human you tagged?",
+         "valid_regex":"[A-Z\\d]{6}",
+         "rejection_response":"Try again! The tag code is 6 characters of numbers and capital letters. None of these: 0 o O Q I 1 D V U"
+      },
+      {
+         "name":"Tag_Day",
+         "query":"Did the tag happen \"today\" or \"yesterday\"?",
+         "valid_regex":"(?i)(today)|yesterday",
+         "rejection_response":"Try again. Respond with either \"today\" or \"tomorrow\""
+      },
+      {
+         "name":"Tag_Time",
+         "query":"About what time did the tag happen? Use the format 3:04pm",
+         "valid_regex":"(?i)\\d{1,2}:\\d{2}\\s?(am|pm)",
+         "rejection_response":"Try again. Please use a format like 12:26pm or 7:00 am"  
+      }
+   ]
+}
