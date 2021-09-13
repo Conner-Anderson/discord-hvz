@@ -1,5 +1,8 @@
 # discord-hvz
 
+A Discord bot designed to do the job that hvz-source.com performed before it went down. Information about HvZ: https://humansvszombies.org/
+This bot is currently only in development to help the LeTourneau University Nerf Club run their HvZ game. I have aspirations to make it good enough to release to the word, but that's a ways off.
+
 To get your development environment ready after you have the repo local:
 1. Follow the directions here to create a virtual environment in the project folder and activate it: 
 https://packaging.python.org/guides/installing-using-pip-and-virtual-environments/
