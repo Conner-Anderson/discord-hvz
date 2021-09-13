@@ -1,8 +1,10 @@
 
 HvZDB.py
 __pycache__
+.env
 venv
 ChatBot.log
 credentials.json
 token.json
+hvzdb.db
 

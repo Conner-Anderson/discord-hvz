@@ -1,12 +1,19 @@
 import logging
 import sheets
 from chatbot import ChatBot
-from hvz-db import HvzDb
+from hvzdb import HvzDb
 import discord
 from discord.ext import commands
 from datetime import timedelta
 from datetime import datetime
 from dateutil import parser
+
+from dotenv import load_dotenv
+from os import getenv
+
+load_dotenv() # You can pass the location of the .env file if it's not in a standard location
+token = getenv("TOKEN")
+
 
 
 
@@ -133,4 +140,4 @@ def resolve_chat(chatbot):
 
 
 
-bot.run('NzY3MTI1NTk2NDAwMjU0OTg4.X4tXYg.zU6DFr93WxsjX4B5PyJ3AXXZk6k')
+bot.run(token)
