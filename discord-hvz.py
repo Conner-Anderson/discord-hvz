@@ -127,7 +127,7 @@ def resolve_chat(chatbot): # Called when a ChatBot returns 1, showing it is done
             tag_day -= timedelta(days=1)
         tag_datetime = parser.parse(responses['Tag_Time'] + ' and 0 seconds', default=tag_day)
         responses['Tag_Time'] = tag_datetime.isoformat()
-        responses['Log_Time'] = datetime.today()
+        responses['Log_Time'] = datetime.today().isoformat()
 
 
         db.add_row('tag_logging', responses)
