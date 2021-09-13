@@ -8,4 +8,5 @@ token.json
 hvzdb.db
 *.sublime-project
 *.sublime-workspace
+*.log
 
