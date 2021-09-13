@@ -14,10 +14,9 @@ logger.addHandler(handler)
 
 class ChatBot:
 
-    def __init__(self, bot, member, selection):
-        # Arguments: The "bot" object from the main system, the member to ask the questions to,
+    def __init__(self, member, selection):
+        # Arguments: The member to ask the questions to,
         # and a string matching the question set this chatbot will use.
-        self.bot = bot
         self.member = member
         self.next_question = 0
         self.questions = []
@@ -45,7 +44,7 @@ class ChatBot:
                 # Do stuff to finish the ChatBot
                 print('finished')
                 return 1
-            else:
+            else: # User must be responding to the verification prompt
                 for i, q in enumerate(self.questions):  # Iterate through question names to see if the user has named one to edit
                     print(q['name'])
                     if message.content.casefold().find(q['name'].casefold()) != -1:
@@ -54,18 +53,19 @@ class ChatBot:
                         return
                 await self.member.send('That response doesn\'t make any sense. Try again?')
                 return
-        # At this point, it is time to accept the response to a normal question
+        # At this point, it is time to accept the response to a normal or re-asked question
         q = self.questions[self.next_question]  # Set the current question
         match = regex.fullmatch(r'{}'.format(q['valid_regex']), message.content)
         if match is None:
             await message.reply(q['rejection_response'] + '\nPlease answer again.')  # An error message for failing the regex test, configurable per-question
             return
-        # Record the accepted answer and proceed to the next question.
 
+        # Record the accepted answer and proceed to the next question.
         q['response'] = str(message.content)
         self.next_question += 1
 
-        if self.verifying:
+        # This if sequence is a bit confusing, and could use rework
+        if self.verifying: # Set the next question to the end of the list and verify again
             self.next_question = len(self.questions)
             await self.verify()
         elif (self.next_question >= len(self.questions)):
@@ -77,6 +77,6 @@ class ChatBot:
     async def verify(self):
         message = ('Please check over the info you provided. If it\'s good, type "Yes".'
             '\nIf not, type the name of what you want to change, such as "%s".\n\n' % (self.questions[0]['name']))
-        for q in self.questions:
+        for q in self.questions: # Build a list of the questions and their responses
             message += (q['name'] + ': ' + q['response'] + '\n')
         await self.member.send(message)
