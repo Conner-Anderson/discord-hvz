@@ -9,6 +9,7 @@
   - [ ] Have the bot use and/or setup a channel just for tag logging. Should respond to reactions to start a ChatBot conversation
   - [ ] Tags are announced in a channel. Should be a rich message with as much interesting information as is reasonable
 - [ ] A button (reaction) users can click to register for HvZ. Remember that this will all happen on the LETU nerf server, and everyone won't play HvZ
+- [ ] Improve item readability in the verification step of ChatBot. Currently variable_names are used, which is awkward
 - [ ] Admin commands (to start with, these should assume the admin knows what they are doing. No confirmation. We can fix that later)
   - [x] Delete user
   - [ ] Revoke tag (maybe a stupid-check to see if it would break history?)
