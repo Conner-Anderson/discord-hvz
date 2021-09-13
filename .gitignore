@@ -7,4 +7,6 @@ ChatBot.log
 credentials.json
 token.json
 hvzdb.db
+*.sublime-project
+*.sublime-workspace
 
