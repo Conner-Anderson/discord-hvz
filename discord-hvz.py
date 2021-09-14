@@ -111,14 +111,14 @@ async def on_member_update(before, after):
 
 
 @bot.command()
-@commands.has_role('Admin') # This means of checking the role is nice, but isn't flexible
+@commands.has_role('Admin')  # This means of checking the role is nice, but isn't flexible
 async def add(self, left: int, right: int):  # A command for testing
     """Adds two numbers together."""
     await self.send(left + right)
 
 @bot.group()
 @commands.has_role('Admin')
-async def member(ctx): # A group command. Used like "!member delete @Wookieguy"
+async def member(ctx):  # A group command. Used like "!member delete @Wookieguy"
     if ctx.invoked_subcommand is None:
         await ctx.send('Invalid command passed...')
 
@@ -175,7 +175,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             return 0
 
         tag_day = datetime.today()
-        if responses['Tag_Day'].casefold().find('yesterday'): # Converts tag_day to the previous day
+        if responses['Tag_Day'].casefold().find('yesterday'):  # Converts tag_day to the previous day
             tag_day -= timedelta(days=1)
         tag_datetime = parser.parse(responses['Tag_Time'] + ' and 0 seconds', default=tag_day)
         responses['Tag_Time'] = tag_datetime.isoformat()

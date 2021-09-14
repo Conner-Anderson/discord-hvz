@@ -127,18 +127,15 @@ class HvzDb():
     def edit_member(self, member, column, value):
         member_id = member
         if isinstance(member, discord.abc.User):
-            print('Was passed a user or member object')
             member_id = member.id
 
         sql = f'''UPDATE members
                 SET {column} = \'{value}\'
                 WHERE ID = \'{member_id}\'
         '''
-        print('SQL --> ', sql)
         cur = self.conn.cursor()
         cur.execute(sql)
         self.conn.commit()
-        print(cur.fetchall())
 
 
     def create_project(self, conn, project):
