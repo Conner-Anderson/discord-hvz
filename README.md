@@ -13,3 +13,6 @@ https://packaging.python.org/guides/installing-using-pip-and-virtual-environment
 
 4. Run discord-hvz.py. The first time, it will launch a google login window. Login to allow the bot to edit the Sheet you have access to. 
 You may need to request permissions from me I don't know exactly how that works. If this fails, I could just let you use my account.
+
+This is the sheet the bot currently exports to: https://docs.google.com/spreadsheets/d/1YUXeRoEpV9MukZ7B_xVlBkc-D6DNEfVxLBmJlf1Fm-0/edit?usp=sharing
+It is in the L.Y.N.C folder, ohitzujoey
