@@ -7,6 +7,8 @@ from discord.ext import commands
 from datetime import timedelta
 from datetime import datetime
 from dateutil import parser
+from discord_slash.utils.manage_components import create_button, create_actionrow
+from discord_slash.model import ButtonStyle
 
 from dotenv import load_dotenv
 from os import getenv
@@ -54,7 +56,7 @@ async def on_ready():
             print(f'{x} role not found!')
 
     bot.channels = {}
-    needed_channels = ['tag-announcements']  # Should eventually be a config or setup procedure
+    needed_channels = ['tag-announcements', 'report-tags-here']  # Should eventually be a config or setup procedure
     for i, x in enumerate(needed_channels):
         for c in bot.guild.channels:
             if c.name.lower() == x:
@@ -62,6 +64,21 @@ async def on_ready():
                 break
         else:
             print(f'{x} channel not found!')
+
+    messages = await bot.channels['report-tags-here'].history(limit=100, oldest_first=True).flatten()
+    for i, m in enumerate(messages):
+        if bot.user == m.author:
+            buttons = [
+                create_button(
+                    style=ButtonStyle.green,
+                    label="Report Tag"
+                ),
+            ]
+            action_row = create_actionrow(*buttons)
+            await m.edit(content='---', components=[action_row])
+            break
+    else:
+        print('No message found to edit')
 
 
     print('Logged in as')
@@ -112,9 +129,17 @@ async def on_member_update(before, after):
 
 @bot.command()
 @commands.has_role('Admin')  # This means of checking the role is nice, but isn't flexible
-async def add(self, left: int, right: int):  # A command for testing
+async def add(ctx, left: int, right: int):  # A command for testing
     """Adds two numbers together."""
-    await self.send(left + right)
+    buttons = [
+        create_button(
+            style=ButtonStyle.green,
+            label="A Green Button"
+        ),
+    ]
+    action_row = create_actionrow(*buttons)
+    await ctx.send(left + right, components=[action_row])
+    await ctx.send(left + right)
 
 @bot.group()
 @commands.has_role('Admin')
