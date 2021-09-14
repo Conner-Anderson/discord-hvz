@@ -7,8 +7,10 @@ from discord.ext import commands
 from datetime import timedelta
 from datetime import datetime
 from dateutil import parser
+
 from discord_slash.utils.manage_components import create_button, create_actionrow
 from discord_slash.model import ButtonStyle
+from discord_slash import SlashCommand
 
 from dotenv import load_dotenv
 from os import getenv
@@ -28,6 +30,7 @@ logger.addHandler(handler)
 intents = discord.Intents.default()
 intents.members = True
 bot = commands.Bot(command_prefix='!', description='Discord HvZ Bot!', intents=intents)
+slash = SlashCommand(bot, sync_commands=True)  # Declares slash commands through the client.
 
 db = HvzDb()
 
@@ -64,7 +67,7 @@ async def on_ready():
                 break
         else:
             print(f'{x} channel not found!')
-
+    # Edit the first bot message of the tag report channel to include a button
     messages = await bot.channels['report-tags-here'].history(limit=100, oldest_first=True).flatten()
     for i, m in enumerate(messages):
         if bot.user == m.author:
@@ -110,6 +113,12 @@ async def on_raw_reaction_add(payload):
             await chatbot.ask_question()
             awaiting_chatbots.append(chatbot)
             break
+
+@bot.event
+async def on_component(ctx):
+    print(ctx)
+   # for i, buttonbot in enumerate(awaiting_buttonbots):
+     #   if button
 
 @bot.listen()
 async def on_member_update(before, after):
