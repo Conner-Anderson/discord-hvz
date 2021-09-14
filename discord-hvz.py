@@ -84,7 +84,7 @@ async def on_message(message):
                 break
 
 # Occurs when a reaction happens. Using the raw version so old messages not in the cache work fine.
-@bot.event
+@bot.listen()
 async def on_raw_reaction_add(payload):
     # Searches guild cache for the member.
     for m in bot.guild.members:
@@ -93,6 +93,22 @@ async def on_raw_reaction_add(payload):
             await chatbot.ask_question()
             awaiting_chatbots.append(chatbot)
             break
+
+@bot.listen()
+async def on_member_update(before, after):
+
+    if not before.roles == after.roles:
+        zombie = bot.roles['zombie'] in after.roles
+        human = bot.roles['human'] in after.roles
+
+        if zombie and not human:
+            db.edit_member(after, 'faction', 'zombie')
+            sheets.export_to_sheet('members')
+        elif human and not zombie:
+            db.edit_member(after, 'faction', 'human')
+            sheets.export_to_sheet('members')
+
+
 
 @bot.command()
 @commands.has_role('Admin') # This means of checking the role is nice, but isn't flexible
