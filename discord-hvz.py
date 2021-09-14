@@ -132,6 +132,27 @@ async def resolve_chat(chatbot): # Called when a ChatBot returns 1, showing it i
 
     elif chatbot.chat_type == 'tag_logging':
 
+        if bot.roles['human'] in chatbot.member.roles:
+            await chatbot.member.send('Hold up... you\'re a  human! You can\'t tag anyone. The zombie who tagged you may not have logged their tag')
+            return 0
+
+        tagged_member_data = db.get_row('members', 'Tag_Code', responses['Tag_Code'])
+
+        if not tagged_member_data:
+            await chatbot.member.send('That tag code doesn\'t match anyone! Try again.')
+            return 0
+        elif len(tagged_member_data) > 1:
+            print('Multiple tag code matches!')
+            return 0
+
+        tagged_user_id = int(tagged_member_data[0]['ID'])
+
+        tagged_member = bot.guild.get_member(tagged_user_id)
+
+        if bot.roles['zombie'] in tagged_member.roles:
+            await chatbot.member.send('%s is already a zombie! What are you up to?' % (tagged_member_data[0]['Name']))
+            return 0
+
         tag_day = datetime.today()
         if responses['Tag_Day'].casefold().find('yesterday'): # Converts tag_day to the previous day
             tag_day -= timedelta(days=1)
@@ -142,7 +163,7 @@ async def resolve_chat(chatbot): # Called when a ChatBot returns 1, showing it i
         db.add_row('tag_logging', responses)
         sheets.export_to_sheet('tag_logging')
 
-        msg = f'User has turned zombie!\nTagged by <@{chatbot.member.id}>\n'
+        msg = f'<@{tagged_user_id}> has turned zombie!\nTagged by <@{chatbot.member.id}>\n'
         msg += tag_datetime.strftime('%A, at about %I:%M %p')
         await bot.channels['tag-announcements'].send(msg)
 
