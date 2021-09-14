@@ -53,6 +53,16 @@ async def on_ready():
         else:
             print(f'{x} role not found!')
 
+    bot.channels = {}
+    needed_channels = ['tag-announcements']  # Should eventually be a config or setup procedure
+    for i, x in enumerate(needed_channels):
+        for c in bot.guild.channels:
+            if c.name.lower() == x:
+                bot.channels[x] = c
+                break
+        else:
+            print(f'{x} channel not found!')
+
 
     print('Logged in as')
     print(bot.user.name)
@@ -69,7 +79,7 @@ async def on_message(message):
             if chatbot.member == message.author:
                 result = await chatbot.take_response(message)
                 if result == 1:
-                    resolve_chat(chatbot)
+                    await resolve_chat(chatbot)
                     awaiting_chatbots.pop(i)
                 break
 
@@ -79,7 +89,7 @@ async def on_raw_reaction_add(payload):
     # Searches guild cache for the member.
     for m in bot.guild.members:
         if m.id == payload.user_id:
-            chatbot = ChatBot(m, "registration")
+            chatbot = ChatBot(m, "tag_logging")
             await chatbot.ask_question()
             awaiting_chatbots.append(chatbot)
             break
@@ -105,7 +115,7 @@ async def delete(ctx, member: str):
     else:
         await ctx.send('You must @mention a single server member to delete them.')
 
-def resolve_chat(chatbot): # Called when a ChatBot returns 1, showing it is done
+async def resolve_chat(chatbot): # Called when a ChatBot returns 1, showing it is done
 
     responses = {}
     for question in chatbot.questions:
@@ -122,6 +132,27 @@ def resolve_chat(chatbot): # Called when a ChatBot returns 1, showing it is done
 
     elif chatbot.chat_type == 'tag_logging':
 
+        if bot.roles['human'] in chatbot.member.roles:
+            await chatbot.member.send('Hold up... you\'re a  human! You can\'t tag anyone. The zombie who tagged you may not have logged their tag')
+            return 0
+
+        tagged_member_data = db.get_row('members', 'Tag_Code', responses['Tag_Code'])
+
+        if not tagged_member_data:
+            await chatbot.member.send('That tag code doesn\'t match anyone! Try again.')
+            return 0
+        elif len(tagged_member_data) > 1:
+            print('Multiple tag code matches!')
+            return 0
+
+        tagged_user_id = int(tagged_member_data[0]['ID'])
+
+        tagged_member = bot.guild.get_member(tagged_user_id)
+
+        if bot.roles['zombie'] in tagged_member.roles:
+            await chatbot.member.send('%s is already a zombie! What are you up to?' % (tagged_member_data[0]['Name']))
+            return 0
+
         tag_day = datetime.today()
         if responses['Tag_Day'].casefold().find('yesterday'): # Converts tag_day to the previous day
             tag_day -= timedelta(days=1)
@@ -129,8 +160,12 @@ def resolve_chat(chatbot): # Called when a ChatBot returns 1, showing it is done
         responses['Tag_Time'] = tag_datetime.isoformat()
         responses['Log_Time'] = datetime.today().isoformat()
 
-
         db.add_row('tag_logging', responses)
         sheets.export_to_sheet('tag_logging')
+
+        msg = f'<@{tagged_user_id}> has turned zombie!\nTagged by <@{chatbot.member.id}>\n'
+        msg += tag_datetime.strftime('%A, at about %I:%M %p')
+        await bot.channels['tag-announcements'].send(msg)
+
 
 bot.run(token)

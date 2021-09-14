@@ -1,5 +1,6 @@
 import sqlite3
 from sqlite3 import Error
+import discord
 
 class HvzDb():
     def __init__(self):
@@ -11,7 +12,8 @@ class HvzDb():
                                             ID text PRIMARY KEY,
                                             Name text NOT NULL,
                                             CPO text,
-                                            Faction text
+                                            Faction text,
+                                            Tag_Code text
                                         ); """
 
         sql_create_tasks_table = """CREATE TABLE IF NOT EXISTS tag_logging (
@@ -20,7 +22,8 @@ class HvzDb():
                                         Tag_Time time,
                                         Log_Time time
                                     );"""
-        self.conn = self.create_connection(database)   
+        self.conn = self.create_connection(database)
+        # self.conn.row_factory = sqlite3.Row  # Queries of rows now return Row objects. They are similar to tuples, but with dict-like functions
 
         if self.conn is not None:
 
@@ -81,9 +84,47 @@ class HvzDb():
     def get_table(self, table):
         cur = self.conn.cursor()
         rows = cur.execute(f'SELECT * FROM {table}').fetchall()
-        columns = cur.execute(f'PRAGMA table_info({table})').fetchall()
-        rows.insert(0, [c[1] for c in columns])
+        print('get_table rows:',rows)
+        columns = cur.description
+        rows.insert(0, [c[0] for c in columns])
         return rows
+
+    def get_member(self, member):
+        # Returns a row<list> from the database. Takes a member object or id.
+        member_id = member
+        if isinstance(member, discord.User):
+            member_id = member.id
+
+        sql = f'SELECT * FROM members WHERE ID = {member_id}'
+        cur = self.conn.cursor()
+        try:
+            member_row = cur.execute(sql).fetchone()
+        except Exception as e:
+            print(e)
+            return 0
+        return member_row
+
+    def get_row(self, table, column, value):
+        print(self, table, column, value)
+
+        sql = f'''SELECT * FROM {table}
+                WHERE {column} = \'{value}\''''
+        cur = self.conn.cursor()
+        try:
+            rows = cur.execute(sql).fetchall()
+        except Exception as e:
+            print(e)
+            return 0
+        rows_output = []
+        columns = cur.description
+        for r in rows:
+            row_dict = {}
+            for c, x in enumerate(r):
+                row_dict[columns[c][0]] = x
+            rows_output.append(row_dict)
+        print('rows_output --> ', rows_output)
+        return rows_output
+
 
     def create_project(self, conn, project):
         # Leftover example code
