@@ -141,16 +141,13 @@ async def resolve_chat(chatbot): # Called when a ChatBot returns 1, showing it i
         if not tagged_member_data:
             await chatbot.member.send('That tag code doesn\'t match anyone! Try again.')
             return 0
-        elif len(tagged_member_data) > 1:
-            print('Multiple tag code matches!')
-            return 0
 
-        tagged_user_id = int(tagged_member_data[0]['ID'])
+        tagged_user_id = int(tagged_member_data['ID'])
 
         tagged_member = bot.guild.get_member(tagged_user_id)
 
         if bot.roles['zombie'] in tagged_member.roles:
-            await chatbot.member.send('%s is already a zombie! What are you up to?' % (tagged_member_data[0]['Name']))
+            await chatbot.member.send('%s is already a zombie! What are you up to?' % (tagged_member_data['Name']))
             return 0
 
         tag_day = datetime.today()

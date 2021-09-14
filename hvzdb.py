@@ -105,25 +105,23 @@ class HvzDb():
         return member_row
 
     def get_row(self, table, column, value):
+        # Returns the first row that matches. The row is a dict, where the keys are column names
         print(self, table, column, value)
 
         sql = f'''SELECT * FROM {table}
                 WHERE {column} = \'{value}\''''
         cur = self.conn.cursor()
         try:
-            rows = cur.execute(sql).fetchall()
+            row = cur.execute(sql).fetchone()
         except Exception as e:
             print(e)
             return 0
-        rows_output = []
         columns = cur.description
-        for r in rows:
-            row_dict = {}
-            for c, x in enumerate(r):
-                row_dict[columns[c][0]] = x
-            rows_output.append(row_dict)
-        print('rows_output --> ', rows_output)
-        return rows_output
+        row_dict = {}
+        for c, x in enumerate(row):
+            row_dict[columns[c][0]] = x
+
+        return row_dict
 
 
     def create_project(self, conn, project):
