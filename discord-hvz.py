@@ -144,7 +144,15 @@ async def resolve_chat(chatbot): # Called when a ChatBot returns 1, showing it i
 
         tagged_user_id = int(tagged_member_data['ID'])
 
+        if tagged_user_id == 0:
+            await chatbot.member.send('Something went wrong with the database... This is a bug! Please contact an admin.')
+            return 0
+
         tagged_member = bot.guild.get_member(tagged_user_id)
+
+        if tagged_member is None:
+            await chatbot.member.send('Couldn\'t find the user you tagged... This is a bug! Please contact an admin.')
+            return
 
         if bot.roles['zombie'] in tagged_member.roles:
             await chatbot.member.send('%s is already a zombie! What are you up to?' % (tagged_member_data['Name']))
@@ -156,6 +164,10 @@ async def resolve_chat(chatbot): # Called when a ChatBot returns 1, showing it i
         tag_datetime = parser.parse(responses['Tag_Time'] + ' and 0 seconds', default=tag_day)
         responses['Tag_Time'] = tag_datetime.isoformat()
         responses['Log_Time'] = datetime.today().isoformat()
+
+        if tag_datetime > datetime.today():
+            chatbot.member.send('The tag time you stated is in the future. Try again.')
+            return 0
 
         db.add_row('tag_logging', responses)
         sheets.export_to_sheet('tag_logging')
