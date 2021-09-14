@@ -172,6 +172,16 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
         db.add_row('tag_logging', responses)
         sheets.export_to_sheet('tag_logging')
 
+        try:
+            await tagged_member.add_roles(bot.roles['zombie'])
+            await tagged_member.remove_roles(bot.roles['human'])
+        except discord.HTTPException as e:
+            chatbot.member.send('Couldn\'t change the tagged player\'s Discord role! Contact an admin.')
+            print('Tried to change user roles and failed --> ', e)
+
+        db.edit_member(tagged_member, 'faction', 'zombie')
+        sheets.export_to_sheet('members')
+
         msg = f'<@{tagged_user_id}> has turned zombie!\nTagged by <@{chatbot.member.id}>\n'
         msg += tag_datetime.strftime('%A, at about %I:%M %p')
         await bot.channels['tag-announcements'].send(msg)
