@@ -48,6 +48,7 @@ class HvzDb():
         try:
             c = conn.cursor()
             c.execute(create_table_sql)
+            self.conn.commit()
         except Error as e:
             print(e)
 
@@ -122,6 +123,22 @@ class HvzDb():
             row_dict[columns[c][0]] = x
 
         return row_dict
+
+    def edit_member(self, member, column, value):
+        member_id = member
+        if isinstance(member, discord.abc.User):
+            print('Was passed a user or member object')
+            member_id = member.id
+
+        sql = f'''UPDATE members
+                SET {column} = \'{value}\'
+                WHERE ID = \'{member_id}\'
+        '''
+        print('SQL --> ', sql)
+        cur = self.conn.cursor()
+        cur.execute(sql)
+        self.conn.commit()
+        print(cur.fetchall())
 
 
     def create_project(self, conn, project):
