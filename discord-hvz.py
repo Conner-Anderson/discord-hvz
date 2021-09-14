@@ -11,7 +11,7 @@ from dateutil import parser
 from dotenv import load_dotenv
 from os import getenv
 
-load_dotenv() # Load the Discord token from the .env file
+load_dotenv()  # Load the Discord token from the .env file
 token = getenv("TOKEN")
 
 logging.basicConfig(level=logging.INFO)
@@ -31,12 +31,12 @@ db = HvzDb()
 
 awaiting_chatbots = []
 
-@bot.listen() # Always using listen() because it allows multiple events to respond to one thing
+@bot.listen()  # Always using listen() because it allows multiple events to respond to one thing
 async def on_ready():
 
     sheets.setup(db)
 
-    bot.guild = bot.guilds[0] # This is the guild the bot is one. Does not yet support multiple
+    bot.guild = bot.guilds[0]  # This is the guild the bot is one. Does not yet support multiple
    
     # Updates the cache with all members and channels and roles
     await bot.guild.fetch_members(limit=500).flatten()
@@ -75,7 +75,7 @@ async def on_message(message):
         return
 
     if (message.channel.type == discord.ChannelType.private):
-        for i, chatbot in enumerate(awaiting_chatbots): # Check if the message could be part of an ongoing chat conversation
+        for i, chatbot in enumerate(awaiting_chatbots):  # Check if the message could be part of an ongoing chat conversation
             if chatbot.member == message.author:
                 result = await chatbot.take_response(message)
                 if result == 1:
@@ -96,7 +96,7 @@ async def on_raw_reaction_add(payload):
 
 @bot.command()
 @commands.has_role('Admin') # This means of checking the role is nice, but isn't flexible
-async def add(self, left: int, right: int): # A command for testing
+async def add(self, left: int, right: int):  # A command for testing
     """Adds two numbers together."""
     await self.send(left + right)
 
@@ -115,7 +115,7 @@ async def delete(ctx, member: str):
     else:
         await ctx.send('You must @mention a single server member to delete them.')
 
-async def resolve_chat(chatbot): # Called when a ChatBot returns 1, showing it is done
+async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it is done
 
     responses = {}
     for question in chatbot.questions:
@@ -128,7 +128,7 @@ async def resolve_chat(chatbot): # Called when a ChatBot returns 1, showing it i
         responses['id'] = str(chatbot.member.id)
 
         db.add_row('members', responses)
-        sheets.export_to_sheet('members') # I always update the Google sheet after changing a value in the db
+        sheets.export_to_sheet('members')  # I always update the Google sheet after changing a value in the db
 
     elif chatbot.chat_type == 'tag_logging':
 

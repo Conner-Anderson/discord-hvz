@@ -44,7 +44,7 @@ class ChatBot:
                 # Do stuff to finish the ChatBot
                 print('finished')
                 return 1
-            else: # User must be responding to the verification prompt
+            else:  # User must be responding to the verification prompt
                 for i, q in enumerate(self.questions):  # Iterate through question names to see if the user has named one to edit
                     print(q['name'])
                     if message.content.casefold().find(q['name'].casefold()) != -1:
@@ -65,7 +65,7 @@ class ChatBot:
         self.next_question += 1
 
         # This if sequence is a bit confusing, and could use rework
-        if self.verifying: # Set the next question to the end of the list and verify again
+        if self.verifying:  # Set the next question to the end of the list and verify again
             self.next_question = len(self.questions)
             await self.verify()
         elif (self.next_question >= len(self.questions)):
@@ -77,6 +77,6 @@ class ChatBot:
     async def verify(self):
         message = ('Please check over the info you provided. If it\'s good, type "Yes".'
             '\nIf not, type the name of what you want to change, such as "%s".\n\n' % (self.questions[0]['name']))
-        for q in self.questions: # Build a list of the questions and their responses
+        for q in self.questions:  # Build a list of the questions and their responses
             message += (q['name'] + ': ' + q['response'] + '\n')
         await self.member.send(message)
