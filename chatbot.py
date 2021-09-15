@@ -1,5 +1,6 @@
 import logging
 import json
+import yaml
 import regex
 
 logging.basicConfig(level=logging.INFO)
@@ -24,8 +25,9 @@ class ChatBot:
         self.chat_type = selection
 
         # Load questions from JSON file
-        file = open('questions.json', mode='r')
-        data = json.load(file)[self.chat_type]
+        file = open('questions.yml', mode='r')
+        raw_data = yaml.safe_load(file)
+        data = raw_data[self.chat_type]
         for i in data:
             i['response'] = None  # Add an empty response field to each question
             self.questions.append(i)
