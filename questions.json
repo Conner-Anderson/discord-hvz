@@ -31,7 +31,7 @@
       {
          "name":"Tag_Time",
          "query":"About what time did the tag happen? Use the format 3:04pm",
-         "valid_regex":"(?i)\\d{1,2}:\\d{2}\\s?(am|pm)",
+         "valid_regex":"(?i)\\d{1,2}:[0-5]?[0-9]\\s?(am|pm)",
          "rejection_response":"Try again. Please use a format like 12:26pm or 7:00 am"  
       }
    ]
