@@ -113,8 +113,12 @@ async def on_raw_reaction_add(payload):
 
 @slash.component_callback()
 async def register(ctx):
+    if db.get_member(ctx.author) is not None:
+        await ctx.author.send('You are already registered for HvZ! Contact an admin if you think this is wrong.')
+        await ctx.edit_origin()
+        return
     chatbot = ChatBot(ctx.author, 'registration')
-    await ctx.edit_origin()
+    await ctx.edit_origin()  # Appeases the component system into thinking the component succeeded. 
     await chatbot.ask_question()
     awaiting_chatbots.append(chatbot)
 
@@ -139,8 +143,6 @@ async def on_member_update(before, after):
         elif human and not zombie:
             db.edit_member(after, 'faction', 'human')
             sheets.export_to_sheet('members')
-
-
 
 @bot.command()
 @commands.has_role('Admin')  # This means of checking the role is nice, but isn't flexible
@@ -185,6 +187,8 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
 
         db.add_row('members', responses)
         sheets.export_to_sheet('members')  # I always update the Google sheet after changing a value in the db
+
+        await chatbot.member.add_roles(bot.roles['human'])
 
     elif chatbot.chat_type == 'tag_logging':
 

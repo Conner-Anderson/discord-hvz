@@ -93,7 +93,7 @@ class HvzDb():
     def get_member(self, member):
         # Returns a row<list> from the database. Takes a member object or id.
         member_id = member
-        if isinstance(member, discord.User):
+        if isinstance(member, discord.abc.User):
             member_id = member.id
 
         sql = f'SELECT * FROM members WHERE ID = {member_id}'
@@ -102,7 +102,7 @@ class HvzDb():
             member_row = cur.execute(sql).fetchone()
         except Exception as e:
             print(e)
-            return 0
+            return None
         return member_row
 
     def get_row(self, table, column, value):
