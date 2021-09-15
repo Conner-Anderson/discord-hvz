@@ -59,7 +59,7 @@ async def on_ready():
             print(f'{x} role not found!')
 
     bot.channels = {}
-    needed_channels = ['tag-announcements', 'report-tags-here']  # Should eventually be a config or setup procedure
+    needed_channels = ['tag-announcements', 'report-tags-here', 'landing']  # Should eventually be a config or setup procedure
     for i, x in enumerate(needed_channels):
         for c in bot.guild.channels:
             if c.name.lower() == x:
@@ -79,6 +79,21 @@ async def on_ready():
             ]
             action_row = create_actionrow(*buttons)
             await m.edit(content='---', components=[action_row])
+            break
+    else:
+        print('No message found to edit')
+
+    messages = await bot.channels['landing'].history(limit=100, oldest_first=True).flatten()
+    for i, m in enumerate(messages):
+        if bot.user == m.author:
+            buttons = [
+                create_button(
+                    style=ButtonStyle.green,
+                    label='Register for HvZ'
+                )
+            ]
+            action_row = create_actionrow(*buttons)
+            await m.edit(content='Use this button, then check your Direct Messages!', components=[action_row])
             break
     else:
         print('No message found to edit')
@@ -116,9 +131,11 @@ async def on_raw_reaction_add(payload):
 
 @bot.event
 async def on_component(ctx):
-    print(ctx)
-   # for i, buttonbot in enumerate(awaiting_buttonbots):
-     #   if button
+    # await ctx.defer(edit_origin=True)
+    chatbot = ChatBot(ctx.author, 'tag_logging')
+    await ctx.edit_origin(content='---')
+    await chatbot.ask_question()
+    awaiting_chatbots.append(chatbot)
 
 @bot.listen()
 async def on_member_update(before, after):
@@ -235,6 +252,10 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
         msg = f'<@{tagged_user_id}> has turned zombie!\nTagged by <@{chatbot.member.id}>\n'
         msg += tag_datetime.strftime('%A, at about %I:%M %p')
         await bot.channels['tag-announcements'].send(msg)
+
+def dump(obj):
+    for attr in dir(obj):
+        print("obj.%s = %r" % (attr, getattr(obj, attr)))
 
 
 bot.run(token)
