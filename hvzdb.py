@@ -108,21 +108,19 @@ class HvzDb():
     def get_row(self, table, column, value):
         # Returns the first row that matches. The row is a dict, where the keys are column names
         print(self, table, column, value)
-
+        output = None
         sql = f'''SELECT * FROM {table}
                 WHERE {column} = \'{value}\''''
         cur = self.conn.cursor()
-        try:
-            row = cur.execute(sql).fetchone()
-        except Exception as e:
-            print(e)
-            return 0
-        columns = cur.description
-        row_dict = {}
-        for c, x in enumerate(row):
-            row_dict[columns[c][0]] = x
 
-        return row_dict
+        row = cur.execute(sql).fetchone()
+        if row is not None:
+            columns = cur.description
+            output = {}
+            for c, x in enumerate(row):
+                output[columns[c][0]] = x
+
+        return output
 
     def edit_member(self, member, column, value):
         member_id = member

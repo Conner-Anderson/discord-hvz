@@ -15,6 +15,9 @@ from discord_slash import SlashCommand
 from dotenv import load_dotenv
 from os import getenv
 
+import string
+import random
+
 load_dotenv()  # Load the Discord token from the .env file
 token = getenv("TOKEN")
 
@@ -196,6 +199,23 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
     if chatbot.chat_type == 'registration':
         responses['faction'] = 'human'
         responses['id'] = str(chatbot.member.id)
+
+        tag_code = ''
+        try:
+            while True:
+                code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '01IOUDQV'))
+                for n in range(6):
+                    tag_code += code_set[random.randint(0, len(code_set) - 1)]
+                if db.get_row('members', 'tag_code', tag_code) is None:
+                    break
+                else:
+                    tag_code = ''
+        except Exception as e:
+            chatbot.member.send('Could not generate your tag code. This is a bug! Contact an admin.')
+            print('Error generating tag code --> ', e)
+            return
+
+        responses['tag_code'] = tag_code
 
         db.add_row('members', responses)
         sheets.export_to_sheet('members')  # I always update the Google sheet after changing a value in the db
