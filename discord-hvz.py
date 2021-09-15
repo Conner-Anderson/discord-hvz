@@ -117,6 +117,12 @@ async def register(ctx):
         await ctx.author.send('You are already registered for HvZ! Contact an admin if you think this is wrong.')
         await ctx.edit_origin()
         return
+
+    for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
+        if (c.member == ctx.author) and c.chat_type == 'registration':
+            await ctx.author.send('**Restarting registration process...**')
+            awaiting_chatbots.pop(i)
+
     chatbot = ChatBot(ctx.author, 'registration')
     await ctx.edit_origin()  # Appeases the component system into thinking the component succeeded. 
     await chatbot.ask_question()
@@ -124,6 +130,12 @@ async def register(ctx):
 
 @slash.component_callback()
 async def tag_log(ctx):
+
+    for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
+        if (c.member == ctx.author) and c.chat_type == 'tag_logging':
+            await ctx.author.send('**Restarting tag logging process...**')
+            awaiting_chatbots.pop(i)
+
     chatbot = ChatBot(ctx.author, 'tag_logging')
     await ctx.edit_origin()
     await chatbot.ask_question()
