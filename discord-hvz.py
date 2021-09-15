@@ -8,6 +8,10 @@ from datetime import timedelta
 from datetime import datetime
 from dateutil import parser
 
+from discord_slash.utils.manage_components import create_button, create_actionrow
+from discord_slash.model import ButtonStyle
+from discord_slash import SlashCommand
+
 from dotenv import load_dotenv
 from os import getenv
 
@@ -26,6 +30,7 @@ logger.addHandler(handler)
 intents = discord.Intents.default()
 intents.members = True
 bot = commands.Bot(command_prefix='!', description='Discord HvZ Bot!', intents=intents)
+slash = SlashCommand(bot, sync_commands=True)  # Declares slash commands through the client.
 
 db = HvzDb()
 
@@ -54,7 +59,7 @@ async def on_ready():
             print(f'{x} role not found!')
 
     bot.channels = {}
-    needed_channels = ['tag-announcements']  # Should eventually be a config or setup procedure
+    needed_channels = ['tag-announcements', 'report-tags-here', 'landing']  # Should eventually be a config or setup procedure
     for i, x in enumerate(needed_channels):
         for c in bot.guild.channels:
             if c.name.lower() == x:
@@ -62,6 +67,23 @@ async def on_ready():
                 break
         else:
             print(f'{x} channel not found!')
+
+    button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ!', 
+                        create_button(style=ButtonStyle.green, label='Register for HvZ', custom_id='register')],
+                    'report-tags-here': ['---', 
+                    create_button(style=ButtonStyle.green, label='Report Tag', custom_id='tag_log')]}
+
+
+    for channel, buttons in button_messages.items():
+        messages = await bot.channels[channel].history(limit=100, oldest_first=True).flatten()
+        content = buttons.pop(0)
+        action_row = create_actionrow(*buttons)
+        for i, m in enumerate(messages):
+            if bot.user == m.author:
+                await m.edit(content=content, components=[action_row])
+                break
+        else:
+            await bot.channels[channel].send(content=content, components=[action_row])
 
 
     print('Logged in as')
@@ -86,13 +108,23 @@ async def on_message(message):
 # Occurs when a reaction happens. Using the raw version so old messages not in the cache work fine.
 @bot.listen()
 async def on_raw_reaction_add(payload):
-    # Searches guild cache for the member.
-    for m in bot.guild.members:
-        if m.id == payload.user_id:
-            chatbot = ChatBot(m, "tag_logging")
-            await chatbot.ask_question()
-            awaiting_chatbots.append(chatbot)
-            break
+    # Old function, might use later
+    return
+
+@slash.component_callback()
+async def register(ctx):
+    chatbot = ChatBot(ctx.author, 'registration')
+    await ctx.edit_origin()
+    await chatbot.ask_question()
+    awaiting_chatbots.append(chatbot)
+
+@slash.component_callback()
+async def tag_log(ctx):
+    chatbot = ChatBot(ctx.author, 'tag_logging')
+    await ctx.edit_origin()
+    await chatbot.ask_question()
+    awaiting_chatbots.append(chatbot)
+
 
 @bot.listen()
 async def on_member_update(before, after):
@@ -112,9 +144,17 @@ async def on_member_update(before, after):
 
 @bot.command()
 @commands.has_role('Admin')  # This means of checking the role is nice, but isn't flexible
-async def add(self, left: int, right: int):  # A command for testing
+async def add(ctx, left: int, right: int):  # A command for testing
     """Adds two numbers together."""
-    await self.send(left + right)
+    buttons = [
+        create_button(
+            style=ButtonStyle.green,
+            label="A Green Button"
+        ),
+    ]
+    action_row = create_actionrow(*buttons)
+    await ctx.send(left + right, components=[action_row])
+    await ctx.send(left + right)
 
 @bot.group()
 @commands.has_role('Admin')
@@ -201,6 +241,10 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
         msg = f'<@{tagged_user_id}> has turned zombie!\nTagged by <@{chatbot.member.id}>\n'
         msg += tag_datetime.strftime('%A, at about %I:%M %p')
         await bot.channels['tag-announcements'].send(msg)
+
+def dump(obj):
+    for attr in dir(obj):
+        print("obj.%s = %r" % (attr, getattr(obj, attr)))
 
 
 bot.run(token)
