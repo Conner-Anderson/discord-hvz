@@ -134,6 +134,11 @@ async def register(ctx):
 @slash.component_callback()
 async def tag_log(ctx):
 
+    if bot.roles['zombie'] not in ctx.author.roles:
+        await ctx.author.send('Only zombies can make tags! Silly human with your silly brains.')
+        await ctx.edit_origin()
+        return
+
     for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
         if (c.member == ctx.author) and c.chat_type == 'tag_logging':
             await ctx.author.send('**Restarting tag logging process...**')
