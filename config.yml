@@ -1,0 +1,10 @@
+# Configuration file for the discord-hvz bot, in YAML format. These settings only apply on program start.
+# YAML Reference: https://camel.readthedocs.io/en/latest/yamlref.html
+
+# The server for the bot to activate on. Only one at a time. Must be in available_servers
+active_server: dev
+
+# A dictionary of servers and their ids. 
+available_servers:
+  dev: 767126786617114635
+  letu: 760568283723202630

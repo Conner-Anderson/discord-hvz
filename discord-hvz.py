@@ -1,22 +1,25 @@
-import logging
+from config import config
 import sheets
 from chatbot import ChatBot
 from hvzdb import HvzDb
+
+import logging
+
 import discord
 from discord.ext import commands
+
 from datetime import timedelta
 from datetime import datetime
 from dateutil import parser
-
 from discord_slash.utils.manage_components import create_button, create_actionrow
 from discord_slash.model import ButtonStyle
 from discord_slash import SlashCommand
-
 from dotenv import load_dotenv
 from os import getenv
 
 import string
 import random
+import sys
 
 load_dotenv()  # Load the Discord token from the .env file
 token = getenv("TOKEN")
@@ -42,9 +45,15 @@ awaiting_chatbots = []
 @bot.listen()  # Always using listen() because it allows multiple events to respond to one thing
 async def on_ready():
 
-    sheets.setup(db)
+    for guild in bot.guilds:
+        if guild.id == config['available_servers'][config['active_server']]:
+            bot.guild = guild
+            break
+    else:
+        print('Cannot find a valid server. Check config.yml')
+        sys.exit()
 
-    bot.guild = bot.guilds[0]  # This is the guild the bot is one. Does not yet support multiple
+    sheets.setup(db)
    
     # Updates the cache with all members and channels and roles
     await bot.guild.fetch_members(limit=500).flatten()
