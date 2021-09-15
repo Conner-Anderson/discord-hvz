@@ -67,36 +67,23 @@ async def on_ready():
                 break
         else:
             print(f'{x} channel not found!')
-    # Edit the first bot message of the tag report channel to include a button
-    messages = await bot.channels['report-tags-here'].history(limit=100, oldest_first=True).flatten()
-    for i, m in enumerate(messages):
-        if bot.user == m.author:
-            buttons = [
-                create_button(
-                    style=ButtonStyle.green,
-                    label="Report Tag"
-                ),
-            ]
-            action_row = create_actionrow(*buttons)
-            await m.edit(content='---', components=[action_row])
-            break
-    else:
-        print('No message found to edit')
 
-    messages = await bot.channels['landing'].history(limit=100, oldest_first=True).flatten()
-    for i, m in enumerate(messages):
-        if bot.user == m.author:
-            buttons = [
-                create_button(
-                    style=ButtonStyle.green,
-                    label='Register for HvZ'
-                )
-            ]
-            action_row = create_actionrow(*buttons)
-            await m.edit(content='Use this button, then check your Direct Messages!', components=[action_row])
-            break
-    else:
-        print('No message found to edit')
+    button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ!', 
+                        create_button(style=ButtonStyle.green, label='Register for HvZ', custom_id='register')],
+                    'report-tags-here': ['---', 
+                    create_button(style=ButtonStyle.green, label='Report Tag', custom_id='tag_log')]}
+
+
+    for channel, buttons in button_messages.items():
+        messages = await bot.channels[channel].history(limit=100, oldest_first=True).flatten()
+        content = buttons.pop(0)
+        action_row = create_actionrow(*buttons)
+        for i, m in enumerate(messages):
+            if bot.user == m.author:
+                await m.edit(content=content, components=[action_row])
+                break
+        else:
+            await bot.channels[channel].send(content=content, components=[action_row])
 
 
     print('Logged in as')
@@ -121,21 +108,23 @@ async def on_message(message):
 # Occurs when a reaction happens. Using the raw version so old messages not in the cache work fine.
 @bot.listen()
 async def on_raw_reaction_add(payload):
-    # Searches guild cache for the member.
-    for m in bot.guild.members:
-        if m.id == payload.user_id:
-            chatbot = ChatBot(m, "tag_logging")
-            await chatbot.ask_question()
-            awaiting_chatbots.append(chatbot)
-            break
+    # Old function, might use later
+    return
 
-@bot.event
-async def on_component(ctx):
-    # await ctx.defer(edit_origin=True)
-    chatbot = ChatBot(ctx.author, 'tag_logging')
-    await ctx.edit_origin(content='---')
+@slash.component_callback()
+async def register(ctx):
+    chatbot = ChatBot(ctx.author, 'registration')
+    await ctx.edit_origin()
     await chatbot.ask_question()
     awaiting_chatbots.append(chatbot)
+
+@slash.component_callback()
+async def tag_log(ctx):
+    chatbot = ChatBot(ctx.author, 'tag_logging')
+    await ctx.edit_origin()
+    await chatbot.ask_question()
+    awaiting_chatbots.append(chatbot)
+
 
 @bot.listen()
 async def on_member_update(before, after):
