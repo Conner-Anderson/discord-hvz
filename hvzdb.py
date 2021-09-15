@@ -13,7 +13,9 @@ class HvzDb():
                                             Name text NOT NULL,
                                             CPO text,
                                             Faction text,
-                                            Tag_Code text
+                                            Tag_Code text,
+                                            OZ_Desire text,
+                                            Email text
                                         ); """
 
         sql_create_tasks_table = """CREATE TABLE IF NOT EXISTS tag_logging (

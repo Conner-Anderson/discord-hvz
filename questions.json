@@ -3,15 +3,27 @@
    [
       {
          "name":"Name",
-         "query":"What is your name?",
+         "query":"I\\'ll register you for HvZ!\nWhat is your name? Use the name you would use on homework.",
          "valid_regex":"\\D*",
          "rejection_response":"No numbers allowed in names."
       },
       {
          "name":"CPO",
-         "query":"What is your CPO?",
-         "valid_regex":"\\d*",
-         "rejection_response":"I'm looking for a single number here, nothing else."
+         "query":"What is your CPO? This is used for player band delivery.\nIf you don\\'t have one (such as commuters), please type \"None\"",
+         "valid_regex":"(?i)\\d*|none",
+         "rejection_response":"I'm looking for a single number here, or None. Try again."
+      },
+      {
+         "name":"email",
+         "query":"What is your @LETU.edu email?",
+         "valid_regex":"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$)",
+         "rejection_response":"That isn\\'t a valid email. Try again."
+      },
+      {
+         "name":"oz_desire",
+         "query":"Do you want a chance to be one of the original zombies? If chosen, you won\\'t be a human this game.\nAnswer \"yes\" or \"no\".",
+         "valid_regex":"(?i)\\s*(yes|no)\\s*",
+         "rejection_response":"Just need a yes or no here."
       }
    ],
    "tag_logging":
