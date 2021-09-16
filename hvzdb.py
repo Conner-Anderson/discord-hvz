@@ -2,6 +2,8 @@ import sqlite3
 from sqlite3 import Error
 import discord
 
+# TODO: convert this to use SQLAlchemy, an ORM
+
 class HvzDb():
     def __init__(self):
         database = r"hvzdb.db"

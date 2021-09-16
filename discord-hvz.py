@@ -4,6 +4,7 @@ from chatbot import ChatBot
 from hvzdb import HvzDb
 
 import logging
+import time
 
 import discord
 from discord.ext import commands
@@ -44,64 +45,70 @@ awaiting_chatbots = []
 
 @bot.listen()  # Always using listen() because it allows multiple events to respond to one thing
 async def on_ready():
+    try:
+        try:
+            for guild in bot.guilds:
+                if guild.id == config['available_servers'][config['active_server']]:
+                    bot.guild = guild
+                    break
+        except Exception as e:
+            raise Exception(f'Cannot find a valid server. Check config.yml. Error --> {e}')
 
-    for guild in bot.guilds:
-        if guild.id == config['available_servers'][config['active_server']]:
-            bot.guild = guild
-            break
-    else:
-        print('Cannot find a valid server. Check config.yml')
-        sys.exit()
+        sheets.setup(db)
+       
+        # Updates the cache with all members and channels and roles
+        await bot.guild.fetch_members(limit=500).flatten()
+        await bot.guild.fetch_channels()
+        await bot.guild.fetch_roles()
 
-    sheets.setup(db)
-   
-    # Updates the cache with all members and channels and roles
-    await bot.guild.fetch_members(limit=500).flatten()
-    await bot.guild.fetch_channels()
-    await bot.guild.fetch_roles()
+        bot.roles = {}
+        needed_roles = ['admin', 'zombie', 'human', 'guest']
+        for i, x in enumerate(needed_roles):
+            for r in bot.guild.roles:
+                if r.name.lower() == x:
+                    bot.roles[x] = r
+                    break
+            else:
+                raise Exception(f'{x} role not found!')
 
-    bot.roles = {}
-    needed_roles = ['admin', 'zombie', 'human', 'guest']
-    for i, x in enumerate(needed_roles):
-        for r in bot.guild.roles:
-            if r.name.lower() == x:
-                bot.roles[x] = r
-                break
-        else:
-            print(f'{x} role not found!')
+        bot.channels = {}
+        needed_channels = ['tag-announcements', 'report-tags-here', 'landing']  # Should eventually be a config or setup procedure
+        for i, x in enumerate(needed_channels):
+            for c in bot.guild.channels:
+                if c.name.lower() == x:
+                    bot.channels[x] = c
+                    break
+            else:
+                raise Exception(f'{x} channel not found!')
 
-    bot.channels = {}
-    needed_channels = ['tag-announcements', 'report-tags-here', 'landing']  # Should eventually be a config or setup procedure
-    for i, x in enumerate(needed_channels):
-        for c in bot.guild.channels:
-            if c.name.lower() == x:
-                bot.channels[x] = c
-                break
-        else:
-            print(f'{x} channel not found!')
+        button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ!', 
+                            create_button(style=ButtonStyle.green, label='Register for HvZ', custom_id='register')],
+                        'report-tags-here': ['---', 
+                        create_button(style=ButtonStyle.green, label='Report Tag', custom_id='tag_log')]}
 
-    button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ!', 
-                        create_button(style=ButtonStyle.green, label='Register for HvZ', custom_id='register')],
-                    'report-tags-here': ['---', 
-                    create_button(style=ButtonStyle.green, label='Report Tag', custom_id='tag_log')]}
-
-
-    for channel, buttons in button_messages.items():
-        messages = await bot.channels[channel].history(limit=100, oldest_first=True).flatten()
-        content = buttons.pop(0)
-        action_row = create_actionrow(*buttons)
-        for i, m in enumerate(messages):
-            if bot.user == m.author:
-                await m.edit(content=content, components=[action_row])
-                break
-        else:
-            await bot.channels[channel].send(content=content, components=[action_row])
+        try:
+            for channel, buttons in button_messages.items():
+                messages = await bot.channels[channel].history(limit=100, oldest_first=True).flatten()
+                content = buttons.pop(0)
+                action_row = create_actionrow(*buttons)
+                for i, m in enumerate(messages):
+                    if bot.user == m.author:
+                        await m.edit(content=content, components=[action_row])
+                        break
+                else:  # If there is no message to edit, make one.
+                    await bot.channels[channel].send(content=content, components=[action_row])
+        except KeyError as e:
+            raise KeyError(f'Could not find the channel {e}!')  # A bit redundant
 
 
-    print('Logged in as')
-    print(bot.user.name)
-    print(bot.user.id)
-    print('------')
+        print('Discord-HvZ bot launched! Logged in as:')
+        print(bot.user.name)
+        print(bot.user.id)
+        print('------')
+    except Exception as e:
+        print(f'Bot startup failed with this error --> {e}')
+        await bot.close()
+        time.sleep(1)
 
 @bot.listen()
 async def on_message(message):
@@ -295,6 +302,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
 def dump(obj):
     for attr in dir(obj):
         print("obj.%s = %r" % (attr, getattr(obj, attr)))
+
 
 
 bot.run(token)
