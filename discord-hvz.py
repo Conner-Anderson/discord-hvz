@@ -183,7 +183,14 @@ async def on_member_update(before, after):
 @bot.command()
 @commands.has_role('Admin')  # This means of checking the role is nice, but isn't flexible
 async def add(ctx, left: int, right: int):  # A command for testing
-    """Adds two numbers together."""
+    '''
+    This is a test command.
+
+    :param param1: this is a first param
+    :param param2: this is a second param
+    :returns: this is a description of what is returned
+    :raise
+    '''
     buttons = [
         create_button(
             style=ButtonStyle.green,
@@ -194,17 +201,26 @@ async def add(ctx, left: int, right: int):  # A command for testing
     await ctx.send(left + right, components=[action_row])
     await ctx.send(left + right)
 
-@bot.group(description='A group of commands for interacting with members.', help='Manages members.')
+@bot.group(description='A group of commands for interacting with members.')
 @commands.has_role('Admin')
-async def member(ctx):  # A group command. Used like "!member delete @Wookieguy"
+async def member(ctx):
+    '''
+    A group of commands to manage members.
+
+    Example command: !member delete @Wookieguy
+    '''
     if ctx.invoked_subcommand is None:
         await ctx.send('Invalid command passed...')
 
-@member.command(
-    help='Deletes members from the game.',
-    description='Deletes all members @mentioned from the game. They remain on the Discord server, but their human and zombie roles are revoked.')
+@member.command()
 @commands.has_role('Admin')
 async def delete(ctx, list_of_members: str):
+    '''
+    Removes all @mentioned members from the game.
+
+    Take any number of @mentioned Discord users and both removes them from the game database
+    and revokes their human/zombie roles. They still remain on the server and in tag records.
+    '''
     try:
         if not len(ctx.message.mentions) == 0:
             for member in ctx.message.mentions:
