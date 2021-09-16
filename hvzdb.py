@@ -100,6 +100,7 @@ class HvzDb():
 
     def get_member(self, member):
         # Returns a row<list> from the database. Takes a member object or id.
+        output_row = {}
         member_id = member
         if isinstance(member, discord.abc.User):
             member_id = member.id
@@ -107,11 +108,13 @@ class HvzDb():
         sql = f'SELECT * FROM members WHERE ID = {member_id}'
         cur = self.conn.cursor()
         try:
-            member_row = cur.execute(sql).fetchone()
-        except Exception as e:
-            print(e)
-            return None
-        return member_row
+            row = cur.execute(sql).fetchone()
+            columns = cur.description
+            for c, x in enumerate(row):
+                output_row[columns[c][0]] = x
+        except sqlite3.OperationalError as e:
+            raise ValueError(e)
+        return output_row
 
     def get_row(self, table, column, value):
         # Returns the first row that matches. The row is a dict, where the keys are column names
@@ -131,17 +134,20 @@ class HvzDb():
         return output
 
     def edit_member(self, member, column, value):
-        member_id = member
-        if isinstance(member, discord.abc.User):
-            member_id = member.id
+        try:
+            member_id = member
+            if isinstance(member, discord.abc.User):
+                member_id = member.id
 
-        sql = f'''UPDATE members
-                SET {column} = \'{value}\'
-                WHERE ID = \'{member_id}\'
-        '''
-        cur = self.conn.cursor()
-        cur.execute(sql)
-        self.conn.commit()
+            sql = f'''UPDATE members
+                    SET {column} = \'{value}\'
+                    WHERE ID = \'{member_id}\'
+            '''
+            cur = self.conn.cursor()
+            cur.execute(sql)
+            self.conn.commit()
+        except sqlite3.OperationalError as e:
+            raise ValueError(e)
 
 
     def create_project(self, conn, project):
@@ -152,3 +158,6 @@ class HvzDb():
         cur.execute(sql, project)
         self.conn.commit()
         return cur.lastrowid
+
+    class DBError(Exception):
+        pass

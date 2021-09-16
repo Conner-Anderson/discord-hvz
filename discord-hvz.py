@@ -22,6 +22,7 @@ import string
 import random
 import sys
 
+
 load_dotenv()  # Load the Discord token from the .env file
 token = getenv("TOKEN")
 
@@ -132,7 +133,7 @@ async def on_raw_reaction_add(payload):
 
 @slash.component_callback()
 async def register(ctx):
-    if db.get_member(ctx.author) is not None:
+    if len(db.get_member(ctx.author)) != 0:
         await ctx.author.send('You are already registered for HvZ! Contact an admin if you think this is wrong.')
         await ctx.edit_origin()
         return
@@ -245,11 +246,18 @@ async def edit(ctx, member: str, attribute: str, value: str):
     '''
     if not len(ctx.message.mentions) == 1:
         await ctx.send('You must @mention a single member to edit.')
+        return
+    member = ctx.message.mentions[0]
     try:
-        db.edit_member(ctx.message.mentions[0], attribute, value)
+        original_value = db.get_row('members', 'ID', member.id)[attribute]
+        db.edit_member(member, attribute, value)
+        await ctx.send(f'The value of {attribute} for <@{member.id}> was changed from {original_value} to {value}.')
+
+    except ValueError as e:
+        await ctx.send(f'Bad command! Error: {e}')
     except Exception as e:
-        print(e)
-        await ctx.send(f'Command error! Let an admin know. Error: {e}')
+        await ctx.send(f'Fatal dataase error! --> {e}')
+        raise
 
 async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it is done
 
@@ -344,7 +352,6 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
 def dump(obj):
     for attr in dir(obj):
         print("obj.%s = %r" % (attr, getattr(obj, attr)))
-
 
 
 bot.run(token)
