@@ -1,3 +1,4 @@
+from config import config
 from __future__ import print_function
 import os.path
 from googleapiclient.discovery import build
@@ -11,7 +12,7 @@ logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 # ID of Google Sheet: can be taken from the sheet address. Google account must have permission
-SPREADSHEET_ID = '1YUXeRoEpV9MukZ7B_xVlBkc-D6DNEfVxLBmJlf1Fm-0'
+SPREADSHEET_ID = config['export_sheet_id']
 SAMPLE_RANGE_NAME = 'Output!A2:B'
 
 def setup(db):
@@ -45,11 +46,13 @@ def setup(db):
     DB = db
 
 
-
 def export_to_sheet(table_name):
     values = DB.get_table(table_name)
+
+    # Temporary fix until we make the database system for variable
+    sheet_names = {'registration': config['members_sheet_name'], 'tag_logging': config['tag_log_sheet_name']}
     # Erases entire sheet below row 1!
-    SPREADSHEETS.values().clear(spreadsheetId=SPREADSHEET_ID, range='\'%s\'!A1:ZZZ' % (table_name)).execute()
+    SPREADSHEETS.values().clear(spreadsheetId=SPREADSHEET_ID, range=f'\'{sheet_names[table_name]}\'!A1:ZZZ').execute()
 
     body = {'values': values}
 
