@@ -194,20 +194,29 @@ async def add(ctx, left: int, right: int):  # A command for testing
     await ctx.send(left + right, components=[action_row])
     await ctx.send(left + right)
 
-@bot.group()
+@bot.group(description='A group of commands for interacting with members.', help='Manages members.')
 @commands.has_role('Admin')
 async def member(ctx):  # A group command. Used like "!member delete @Wookieguy"
     if ctx.invoked_subcommand is None:
         await ctx.send('Invalid command passed...')
 
-@member.command()
+@member.command(
+    help='Deletes members from the game.',
+    description='Deletes all members @mentioned from the game. They remain on the Discord server, but their human and zombie roles are revoked.')
 @commands.has_role('Admin')
-async def delete(ctx, member: str):
-    if len(ctx.message.mentions) == 1:
-        user_id = ctx.message.mentions[0].id
-        db.delete_row('members', user_id)
-    else:
-        await ctx.send('You must @mention a single server member to delete them.')
+async def delete(ctx, list_of_members: str):
+    try:
+        if not len(ctx.message.mentions) == 0:
+            for member in ctx.message.mentions:
+                await member.remove_roles(bot.roles['human'])
+                await member.remove_roles(bot.roles['zombie'])
+                db.delete_row('members', member)
+                sheets.export_to_sheet('members')
+        else:
+            await ctx.send('You must @mention a list of server members to delete them.')
+    except Exception as e:
+        print(e)
+        await ctx.send(f'Command error! Let an admin know. Error: {e}')
 
 async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it is done
 
