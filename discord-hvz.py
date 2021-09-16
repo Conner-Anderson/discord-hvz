@@ -234,6 +234,23 @@ async def delete(ctx, list_of_members: str):
         print(e)
         await ctx.send(f'Command error! Let an admin know. Error: {e}')
 
+@member.command()
+@commands.has_role('Admin')
+async def edit(ctx, member: str, attribute: str, value: str):
+    '''
+    Edits one attribute of a member
+
+    Valid attributes are the column names in the database, which can be found in exported Google Sheets.
+    There is no validation to check if the value you provide will work, so be careful! 
+    '''
+    if not len(ctx.message.mentions) == 1:
+        await ctx.send('You must @mention a single member to edit.')
+    try:
+        db.edit_member(ctx.message.mentions[0], attribute, value)
+    except Exception as e:
+        print(e)
+        await ctx.send(f'Command error! Let an admin know. Error: {e}')
+
 async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it is done
 
     responses = {}
