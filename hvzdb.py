@@ -75,10 +75,14 @@ class HvzDb():
         self.conn.commit()
         return cur.lastrowid
 
-    def delete_row(self, table, user_id):
+    def delete_row(self, table, member):
+
+        member_id = member
+        if isinstance(member, discord.abc.User):
+            member_id = member.id
 
         sql = f''' DELETE FROM {table}
-                WHERE ID = {user_id};
+                WHERE ID = {member_id};
         '''
 
         cur = self.conn.cursor()
