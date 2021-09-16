@@ -50,7 +50,7 @@ def export_to_sheet(table_name):
     values = DB.get_table(table_name)
 
     # Temporary fix until we make the database system for variable
-    sheet_names = {'registration': config['members_sheet_name'], 'tag_logging': config['tag_log_sheet_name']}
+    sheet_names = {'members': config['members_sheet_name'], 'tag_logging': config['tag_log_sheet_name']}
     # Erases entire sheet below row 1!
     SPREADSHEETS.values().clear(spreadsheetId=SPREADSHEET_ID, range=f'\'{sheet_names[table_name]}\'!A1:ZZZ').execute()
 
