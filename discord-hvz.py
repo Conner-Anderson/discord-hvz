@@ -1,3 +1,5 @@
+#!/bin/python3
+
 from config import config
 import sheets
 from chatbot import ChatBot
