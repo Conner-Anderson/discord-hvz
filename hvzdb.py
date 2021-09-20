@@ -109,9 +109,10 @@ class HvzDb():
         cur = self.conn.cursor()
         try:
             row = cur.execute(sql).fetchone()
-            columns = cur.description
-            for c, x in enumerate(row):
-                output_row[columns[c][0]] = x
+            if row is not None:
+                columns = cur.description
+                for c, x in enumerate(row):
+                    output_row[columns[c][0]] = x
         except sqlite3.OperationalError as e:
             raise ValueError(e)
         return output_row
