@@ -1,5 +1,4 @@
 import logging
-import json
 import yaml
 import regex
 
@@ -24,7 +23,7 @@ class ChatBot:
         self.verifying = False
         self.chat_type = selection
 
-        # Load questions from JSON file
+        # Load questions from YAML file
         file = open('questions.yml', mode='r')
         raw_data = yaml.safe_load(file)
         data = raw_data[self.chat_type]
@@ -48,8 +47,8 @@ class ChatBot:
                 return 1
             else:  # User must be responding to the verification prompt
                 for i, q in enumerate(self.questions):  # Iterate through question names to see if the user has named one to edit
-                    print(q['name'])
-                    if message.content.casefold().find(q['name'].casefold()) != -1:
+                    pattern = q['name'] + '|' + q['display_name']
+                    if regex.search(pattern, message.content, flags=regex.I) is not None:
                         self.next_question = i  # Set the selection of the question to edit
                         await self.ask_question()
                         return
@@ -78,7 +77,7 @@ class ChatBot:
 
     async def verify(self):
         message = ('Please check over the info you provided. If it\'s good, type "Yes".'
-            '\nIf not, type the name of what you want to change, such as "%s".\n\n' % (self.questions[0]['name']))
+            '\nIf not, type the name of what you want to change, such as "%s".\n\n' % (self.questions[0]['display_name']))
         for q in self.questions:  # Build a list of the questions and their responses
-            message += (q['name'] + ': ' + q['response'] + '\n')
+            message += (q['display_name'] + ': ' + q['response'] + '\n')
         await self.member.send(message)

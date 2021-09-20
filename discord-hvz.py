@@ -301,13 +301,13 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             await chatbot.member.send('Hold up... you\'re a  human! You can\'t tag anyone. The zombie who tagged you may not have logged their tag')
             return 0
 
-        tagged_member_data = db.get_row('members', 'Tag_Code', responses['Tag_Code'])
+        tagged_member_data = db.get_row('members', 'tag_code', responses['tag_code'])
 
         if not tagged_member_data:
             await chatbot.member.send('That tag code doesn\'t match anyone! Try again.')
             return 0
 
-        tagged_user_id = int(tagged_member_data['ID'])
+        tagged_user_id = int(tagged_member_data['id'])
 
         if tagged_user_id == 0:
             await chatbot.member.send('Something went wrong with the database... This is a bug! Please contact an admin.')
