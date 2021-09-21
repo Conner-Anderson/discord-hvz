@@ -120,7 +120,12 @@ async def on_message(message):
     if (message.channel.type == discord.ChannelType.private):
         for i, chatbot in enumerate(awaiting_chatbots):  # Check if the message could be part of an ongoing chat conversation
             if chatbot.member == message.author:
-                result = await chatbot.take_response(message)
+                try:
+                    result = await chatbot.take_response(message)
+                except Exception as e:
+                    print(f'Exception in take_response() --> {e}')
+                    await message.author.send('There was an error when running the registration bot! Report this to an admin with details.')
+                    return
                 if result == 1:
                     await resolve_chat(chatbot)
                     awaiting_chatbots.pop(i)
@@ -278,7 +283,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
         tag_code = ''
         try:
             while True:
-                code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '01IOUDQV'))
+                code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '015IOUDQVS'))
                 for n in range(6):
                     tag_code += code_set[random.randint(0, len(code_set) - 1)]
                 if db.get_row('members', 'tag_code', tag_code) is None:

@@ -39,7 +39,7 @@ class ChatBot:
     async def ask_question(self):
         msg = ''
         if (not self.verifying) and (self.next_question == 0):
-            msg += self.beginning_text + '/n'
+            msg += self.beginning_text + '\n'
         msg += self.questions[self.next_question]['query']
         await self.member.send(msg)
 
