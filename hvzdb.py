@@ -17,7 +17,8 @@ class HvzDb():
                                             Faction text,
                                             Tag_Code text,
                                             OZ_Desire text,
-                                            Email text
+                                            Email text,
+                                            Want_Bandana text
                                         ); """
 
         sql_create_tasks_table = """CREATE TABLE IF NOT EXISTS tag_logging (

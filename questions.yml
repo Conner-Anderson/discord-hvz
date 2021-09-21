@@ -30,6 +30,14 @@ registration:
     Answer "yes" or "no".
   valid_regex: '(?i)\s*(yes|no)\s*'
   rejection_response: Just need a yes or no here.
+- name: want_bandana
+  display_name: Want Bandana
+  query: |-
+    Do you want us to give you a green bandana with your tag code on it?
+    If no, you will need to write the code we give you on your own green bandana yourself.
+    Answer "yes" or "no".
+  valid_regex: '(?i)\s*(yes|no)\s*'
+  rejection_response: Just need a yes or no here.
 tag_logging:
 - name: tag_code
   display_name: Tag Code
