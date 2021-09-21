@@ -18,7 +18,7 @@ tag_logging_on: True
 # The Google Account that the bot is logged into must have edit access to this sheet
 # These sheets will be chosen based on the active_server selected above
 sheet_ids:
-  letu: 1YUXeRoEpV9MukZ7B_xVlBkc-D6DNEfVxLBmJlf1Fm-0
+  letu: 1q-2H32CRpIDCbP94rBPbIKwGSJ-dHDZjL9SCHCUAaPo
   dev: 1fLYdmc_sp-Rx25794zmPekp48I02lbctyqiLvaLDIwQ
 members_sheet_name: Members
 tag_log_sheet_name: Tag Log

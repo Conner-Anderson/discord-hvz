@@ -128,9 +128,12 @@ async def on_message(message):
                     await message.author.send('There was an error when running the chatbot! Report this to an admin with details.')
                     return
                 if result == 1:
-                    await resolve_chat(chatbot)
-                    awaiting_chatbots.pop(i)
+                    resolved_chat = await resolve_chat(chatbot)
+                    if resolved_chat == 1:
+                        await chatbot.end()
+                        awaiting_chatbots.pop(i)
                 break
+
 
 # Occurs when a reaction happens. Using the raw version so old messages not in the cache work fine.
 @bot.listen()
@@ -322,6 +325,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
 
         await chatbot.member.add_roles(bot.roles['player'])
         await chatbot.member.add_roles(bot.roles['human'])
+        return 1
 
     elif chatbot.chat_type == 'tag_logging':
 

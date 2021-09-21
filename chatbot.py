@@ -48,7 +48,6 @@ class ChatBot:
         # Check if we're in the verification phase and aren't re-answering a question
         if (self.verifying is True) & (self.next_question >= len(self.questions)):
             if message.content.casefold().find('yes') != -1:
-                await self.member.send(self.ending_text)
                 return 1
             else:  # User must be responding to the verification prompt
                 for i, q in enumerate(self.questions):  # Iterate through question names to see if the user has named one to edit
@@ -86,3 +85,7 @@ class ChatBot:
         for q in self.questions:  # Build a list of the questions and their responses
             message += (q['display_name'] + ': ' + q['response'] + '\n')
         await self.member.send(message)
+
+
+    async def end(self):
+        await self.member.send(self.ending_text)
