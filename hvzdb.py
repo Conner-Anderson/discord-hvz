@@ -94,7 +94,6 @@ class HvzDb():
     def get_table(self, table):
         cur = self.conn.cursor()
         rows = cur.execute(f'SELECT * FROM {table}').fetchall()
-        print('get_table rows:', rows)
         columns = cur.description
         rows.insert(0, [c[0] for c in columns])
         return rows

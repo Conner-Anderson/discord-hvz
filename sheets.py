@@ -15,7 +15,7 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 SPREADSHEET_ID = config['export_sheet_id']
 SAMPLE_RANGE_NAME = 'Output!A2:B'
 
-def setup(db):
+def setup(db, bot):
     """Shows basic usage of the Sheets API.
     Prints values from a sample spreadsheet.
     """
@@ -44,6 +44,8 @@ def setup(db):
     SPREADSHEETS = service.spreadsheets()
     global DB
     DB = db
+    global BOT
+    BOT = bot
 
 
 def export_to_sheet(table_name):
@@ -51,6 +53,23 @@ def export_to_sheet(table_name):
 
     # Temporary fix until we make the database system for variable
     sheet_names = {'members': config['members_sheet_name'], 'tag_logging': config['tag_log_sheet_name']}
+
+    # Bit of a quick and dirty fix. This whole thing needs a rework
+    if table_name == 'members':
+        name_index = values[0].index('Name')
+        id_index = values[0].index('ID')
+        values[0].insert(name_index + 1, 'Nickname')
+        values[0].insert(name_index + 2, 'Discord Name')
+        
+        for i, row in enumerate(values[1:]):
+            new_row = list(row)
+            member_id = row[id_index]
+            member = BOT.guild.get_member(int(member_id))
+            new_row.insert(name_index + 1, member.nick)
+            new_row.insert(name_index + 2, member.name)
+            values[i + 1] = new_row
+
+
     # Erases entire sheet below row 1!
     SPREADSHEETS.values().clear(spreadsheetId=SPREADSHEET_ID, range=f'\'{sheet_names[table_name]}\'!A1:ZZZ').execute()
 

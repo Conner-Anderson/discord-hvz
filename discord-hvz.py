@@ -56,7 +56,7 @@ async def on_ready():
         except Exception as e:
             raise Exception(f'Cannot find a valid server. Check config.yml. Error --> {e}')
 
-        sheets.setup(db)
+        sheets.setup(db, bot)
        
         # Updates the cache with all members and channels and roles
         await bot.guild.fetch_members(limit=500).flatten()
