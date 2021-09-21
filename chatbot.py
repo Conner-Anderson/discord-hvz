@@ -26,24 +26,29 @@ class ChatBot:
         # Load questions from YAML file
         file = open('questions.yml', mode='r')
         raw_data = yaml.safe_load(file)
-        data = raw_data[self.chat_type]
-        for i in data:
-            i['response'] = None  # Add an empty response field to each question
-            self.questions.append(i)
+        chat = raw_data[self.chat_type]
+
+        self.beginning_text = chat['beginning']
+        self.ending_text = chat['ending']
+
+        for q in chat['questions']:
+            q['response'] = None  # Add an empty response field to each question
+            self.questions.append(q)
         file.close()
 
     async def ask_question(self):
-        print('Asking Question.')
-        await self.member.send(self.questions[self.next_question]['query'])
-        return
+        msg = ''
+        if (not self.verifying) and (self.next_question == 0):
+            msg += self.beginning_text + '/n'
+        msg += self.questions[self.next_question]['query']
+        await self.member.send(msg)
 
     async def take_response(self, message):
 
         # Check if we're in the verification phase and aren't re-answering a question
         if (self.verifying is True) & (self.next_question >= len(self.questions)):
             if message.content.casefold().find('yes') != -1:
-                # Do stuff to finish the ChatBot
-                print('finished')
+                await self.member.send(self.ending_text)
                 return 1
             else:  # User must be responding to the verification prompt
                 for i, q in enumerate(self.questions):  # Iterate through question names to see if the user has named one to edit

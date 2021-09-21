@@ -4,54 +4,60 @@
 #See those little |- symbols? Those tell the config file that there's a block of text coming up.
 
 registration:
-- name: name
-  display_name: Name
-  query: |-
-    I\'ll register you for HvZ!
-    What is your name? Use the name you would use on homework.
-  valid_regex: '\D*'
-  rejection_response: No numbers allowed in names.
-- name: cpo
-  display_name: CPO
-  query: |-
-    What is your CPO? This is used for player band delivery.
-    If you don\'t have one (such as commuters), please type "None"
-  valid_regex: '(?i)\d*|none'
-  rejection_response: I'm looking for a single number here, or None.
-- name: email
-  display_name: Email
-  query: What is your @LETU.edu email?
-  valid_regex: '(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)'
-  rejection_response: That isn\'t a valid email.
-- name: oz_desire
-  display_name: Original Zombie Desire
-  query: |-
-    Do you want a chance to be one of the original zombies? If chosen, you won\'t be a human this game.
-    Answer "yes" or "no".
-  valid_regex: '(?i)\s*(yes|no)\s*'
-  rejection_response: Just need a yes or no here.
-- name: want_bandana
-  display_name: Want Bandana
-  query: |-
-    Do you want us to give you a green bandana with your tag code on it?
-    If no, you will need to write the code we give you on your own green bandana yourself.
-    Answer "yes" or "no".
-  valid_regex: '(?i)\s*(yes|no)\s*'
-  rejection_response: Just need a yes or no here.
+  beginning: I'll register you for HvZ.
+  ending: You are registered for HvZ! Please read the rules. New channels are available to you.
+  questions:
+  - name: name
+    display_name: Name
+    query: |-
+      What is your name? Use the name you would use on homework.
+    valid_regex: '\D*'
+    rejection_response: No numbers allowed in names.
+  - name: cpo
+    display_name: CPO
+    query: |-
+      What is your CPO? This is used for player band delivery.
+      If you don\'t have one (such as commuters), please type "None"
+    valid_regex: '(?i)\d*|none'
+    rejection_response: I'm looking for a single number here, or None.
+  - name: email
+    display_name: Email
+    query: What is your @LETU.edu email?
+    valid_regex: '(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)'
+    rejection_response: That isn\'t a valid email.
+  - name: oz_desire
+    display_name: Original Zombie Desire
+    query: |-
+      Do you want a chance to be one of the original zombies? If chosen, you won\'t be a human this game.
+      Answer "yes" or "no".
+    valid_regex: '(?i)\s*(yes|no)\s*'
+    rejection_response: Just need a yes or no here.
+  - name: want_bandana
+    display_name: Want Bandana
+    query: |-
+      Do you want us to give you a green bandana with your tag code on it?
+      If no, you will need to write the code we give you on your own green bandana yourself.
+      Answer "yes" or "no".
+    valid_regex: '(?i)\s*(yes|no)\s*'
+    rejection_response: Just need a yes or no here.
+
 tag_logging:
-- name: tag_code
-  display_name: Tag Code
-  query: What is the tag code of the human you tagged?
-  valid_regex: '[a-zA-Z\d]{6}'
-  rejection_response: 'The tag code is 6 characters of numbers and capital
-    letters. None of these: 0 O Q I 1 D V U'
-- name: tag_day
-  display_name: Tag Day
-  query: Did the tag happen "today" or "yesterday"?
-  valid_regex: "(?i)(today)|yesterday"
-  rejection_response: Respond with either "today" or "tomorrow"
-- name: tag_time
-  display_name: Tag Time
-  query: About what time did the tag happen? Use the format 3:04pm
-  valid_regex: '(?i)\d{1,2}:[0-5]?[0-9]\s?(am|pm)'
-  rejection_response: Please use a format like 12:26pm or 7:00 am
+  beginning: Let's log a tag.
+  ending: Tag loged! Make sure your newly-brainless friend feels welcome in the hoard.
+  questions:
+  - name: tag_code
+    display_name: Tag Code
+    query: What is the tag code of the human you tagged?
+    valid_regex: '[a-zA-Z\d]{6}'
+    rejection_response: 'The tag code is 6 characters of numbers and capital
+      letters. None of these: 0 O Q I 1 D V U'
+  - name: tag_day
+    display_name: Tag Day
+    query: Did the tag happen "today" or "yesterday"?
+    valid_regex: "(?i)(today)|yesterday"
+    rejection_response: Respond with either "today" or "tomorrow"
+  - name: tag_time
+    display_name: Tag Time
+    query: About what time did the tag happen? Use the format 3:04pm
+    valid_regex: '(?i)\d{1,2}:[0-5]?[0-9]\s?(am|pm)'
+    rejection_response: Please use a format like 12:26pm or 7:00 am
