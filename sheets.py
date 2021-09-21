@@ -12,7 +12,7 @@ logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 # ID of Google Sheet: can be taken from the sheet address. Google account must have permission
-SPREADSHEET_ID = config['export_sheet_id']
+SPREADSHEET_ID = config['sheet_ids'][config['active_server']]
 SAMPLE_RANGE_NAME = 'Output!A2:B'
 
 def setup(db, bot):
@@ -60,7 +60,7 @@ def export_to_sheet(table_name):
         id_index = values[0].index('ID')
         values[0].insert(name_index + 1, 'Nickname')
         values[0].insert(name_index + 2, 'Discord Name')
-        
+
         for i, row in enumerate(values[1:]):
             new_row = list(row)
             member_id = row[id_index]

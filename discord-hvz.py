@@ -64,7 +64,7 @@ async def on_ready():
         await bot.guild.fetch_roles()
 
         bot.roles = {}
-        needed_roles = ['admin', 'zombie', 'human', 'guest', 'player']
+        needed_roles = ['admin', 'zombie', 'human', 'player']
         for i, x in enumerate(needed_roles):
             for r in bot.guild.roles:
                 if r.name.lower() == x:
@@ -109,6 +109,7 @@ async def on_ready():
         print('------')
     except Exception as e:
         print(f'Bot startup failed with this error --> {e}')
+        logger.exception(e)
         await bot.close()
         time.sleep(1)
 
@@ -124,7 +125,7 @@ async def on_message(message):
                     result = await chatbot.take_response(message)
                 except Exception as e:
                     print(f'Exception in take_response() --> {e}')
-                    await message.author.send('There was an error when running the registration bot! Report this to an admin with details.')
+                    await message.author.send('There was an error when running the chatbot! Report this to an admin with details.')
                     return
                 if result == 1:
                     await resolve_chat(chatbot)

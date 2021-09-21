@@ -12,11 +12,14 @@ available_servers:
 # Is tag logging enabled on the server? Useful for making sure the game doesn't start too early.
 tag_logging_on: True
 
-# The ID of the Google Sheets sheet that the bot will send its data to.
+# The IDs of the Google Sheets that the bot will send its data to.
 # The ID can be found in the URL, like this: https://docs.google.com/spreadsheets/d/1YUXeRoEpV9MukZ7B_xVlBkc-D6DNEfVxLBmJlf1Fm-0/edit#gid=0
 # It's the long string of characters near the end.
 # The Google Account that the bot is logged into must have edit access to this sheet
-export_sheet_id: 1YUXeRoEpV9MukZ7B_xVlBkc-D6DNEfVxLBmJlf1Fm-0
+# These sheets will be chosen based on the active_server selected above
+sheet_ids:
+  letu: 1YUXeRoEpV9MukZ7B_xVlBkc-D6DNEfVxLBmJlf1Fm-0
+  dev: 1fLYdmc_sp-Rx25794zmPekp48I02lbctyqiLvaLDIwQ
 members_sheet_name: Members
 tag_log_sheet_name: Tag Log
 
