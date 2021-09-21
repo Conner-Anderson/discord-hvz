@@ -268,6 +268,25 @@ async def edit(ctx, member: str, attribute: str, value: str):
         await ctx.send(f'Fatal dataase error! --> {e}')
         raise
 
+@bot.command()
+@commands.has_role('Admin')
+async def shutdown(ctx):
+    '''
+    Shuts down bot. If there are active chats, list them and don't shut down.
+
+    '''
+
+    if len(awaiting_chatbots) == 0:
+        await ctx.reply('Shutting Down')
+        print('Shutting Down\n. . .\n\n')
+        await bot.close()
+        time.sleep(1)
+    else:
+        msg = 'These chatbots are active:\n'
+        for c in awaiting_chatbots:
+            msg += f'<@{c.member.id}> has a chatbot of type {c.chat_type}\n'
+        await ctx.reply(msg)
+
 async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it is done
 
     responses = {}
