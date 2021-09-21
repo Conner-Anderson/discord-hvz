@@ -22,7 +22,6 @@ from os import getenv
 
 import string
 import random
-import sys
 
 
 load_dotenv()  # Load the Discord token from the .env file
@@ -91,7 +90,7 @@ async def on_ready():
 
         try:
             for channel, buttons in button_messages.items():
-                messages = await bot.channels[channel].history(limit=100, oldest_first=True).flatten()
+                messages = await bot.channels[channel].history(limit=100).flatten()
                 content = buttons.pop(0)
                 action_row = create_actionrow(*buttons)
                 for i, m in enumerate(messages):
@@ -153,21 +152,23 @@ async def register(ctx):
 @slash.component_callback()
 async def tag_log(ctx):
 
-    if bot.roles['zombie'] not in ctx.author.roles:
+    if config['tag_logging_on'] is False:
+        ctx.author.send('The admin has no enabled tagging yet.')
+    elif bot.roles['zombie'] not in ctx.author.roles:
         await ctx.author.send('Only zombies can make tags! Silly human with your silly brains.')
         await ctx.edit_origin()
         return
+    else:
+        for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
+            if (c.member == ctx.author) and c.chat_type == 'tag_logging':
+                await ctx.author.send('**Restarting tag logging process...**')
+                awaiting_chatbots.pop(i)
 
-    for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
-        if (c.member == ctx.author) and c.chat_type == 'tag_logging':
-            await ctx.author.send('**Restarting tag logging process...**')
-            awaiting_chatbots.pop(i)
+        chatbot = ChatBot(ctx.author, 'tag_logging')
+        await chatbot.ask_question()
+        awaiting_chatbots.append(chatbot)
 
-    chatbot = ChatBot(ctx.author, 'tag_logging')
-    await ctx.edit_origin()
-    await chatbot.ask_question()
-    awaiting_chatbots.append(chatbot)
-
+    await ctx.edit_origin()  # Do this always to convince Discord that the button was successfull
 
 @bot.listen()
 async def on_member_update(before, after):
