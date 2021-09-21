@@ -65,7 +65,7 @@ async def on_ready():
         await bot.guild.fetch_roles()
 
         bot.roles = {}
-        needed_roles = ['admin', 'zombie', 'human', 'guest']
+        needed_roles = ['admin', 'zombie', 'human', 'guest', 'player']
         for i, x in enumerate(needed_roles):
             for r in bot.guild.roles:
                 if r.name.lower() == x:
@@ -75,10 +75,10 @@ async def on_ready():
                 raise Exception(f'{x} role not found!')
 
         bot.channels = {}
-        needed_channels = ['tag-announcements', 'report-tags-here', 'landing']  # Should eventually be a config or setup procedure
+        needed_channels = ['tag-announcements', 'report-tags', 'landing'] 
         for i, x in enumerate(needed_channels):
             for c in bot.guild.channels:
-                if c.name.lower() == x:
+                if c.name.lower() == config['channel_names'][x]:
                     bot.channels[x] = c
                     break
             else:
@@ -86,7 +86,7 @@ async def on_ready():
 
         button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ!', 
                             create_button(style=ButtonStyle.green, label='Register for HvZ', custom_id='register')],
-                        'report-tags-here': ['---', 
+                        'report-tags': ['---', 
                         create_button(style=ButtonStyle.green, label='Report Tag', custom_id='tag_log')]}
 
         try:
@@ -229,6 +229,7 @@ async def delete(ctx, list_of_members: str):
             for member in ctx.message.mentions:
                 await member.remove_roles(bot.roles['human'])
                 await member.remove_roles(bot.roles['zombie'])
+                await member.remove_roles(bot.roles['player'])
                 db.delete_row('members', member)
                 sheets.export_to_sheet('members')
         else:
@@ -293,6 +294,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
         db.add_row('members', responses)
         sheets.export_to_sheet('members')  # I always update the Google sheet after changing a value in the db
 
+        await chatbot.member.add_roles(bot.roles['player'])
         await chatbot.member.add_roles(bot.roles['human'])
 
     elif chatbot.chat_type == 'tag_logging':

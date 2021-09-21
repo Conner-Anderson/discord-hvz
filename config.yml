@@ -17,3 +17,10 @@ export_sheet_id: 1YUXeRoEpV9MukZ7B_xVlBkc-D6DNEfVxLBmJlf1Fm-0
 members_sheet_name: Members
 tag_log_sheet_name: Tag Log
 
+# Assign the real channel names on the right to the variables on the left
+channel_names:
+  tag-announcements: tag-announcements
+  report-tags: report-tags
+  landing: hvz-first-things-first
+
+
