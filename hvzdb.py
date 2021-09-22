@@ -1,6 +1,9 @@
 import sqlite3
 from sqlite3 import Error
 import discord
+import logging
+
+log = logging.getLogger(__name__)
 
 # TODO: convert this to use SQLAlchemy, an ORM
 
@@ -35,7 +38,8 @@ class HvzDb():
             self.create_table(self.conn, sql_create_members_table)
             self.create_table(self.conn, sql_create_tasks_table)
         else:
-            print('Error! Cannot create this database connection!')
+            log.critical('Error! Cannot create this database connection!')
+            raise Exception('Could not connect to the database!')
 
 
     def create_connection(self, db_file):
@@ -43,8 +47,9 @@ class HvzDb():
         conn = None
         try:
             conn = sqlite3.connect(db_file)
-        except Error as e:
-            print(e)
+        except Exception:
+            log.critical('Could not create database connection')
+            raise
 
         return conn
 
@@ -55,7 +60,7 @@ class HvzDb():
             c.execute(create_table_sql)
             self.conn.commit()
         except Error as e:
-            print(e)
+            log.error(e)
 
     def add_row(self, table, row):
         # Assembles an SQL statement to make a new row (tag, member, etc.)
@@ -119,7 +124,6 @@ class HvzDb():
 
     def get_row(self, table, column, value):
         # Returns the first row that matches. The row is a dict, where the keys are column names
-        print(self, table, column, value)
         output = None
         sql = f'''SELECT * FROM {table}
                 WHERE {column} = \'{value}\''''

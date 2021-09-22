@@ -6,6 +6,7 @@ from chatbot import ChatBot
 from hvzdb import HvzDb
 
 import logging
+import coloredlogs
 import time
 import functools
 
@@ -26,17 +27,36 @@ import string
 import random
 
 
+def dump(obj):
+    '''Prints the passed object in a very detailed form for debugging'''
+    for attr in dir(obj):
+        log.debug("obj.%s = %r" % (attr, getattr(obj, attr)))
+
+
 load_dotenv()  # Load the Discord token from the .env file
 token = getenv("TOKEN")
 
-logging.basicConfig(level=logging.INFO)
+log_format = '%(asctime)s %(name)s %(levelname)s %(message)s'
+coloredlogs.DEFAULT_LOG_FORMAT = log_format
+logging.basicConfig(filename='discord-hvz.log', encoding='utf-8', filemode='a', 
+                    format=log_format, level=logging.DEBUG)
+coloredlogs.install(level='INFO')  # Stream handler for root logger 
 
-# Setup logging in a file. This module isn't used very much or well yet
+# Setup a logger for discord.py
+discord_logger = logging.getLogger('discord')
+discord_logger.propagate = False
+discord_logger.setLevel(logging.INFO)
+coloredlogs.install(level='WARNING', logger=discord_logger)
 
-logger = logging.getLogger('discord')
-logger.setLevel(logging.WARNING)
-handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-logger.addHandler(handler)
+# Setup a file handler for discord.py
+file_handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='a')
+file_handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter(log_format)
+file_handler.setFormatter(formatter)
+discord_logger.addHandler(file_handler)
+
+
+log = logging.getLogger(__name__)
 
 intents = discord.Intents.default()
 intents.members = True
@@ -46,8 +66,6 @@ slash = SlashCommand(bot, sync_commands=True)  # Declares slash commands through
 db = HvzDb()
 
 awaiting_chatbots = []
-
-
 
 @bot.listen()  # Always using listen() because it allows multiple events to respond to one thing
 async def on_ready():
@@ -87,7 +105,7 @@ async def on_ready():
             else:
                 raise Exception(f'{x} channel not found!')
 
-        button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ!', 
+        button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ! \nIf the button does nothing, please Allow Direct Messages in your settings for this server.', 
                             create_button(style=ButtonStyle.green, label='Register for HvZ', custom_id='register')],
                         'report-tags': ['---', 
                         create_button(style=ButtonStyle.green, label='Report Tag', custom_id='tag_log')]}
@@ -107,13 +125,10 @@ async def on_ready():
             raise KeyError(f'Could not find the channel {e}!')  # A bit redundant
 
 
-        print('Discord-HvZ bot launched! Logged in as:')
-        print(bot.user.name)
-        print(bot.user.id)
-        print('------')
+        log.critical(f'Discord-HvZ bot launched correctly! Logged in as: {bot.user.name} ------------------------------------------')
+
     except Exception as e:
-        print(f'Bot startup failed with this error --> {e}')
-        logger.exception(e)
+        log.critical(f'Bot startup failed with this error --> {e}')
         await bot.close()
         time.sleep(1)
 
@@ -161,7 +176,7 @@ async def on_message(message):
                 try:
                     result = await chatbot.take_response(message)
                 except Exception as e:
-                    print(f'Exception in take_response() --> {e}')
+                    log.error(f'Exception in take_response() --> {e}')
                     await message.author.send('There was an error when running the chatbot! Report this to an admin with details.')
                     return
                 if result == 1:
@@ -288,7 +303,7 @@ async def delete(ctx, list_of_members: str):
         else:
             await ctx.send('You must @mention a list of server members to delete them.')
     except Exception as e:
-        print(e)
+        log.error(e)
         await ctx.send(f'Command error! Let an admin know. Error: {e}')
 
 @member.command()
@@ -326,7 +341,7 @@ async def shutdown(ctx):
     '''
     if len(awaiting_chatbots) == 0:
         await ctx.reply('Shutting Down')
-        print('Shutting Down\n. . .\n\n')
+        log.critical('Shutting Down\n. . .\n\n')
         await bot.close()
         time.sleep(1)
     else:
@@ -341,7 +356,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
     for question in chatbot.questions:
         responses[question['name']] = question['response']
 
-    print(f'Responses recieved in resolve_chat() --> {responses}')
+    log.debug(f'Responses recieved in resolve_chat() --> {responses}')
 
     if chatbot.chat_type == 'registration':
         responses['faction'] = 'human'
@@ -359,7 +374,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
                     tag_code = ''
         except Exception as e:
             chatbot.member.send('Could not generate your tag code. This is a bug! Contact an admin.')
-            print('Error generating tag code --> ', e)
+            log.error('Error generating tag code --> ', e)
             return
 
         responses['tag_code'] = tag_code
@@ -418,7 +433,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             await tagged_member.remove_roles(bot.roles['human'])
         except discord.HTTPException as e:
             chatbot.member.send('Couldn\'t change the tagged player\'s Discord role! Contact an admin.')
-            print('Tried to change user roles and failed --> ', e)
+            log.error('Tried to change user roles and failed --> ', e)
 
         db.edit_member(tagged_member, 'faction', 'zombie')
         sheets.export_to_sheet('members')
@@ -427,9 +442,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
         msg += tag_datetime.strftime('%A, at about %I:%M %p')
         await bot.channels['tag-announcements'].send(msg)
 
-def dump(obj):
-    for attr in dir(obj):
-        print("obj.%s = %r" % (attr, getattr(obj, attr)))
+
 
 
 

@@ -7,6 +7,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 import logging
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
+log = logging.getLogger(__name__)
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
@@ -78,9 +79,9 @@ def export_to_sheet(table_name):
     try:
         result = SPREADSHEETS.values().update(spreadsheetId=SPREADSHEET_ID, range=f'\'{table_name}\'!A1:ZZZ', valueInputOption='USER_ENTERED', body=body).execute()
     except Exception as e:
-        print('There was an exception with the Google API request! Here it is: %s' % (e))
+        log.error('There was an exception with the Google API request! Here it is: %s' % (e))
     else:
-        print('{0} cells updated.'.format(result.get('updatedCells')))
+        log.debug('{0} cells updated.'.format(result.get('updatedCells')))
 
 # Returns a 2D list of data requested from the specified range in the specified sheet. Range must be given in A1 notation
 # Currently cannot specify which spreadsheet to pull from, but that'll depend on how this function is used
@@ -90,7 +91,7 @@ def read_sheet(sheet_name, range):
         result = SPREADSHEETS.values().get(spreadsheetId=SPREADSHEET_ID, range='\'%s\'!%s' % (sheet_name, range)).execute()
     except Exception as e:
         s = str(e).split('Details: ')
-        print('Error when excecuting read_sheet() with arguments \"%s\" and \"%s\"  ----> %s' % (sheet_name, range, s[1]))
+        log.error('Error when excecuting read_sheet() with arguments \"%s\" and \"%s\"  ----> %s' % (sheet_name, range, s[1]))
         return 0
     else:
         return result.get('values', 0)
