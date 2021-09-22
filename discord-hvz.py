@@ -87,7 +87,7 @@ async def on_ready():
             else:
                 raise Exception(f'{x} channel not found!')
 
-        button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ! \nIf the button does nothing, please Allow Direct Messages in your settings for this server.', 
+        button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ!', 
                             create_button(style=ButtonStyle.green, label='Register for HvZ', custom_id='register')],
                         'report-tags': ['---', 
                         create_button(style=ButtonStyle.green, label='Report Tag', custom_id='tag_log')]}
@@ -140,6 +140,17 @@ def check_event(func):
         return result
     return inner
 
+def check_dm_allowed(func):
+    '''A decorator for component callbacks. Catches the issue of users not allowing bot DMs.'''
+    @functools.wraps(func)
+    async def wrapper(ctx):
+        try:
+            return await func(ctx)
+        except discord.errors.Forbidden:
+            await ctx.send(content='Please check your settings for this server and turn on Allow Direct Messages.', hidden=True)
+            return None
+    return wrapper
+
 @bot.listen()
 @check_event
 async def on_message(message):
@@ -163,6 +174,7 @@ async def on_message(message):
 
 @slash.component_callback()
 @check_event
+@check_dm_allowed
 async def register(ctx):
 
     if len(db.get_member(ctx.author)) != 0:
@@ -182,6 +194,7 @@ async def register(ctx):
 
 @slash.component_callback()
 @check_event
+@check_dm_allowed
 async def tag_log(ctx):
 
     if config['tag_logging_on'] is False:
