@@ -87,7 +87,7 @@ async def on_ready():
             else:
                 raise Exception(f'{x} channel not found!')
 
-        button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ!', 
+        button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ! \nIf the button does nothing, please Allow Direct Messages in your settings for this server.', 
                             create_button(style=ButtonStyle.green, label='Register for HvZ', custom_id='register')],
                         'report-tags': ['---', 
                         create_button(style=ButtonStyle.green, label='Report Tag', custom_id='tag_log')]}
