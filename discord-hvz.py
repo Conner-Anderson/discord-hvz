@@ -169,6 +169,8 @@ async def on_message(message):
                     if resolved_chat == 1:
                         await chatbot.end()
                         awaiting_chatbots.pop(i)
+                elif result == -1:
+                    awaiting_chatbots.pop(i)
                 break
 
 

@@ -44,6 +44,9 @@ class ChatBot:
         await self.member.send(msg)
 
     async def take_response(self, message):
+        if message.content.casefold().replace(' ', '') == 'cancel':
+            await message.reply('Cancelled.')
+            return -1
 
         # Check if we're in the verification phase and aren't re-answering a question
         if (self.verifying is True) & (self.next_question >= len(self.questions)):
