@@ -133,6 +133,14 @@ class HvzDb():
 
         return output
 
+    def get_column(self, table:str, column:str):
+        # Returns the first column that matches. The column is a list.
+        print(self, table, column)
+        sql = f'SELECT {column} FROM {table}'
+        cur = self.conn.cursor()
+        column = cur.execute(sql).fetchone()
+        return column
+
     def edit_member(self, member, column, value):
         try:
             member_id = member

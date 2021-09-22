@@ -24,6 +24,8 @@ import string
 import random
 import sys
 
+import re
+
 
 load_dotenv()  # Load the Discord token from the .env file
 token = getenv("TOKEN")
@@ -75,7 +77,7 @@ async def on_ready():
                 raise Exception(f'{x} role not found!')
 
         bot.channels = {}
-        needed_channels = ['tag-announcements', 'report-tags-here', 'landing']  # Should eventually be a config or setup procedure
+        needed_channels = ['tag-announcements', 'report-tags', 'landing']  # Should eventually be a config or setup procedure
         for i, x in enumerate(needed_channels):
             for c in bot.guild.channels:
                 if c.name.lower() == x:
@@ -86,7 +88,7 @@ async def on_ready():
 
         button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ!', 
                             create_button(style=ButtonStyle.green, label='Register for HvZ', custom_id='register')],
-                        'report-tags-here': ['---', 
+                        'report-tags': ['---', 
                         create_button(style=ButtonStyle.green, label='Report Tag', custom_id='tag_log')]}
 
         try:
@@ -217,6 +219,25 @@ async def member(ctx):
 
 @member.command()
 @commands.has_role('Admin')
+async def register(ctx, *args: str):
+    '''
+    Registers a member for the game.
+
+    Take a @mentioned Discord user and adds the user to the game database.
+    '''
+    try:
+        if len(args) > 0:
+            mentionRegex = re.compile('<@!?\d+>')
+            mentionRegex.match()
+            print(args[0])
+        for arg in args:
+            print(arg)
+    except Exception as e:
+        print(e)
+        await ctx.send(f'Command error! Let an admin know. Error: {e}')
+
+@member.command()
+@commands.has_role('Admin')
 async def delete(ctx, list_of_members: str):
     '''
     Removes all @mentioned members from the game.
@@ -258,7 +279,36 @@ async def edit(ctx, member: str, attribute: str, value: str):
     except ValueError as e:
         await ctx.send(f'Bad command! Error: {e}')
     except Exception as e:
-        await ctx.send(f'Fatal dataase error! --> {e}')
+        await ctx.send(f'Fatal database error! --> {e}')
+        raise
+
+@member.command()
+@commands.has_role('Admin')
+async def list(ctx):
+    '''
+    Lists all members.
+
+    Valid attributes are the column names in the database, which can be found in exported Google Sheets.
+    '''
+    columnName = 'Name'
+    tableName = 'members'
+    if not len(ctx.message.mentions) == 0:
+        await ctx.send('Command does not accept arguments. Ignoring args.')
+    
+    try:
+        columnString = ""
+        column = db.get_column(tableName, columnName)
+        if column != None:
+            for value in column:
+                columnString += value + '\n'
+            await ctx.send(f'{columnString}')
+        else:
+            await ctx.send(f'Could not find column "{columnName}" in table "{tableName}". You may not have any members yet.')
+
+    except ValueError as e:
+        await ctx.send(f'Bad command! Error: {e}')
+    except Exception as e:
+        await ctx.send(f'Fatal database error! --> {e}')
         raise
 
 async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it is done
