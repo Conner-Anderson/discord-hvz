@@ -10,3 +10,4 @@ hvzdb.db
 *.sublime-workspace
 *.log
 
+pyvenv.cfg

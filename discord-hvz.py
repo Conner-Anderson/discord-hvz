@@ -7,6 +7,7 @@ from hvzdb import HvzDb
 
 import logging
 import time
+import functools
 
 import discord
 from discord.ext import commands
@@ -17,12 +18,12 @@ from dateutil import parser
 from discord_slash.utils.manage_components import create_button, create_actionrow
 from discord_slash.model import ButtonStyle
 from discord_slash import SlashCommand
+from discord_slash.context import InteractionContext
 from dotenv import load_dotenv
 from os import getenv
 
 import string
 import random
-import sys
 
 import re
 
@@ -48,6 +49,8 @@ db = HvzDb()
 
 awaiting_chatbots = []
 
+
+
 @bot.listen()  # Always using listen() because it allows multiple events to respond to one thing
 async def on_ready():
     try:
@@ -59,7 +62,7 @@ async def on_ready():
         except Exception as e:
             raise Exception(f'Cannot find a valid server. Check config.yml. Error --> {e}')
 
-        sheets.setup(db)
+        sheets.setup(db, bot)
        
         # Updates the cache with all members and channels and roles
         await bot.guild.fetch_members(limit=500).flatten()
@@ -67,7 +70,7 @@ async def on_ready():
         await bot.guild.fetch_roles()
 
         bot.roles = {}
-        needed_roles = ['admin', 'zombie', 'human', 'guest']
+        needed_roles = ['admin', 'zombie', 'human', 'player']
         for i, x in enumerate(needed_roles):
             for r in bot.guild.roles:
                 if r.name.lower() == x:
@@ -77,10 +80,10 @@ async def on_ready():
                 raise Exception(f'{x} role not found!')
 
         bot.channels = {}
-        needed_channels = ['tag-announcements', 'report-tags', 'landing']  # Should eventually be a config or setup procedure
+        needed_channels = ['tag-announcements', 'report-tags', 'landing'] 
         for i, x in enumerate(needed_channels):
             for c in bot.guild.channels:
-                if c.name.lower() == x:
+                if c.name.lower() == config['channel_names'][x]:
                     bot.channels[x] = c
                     break
             else:
@@ -93,7 +96,7 @@ async def on_ready():
 
         try:
             for channel, buttons in button_messages.items():
-                messages = await bot.channels[channel].history(limit=100, oldest_first=True).flatten()
+                messages = await bot.channels[channel].history(limit=100).flatten()
                 content = buttons.pop(0)
                 action_row = create_actionrow(*buttons)
                 for i, m in enumerate(messages):
@@ -112,31 +115,58 @@ async def on_ready():
         print('------')
     except Exception as e:
         print(f'Bot startup failed with this error --> {e}')
+        logger.exception(e)
         await bot.close()
         time.sleep(1)
 
+def check_event(func):
+    '''
+    A decorator that aborts events/listeners if they are from the wrong guild or from a bot
+    If you add an event of a type not used before, make sure the ctx here works with it
+    '''
+    @functools.wraps(func)
+    async def inner(ctx, *args, **kwargs):
+        if isinstance(ctx, InteractionContext):
+            guild_id = ctx.guild_id
+        elif isinstance(ctx, discord.Message):
+            if ctx.channel.type == discord.ChannelType.private:
+                guild_id = bot.guild.id
+            else:
+                guild_id = ctx.guild.id
+        elif isinstance(ctx, discord.Member) | isinstance(ctx, commands.Context):
+            guild_id = ctx.guild.id
+        if guild_id != bot.guild.id:
+            return
+
+        result = await func(ctx, *args, **kwargs)
+        return result
+    return inner
+
 @bot.listen()
+@check_event
 async def on_message(message):
-    if message.author.bot:  # No recursive bots!
-        return
 
     if (message.channel.type == discord.ChannelType.private):
         for i, chatbot in enumerate(awaiting_chatbots):  # Check if the message could be part of an ongoing chat conversation
             if chatbot.member == message.author:
-                result = await chatbot.take_response(message)
+                try:
+                    result = await chatbot.take_response(message)
+                except Exception as e:
+                    print(f'Exception in take_response() --> {e}')
+                    await message.author.send('There was an error when running the chatbot! Report this to an admin with details.')
+                    return
                 if result == 1:
-                    await resolve_chat(chatbot)
-                    awaiting_chatbots.pop(i)
+                    resolved_chat = await resolve_chat(chatbot)
+                    if resolved_chat == 1:
+                        await chatbot.end()
+                        awaiting_chatbots.pop(i)
                 break
 
-# Occurs when a reaction happens. Using the raw version so old messages not in the cache work fine.
-@bot.listen()
-async def on_raw_reaction_add(payload):
-    # Old function, might use later
-    return
 
 @slash.component_callback()
+@check_event
 async def register(ctx):
+
     if len(db.get_member(ctx.author)) != 0:
         await ctx.author.send('You are already registered for HvZ! Contact an admin if you think this is wrong.')
         await ctx.edit_origin()
@@ -153,25 +183,29 @@ async def register(ctx):
     awaiting_chatbots.append(chatbot)
 
 @slash.component_callback()
+@check_event
 async def tag_log(ctx):
 
-    if bot.roles['zombie'] not in ctx.author.roles:
+    if config['tag_logging_on'] is False:
+        ctx.author.send('The admin has no enabled tagging yet.')
+    elif bot.roles['zombie'] not in ctx.author.roles:
         await ctx.author.send('Only zombies can make tags! Silly human with your silly brains.')
         await ctx.edit_origin()
         return
+    else:
+        for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
+            if (c.member == ctx.author) and c.chat_type == 'tag_logging':
+                await ctx.author.send('**Restarting tag logging process...**')
+                awaiting_chatbots.pop(i)
 
-    for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
-        if (c.member == ctx.author) and c.chat_type == 'tag_logging':
-            await ctx.author.send('**Restarting tag logging process...**')
-            awaiting_chatbots.pop(i)
+        chatbot = ChatBot(ctx.author, 'tag_logging')
+        await chatbot.ask_question()
+        awaiting_chatbots.append(chatbot)
 
-    chatbot = ChatBot(ctx.author, 'tag_logging')
-    await ctx.edit_origin()
-    await chatbot.ask_question()
-    awaiting_chatbots.append(chatbot)
-
+    await ctx.edit_origin()  # Do this always to convince Discord that the button was successfull
 
 @bot.listen()
+@check_event
 async def on_member_update(before, after):
 
     if not before.roles == after.roles:
@@ -185,8 +219,10 @@ async def on_member_update(before, after):
             db.edit_member(after, 'faction', 'human')
             sheets.export_to_sheet('members')
 
+
 @bot.command()
 @commands.has_role('Admin')  # This means of checking the role is nice, but isn't flexible
+@check_event
 async def add(ctx, left: int, right: int):  # A command for testing
     '''
     This is a test command.
@@ -208,6 +244,7 @@ async def add(ctx, left: int, right: int):  # A command for testing
 
 @bot.group(description='A group of commands for interacting with members.')
 @commands.has_role('Admin')
+@check_event
 async def member(ctx):
     '''
     A group of commands to manage members.
@@ -219,6 +256,7 @@ async def member(ctx):
 
 @member.command()
 @commands.has_role('Admin')
+@check_event
 async def register(ctx, *args: str):
     '''
     Registers a member for the game.
@@ -238,6 +276,8 @@ async def register(ctx, *args: str):
 
 @member.command()
 @commands.has_role('Admin')
+
+@check_event
 async def delete(ctx, list_of_members: str):
     '''
     Removes all @mentioned members from the game.
@@ -250,6 +290,7 @@ async def delete(ctx, list_of_members: str):
             for member in ctx.message.mentions:
                 await member.remove_roles(bot.roles['human'])
                 await member.remove_roles(bot.roles['zombie'])
+                await member.remove_roles(bot.roles['player'])
                 db.delete_row('members', member)
                 sheets.export_to_sheet('members')
         else:
@@ -260,6 +301,7 @@ async def delete(ctx, list_of_members: str):
 
 @member.command()
 @commands.has_role('Admin')
+@check_event
 async def edit(ctx, member: str, attribute: str, value: str):
     '''
     Edits one attribute of a member
@@ -311,6 +353,25 @@ async def list(ctx):
         await ctx.send(f'Fatal database error! --> {e}')
         raise
 
+@bot.command()
+@commands.has_role('Admin')
+@check_event
+async def shutdown(ctx):
+    '''
+    Shuts down bot. If there are active chats, list them and don't shut down.
+
+    '''
+    if len(awaiting_chatbots) == 0:
+        await ctx.reply('Shutting Down')
+        print('Shutting Down\n. . .\n\n')
+        await bot.close()
+        time.sleep(1)
+    else:
+        msg = 'These chatbots are active:\n'
+        for c in awaiting_chatbots:
+            msg += f'<@{c.member.id}> has a chatbot of type {c.chat_type}\n'
+        await ctx.reply(msg)
+
 async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it is done
 
     responses = {}
@@ -326,7 +387,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
         tag_code = ''
         try:
             while True:
-                code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '01IOUDQV'))
+                code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '015IOUDQVS'))
                 for n in range(6):
                     tag_code += code_set[random.randint(0, len(code_set) - 1)]
                 if db.get_row('members', 'tag_code', tag_code) is None:
@@ -343,7 +404,9 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
         db.add_row('members', responses)
         sheets.export_to_sheet('members')  # I always update the Google sheet after changing a value in the db
 
+        await chatbot.member.add_roles(bot.roles['player'])
         await chatbot.member.add_roles(bot.roles['human'])
+        return 1
 
     elif chatbot.chat_type == 'tag_logging':
 
@@ -351,13 +414,13 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             await chatbot.member.send('Hold up... you\'re a  human! You can\'t tag anyone. The zombie who tagged you may not have logged their tag')
             return 0
 
-        tagged_member_data = db.get_row('members', 'Tag_Code', responses['Tag_Code'])
+        tagged_member_data = db.get_row('members', 'tag_code', responses['tag_code'])
 
         if not tagged_member_data:
             await chatbot.member.send('That tag code doesn\'t match anyone! Try again.')
             return 0
 
-        tagged_user_id = int(tagged_member_data['ID'])
+        tagged_user_id = int(tagged_member_data['id'])
 
         if tagged_user_id == 0:
             await chatbot.member.send('Something went wrong with the database... This is a bug! Please contact an admin.')
@@ -404,6 +467,8 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
 def dump(obj):
     for attr in dir(obj):
         print("obj.%s = %r" % (attr, getattr(obj, attr)))
+
+
 
 
 bot.run(token)

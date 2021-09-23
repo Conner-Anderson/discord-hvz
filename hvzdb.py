@@ -17,7 +17,8 @@ class HvzDb():
                                             Faction text,
                                             Tag_Code text,
                                             OZ_Desire text,
-                                            Email text
+                                            Email text,
+                                            Want_Bandana text
                                         ); """
 
         sql_create_tasks_table = """CREATE TABLE IF NOT EXISTS tag_logging (
@@ -93,7 +94,6 @@ class HvzDb():
     def get_table(self, table):
         cur = self.conn.cursor()
         rows = cur.execute(f'SELECT * FROM {table}').fetchall()
-        print('get_table rows:', rows)
         columns = cur.description
         rows.insert(0, [c[0] for c in columns])
         return rows
@@ -109,9 +109,10 @@ class HvzDb():
         cur = self.conn.cursor()
         try:
             row = cur.execute(sql).fetchone()
-            columns = cur.description
-            for c, x in enumerate(row):
-                output_row[columns[c][0]] = x
+            if row is not None:
+                columns = cur.description
+                for c, x in enumerate(row):
+                    output_row[columns[c][0]] = x
         except sqlite3.OperationalError as e:
             raise ValueError(e)
         return output_row
