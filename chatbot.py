@@ -2,15 +2,7 @@ import logging
 import yaml
 import regex
 
-logging.basicConfig(level=logging.INFO)
-
-# Setup logging in a file
-
-logger = logging.getLogger('discord')
-logger.setLevel(logging.WARNING)
-handler = logging.FileHandler(filename='ChatBot.log', encoding='utf-8', mode='w')
-logger.addHandler(handler)
-
+log = logging.getLogger(__name__)
 
 class ChatBot:
 
@@ -35,6 +27,7 @@ class ChatBot:
             q['response'] = None  # Add an empty response field to each question
             self.questions.append(q)
         file.close()
+        log.info(f'{self.chat_type} ChatBot started with {self.member.name}')
 
     async def ask_question(self):
         msg = ''
@@ -44,6 +37,9 @@ class ChatBot:
         await self.member.send(msg)
 
     async def take_response(self, message):
+        if message.content.casefold().replace(' ', '') == 'cancel':
+            await message.reply('Cancelled.')
+            return -1
 
         # Check if we're in the verification phase and aren't re-answering a question
         if (self.verifying is True) & (self.next_question >= len(self.questions)):
@@ -89,3 +85,4 @@ class ChatBot:
 
     async def end(self):
         await self.member.send(self.ending_text)
+        log.info(f'{self.member.name}\'s {self.chat_type} chatbot has completed.')
