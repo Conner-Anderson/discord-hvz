@@ -361,30 +361,37 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
     if chatbot.chat_type == 'registration':
         responses['faction'] = 'human'
         responses['id'] = str(chatbot.member.id)
-
-        tag_code = ''
         try:
-            while True:
-                code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '015IOUDQVS'))
-                for n in range(6):
-                    tag_code += code_set[random.randint(0, len(code_set) - 1)]
-                if db.get_row('members', 'tag_code', tag_code) is None:
-                    break
-                else:
-                    tag_code = ''
-        except Exception as e:
-            chatbot.member.send('Could not generate your tag code. This is a bug! Contact an admin.')
-            log.error('Error generating tag code --> ', e)
-            return
+            tag_code = ''
+            try:
+                while True:
+                    code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '015IOUDQVS'))
+                    for n in range(6):
+                        tag_code += code_set[random.randint(0, len(code_set) - 1)]
+                    if db.get_row('members', 'tag_code', tag_code) is None:
+                        break
+                    else:
+                        tag_code = ''
+            except Exception as e:
+                chatbot.member.send('Could not generate your tag code. This is a bug! Contact an admin.')
+                log.error('Error generating tag code --> ', e)
+                return
 
-        responses['tag_code'] = tag_code
+            responses['tag_code'] = tag_code
 
-        db.add_row('members', responses)
-        sheets.export_to_sheet('members')  # I always update the Google sheet after changing a value in the db
+            db.add_row('members', responses)
+            try:
+                sheets.export_to_sheet('members')  # I always update the Google sheet after changing a value in the db
+            except Exception:
+                log.exception(f'Exception when calling export_to_sheet() from resolve_chat() User: {chatbot.member.name}')
 
-        await chatbot.member.add_roles(bot.roles['player'])
-        await chatbot.member.add_roles(bot.roles['human'])
-        return 1
+            await chatbot.member.add_roles(bot.roles['player'])
+            await chatbot.member.add_roles(bot.roles['human'])
+            return 1
+        except Exception:
+            name = responses['name']
+            log.exception(f'Exception when completing registration for {chatbot.member.name}, {name}')
+            await chatbot.member.send('Something went very wrong with the registration, and it was not successful. Please message Conner Anderson about it.')
 
     elif chatbot.chat_type == 'tag_logging':
 
