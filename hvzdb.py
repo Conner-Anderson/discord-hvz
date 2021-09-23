@@ -140,7 +140,6 @@ class HvzDb():
 
     def get_column(self, table:str, column:str):
         # Returns the first column that matches. The column is a list.
-        print(self, table, column)
         sql = f'SELECT {column} FROM {table}'
         cur = self.conn.cursor()
         

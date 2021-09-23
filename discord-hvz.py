@@ -1,5 +1,6 @@
 #!/bin/python3
 
+import enum
 from config import config
 import sheets
 from chatbot import ChatBot
@@ -27,6 +28,8 @@ import string
 import random
 
 import re
+
+DISCORD_MESSAGE_MAX_LENGTH = 2000
 
 
 def dump(obj):
@@ -342,20 +345,29 @@ async def list(ctx):
 
     Valid attributes are the column names in the database, which can be found in exported Google Sheets.
     '''
-    columnName = 'Name'
     tableName = 'members'
     if not len(ctx.message.mentions) == 0:
         await ctx.send('Command does not accept arguments. Ignoring args.')
     
     try:
         columnString = ""
-        column = db.get_column(tableName, columnName)
-        if column:
-            for value in column:
-                columnString += value[0] + '\n'
+        charLength = 0
+        
+        sql = f'SELECT ID, Name, Email FROM {tableName}'
+        cur = db.conn.cursor()
+        data = cur.execute(sql).fetchall()
+        if data:
+            for i in range(len(data)):
+                subString = '<@!' + data[i][0] + '>' + '\t' + data[i][1] + '\t' + data[i][2] + '\n'
+                charLength += len(subString)
+                if charLength > DISCORD_MESSAGE_MAX_LENGTH:
+                    await ctx.send(f'{columnString}')
+                    columnString = ""
+                    charLength = len(subString)
+                columnString += subString
             await ctx.send(f'{columnString}')
         else:
-            await ctx.send(f'Could not find column "{columnName}" in table "{tableName}". You may not have any members yet.')
+            await ctx.send(f'Could not find columns in table "{tableName}". You may not have any members yet.')
 
     except ValueError as e:
         await ctx.send(f'Bad command! Error: {e}')
