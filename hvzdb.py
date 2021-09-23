@@ -143,8 +143,10 @@ class HvzDb():
         print(self, table, column)
         sql = f'SELECT {column} FROM {table}'
         cur = self.conn.cursor()
-        column = cur.execute(sql).fetchone()
-        return column
+        
+        output = cur.execute(sql).fetchall()
+        
+        return output
 
     def edit_member(self, member, column, value):
         try:

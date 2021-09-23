@@ -286,26 +286,6 @@ async def member(ctx):
 
 @member.command()
 @commands.has_role('Admin')
-@check_event
-async def register(ctx, *args: str):
-    '''
-    Registers a member for the game.
-
-    Take a @mentioned Discord user and adds the user to the game database.
-    '''
-    try:
-        if len(args) > 0:
-            mentionRegex = re.compile('<@!?\d+>')
-            mentionRegex.match()
-            print(args[0])
-        for arg in args:
-            print(arg)
-    except Exception as e:
-        print(e)
-        await ctx.send(f'Command error! Let an admin know. Error: {e}')
-
-@member.command()
-@commands.has_role('Admin')
 
 @check_event
 async def delete(ctx, list_of_members: str):
@@ -370,9 +350,9 @@ async def list(ctx):
     try:
         columnString = ""
         column = db.get_column(tableName, columnName)
-        if column != None:
+        if column:
             for value in column:
-                columnString += value + '\n'
+                columnString += value[0] + '\n'
             await ctx.send(f'{columnString}')
         else:
             await ctx.send(f'Could not find column "{columnName}" in table "{tableName}". You may not have any members yet.')
