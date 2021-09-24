@@ -10,3 +10,4 @@ hvzdb.db
 *.log
 
 pyvenv.cfg
+sqalchemytest.py
