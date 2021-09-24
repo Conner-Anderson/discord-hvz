@@ -113,6 +113,12 @@ class HvzDb():
             result_row = conn.execute(selection).first()
             return result_row
 
+    def get_members(self):
+        selection = select(self.members_table)
+        with self.engine.begin() as conn:
+            members_result = conn.execute(selection).all()
+            return members_result
+
     def get_column(self, table:str, column:str):
         # Returns the first column that matches. The column is a list.
         sql = f'SELECT {column} FROM {table}'
@@ -173,3 +179,10 @@ if __name__ == '__main__':
     db = HvzDb()
     print(db.get_member(509173983132778506).Name)
     print(db.edit_member(509173983132778506, 'Faction', 'human'))
+    members = db.get_members()
+
+    for m in members:
+        msg = ''
+        for x in m:
+            msg += f'{x} '
+        print(msg)

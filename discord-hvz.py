@@ -289,7 +289,6 @@ async def member(ctx):
 
 @member.command()
 @commands.has_role('Admin')
-
 @check_event
 async def delete(ctx, list_of_members: str):
     '''
@@ -339,11 +338,11 @@ async def edit(ctx, member: str, attribute: str, value: str):
 
 @member.command()
 @commands.has_role('Admin')
+@check_event
 async def list(ctx):
     '''
     Lists all members.
 
-    Valid attributes are the column names in the database, which can be found in exported Google Sheets.
     '''
     tableName = 'members'
     if not len(ctx.message.mentions) == 0:
@@ -352,13 +351,12 @@ async def list(ctx):
     try:
         columnString = ""
         charLength = 0
+
+        data = db.get_members()
         
-        sql = f'SELECT ID, Name, Email FROM {tableName}'
-        cur = db.conn.cursor()
-        data = cur.execute(sql).fetchall()
         if data:
-            for i in range(len(data)):
-                subString = '<@!' + data[i][0] + '>' + '\t' + data[i][1] + '\t' + data[i][2] + '\n'
+            for m in data:
+                subString = '<@!' + m['ID'] + '>' + '\t' + m['Name'] + '\t' + m['Email'] + '\n'
                 charLength += len(subString)
                 if charLength > DISCORD_MESSAGE_MAX_LENGTH:
                     await ctx.send(f'{columnString}')
@@ -370,8 +368,11 @@ async def list(ctx):
             await ctx.send(f'Could not find columns in table "{tableName}". You may not have any members yet.')
 
     except ValueError as e:
+        log.exception(e)
         await ctx.send(f'Bad command! Error: {e}')
+
     except Exception as e:
+        log.exception(e)
         await ctx.send(f'Fatal database error! --> {e}')
         raise
 
