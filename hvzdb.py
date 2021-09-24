@@ -1,5 +1,3 @@
-import sqlite3
-from sqlite3 import Error
 import discord
 import logging
 
@@ -15,7 +13,6 @@ from sqlalchemy import func, cast
 
 log = logging.getLogger(__name__)
 
-# TODO: convert this to use SQLAlchemy, an ORM
 
 class HvzDb():
     def __init__(self):
@@ -26,58 +23,25 @@ class HvzDb():
         self.members_table = Table('members', self.metadata_obj, autoload_with=self.engine)
         self.tag_logging_table = Table('tag_logging', self.metadata_obj, autoload_with=self.engine)
 
-
-        
-        
+ 
         selection = select(self.members_table)
         with self.engine.begin() as conn:
             result = conn.execute(selection)
             self.members_table.keys = result.keys()
 
 
+    def add_member(self, member_row):
+        result = self.__add_row(self.members_table, member_row)
+        return result
 
-    def add_row(self, table, row):
-        # Assembles an SQL statement to make a new row (tag, member, etc.)
-        # Permits SQL injection attacks, but we can fix that later
-        columns = ''
-        values = ''
-        for key in row:
-            columns += ('\'' + key + '\',')
-            values += ('\'' + row[key] + '\',')
-        columns = columns[:-1]
-        values = values[:-1]
+    def __add_row(self, table, row):
 
-        sql = f''' INSERT INTO {table}({columns})
-                  VALUES({values})'''
+        with self.engine.begin() as conn:
+            result = conn.execute(insert(self.members_table), row)
+            return result
 
-        cur = self.conn.cursor()
-        cur.execute(sql)
-        self.conn.commit()
-        return cur.lastrowid
 
-    def delete_row(self, table, member):
-
-        member_id = member
-        if isinstance(member, discord.abc.User):
-            member_id = member.id
-
-        sql = f''' DELETE FROM {table}
-                WHERE ID = {member_id};
-        '''
-
-        cur = self.conn.cursor()
-        cur.execute(sql)
-        self.conn.commit()
-        return 1
-
-    def get_table(self, table):
-        cur = self.conn.cursor()
-        rows = cur.execute(f'SELECT * FROM {table}').fetchall()
-        columns = cur.description
-        rows.insert(0, [c[0] for c in columns])
-        return rows
-
-    def get_member(self, member):
+    def get_member(self, value, column=None):
         '''
         Returns a Row object that represents a single member in the database
 
@@ -87,11 +51,18 @@ class HvzDb():
         Returns:
                 row (Row): Row object. Access rows in these ways: row.some_row, row['some_row']
         '''
-        member_id = member
-        if isinstance(member, discord.abc.User):
-            member_id = member.id
+        if column is not None:
+            search_value = value
+            search_column = column
+        else:
+            search_column = 'ID'
+            if isinstance(value, discord.abc.User):
+                search_value = value.id
+            else:
+                search_value = value
 
-        member_row = self.__get_row(self.members_table, self.members_table.c.ID, member_id)
+
+        member_row = self.__get_row(self.members_table, self.members_table.c[search_column], search_value)
         return member_row
 
 
@@ -113,13 +84,14 @@ class HvzDb():
             result_row = conn.execute(selection).first()
             return result_row
 
+
     def get_members(self):
         selection = select(self.members_table)
         with self.engine.begin() as conn:
             members_result = conn.execute(selection).all()
             return members_result
 
-    def get_column(self, table:str, column:str):
+    def get_column(self, table: str, column: str):
         # Returns the first column that matches. The column is a list.
         sql = f'SELECT {column} FROM {table}'
         cur = self.conn.cursor()
@@ -167,17 +139,10 @@ class HvzDb():
             return True
 
 
-    class DBError(Exception):
-        pass
-
-    def dump(self, obj):
-        '''Prints the passed object in a very detailed form for debugging'''
-        for attr in dir(obj):
-            log.debug("obj.%s = %r" % (attr, getattr(obj, attr)))
-
+# Below is just for testing when this file is run from the command line
 if __name__ == '__main__':
     db = HvzDb()
-    print(db.get_member(509173983132778506).Name)
+    print(db.get_member('H9K9FJ', 'Tag_Code').Name)
     print(db.edit_member(509173983132778506, 'Faction', 'human'))
     members = db.get_members()
 
