@@ -31,6 +31,16 @@ class HvzDb():
 
 
     def add_member(self, member_row):
+        '''
+        Adds a member to the database
+
+        Parameters:
+                member_row (dict): A dict with pairs of column_name:value. Example:
+                                    {'Name': 'George Soros', 'CPO': 9001, ...}
+
+        Returns:
+                result (result object?): This needs work.
+        '''
         result = self.__add_row(self.members_table, member_row)
         return result
 
@@ -86,11 +96,22 @@ class HvzDb():
 
 
     def get_members(self):
+        '''
+        Returns a list of all members in the database
+
+        Parameters:
+                none
+
+        Returns:
+                members_result (list[Row]): List of Rows. Rows are like tuples, but with dictionary
+                                                keys. Like this: row['Name'] or row.Name
+        '''
         selection = select(self.members_table)
         with self.engine.begin() as conn:
             members_result = conn.execute(selection).all()
             return members_result
 
+    # Legacy method left in here for reference
     def get_column(self, table: str, column: str):
         # Returns the first column that matches. The column is a list.
         sql = f'SELECT {column} FROM {table}'
