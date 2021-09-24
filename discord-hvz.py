@@ -1,5 +1,6 @@
 #!/bin/python3
 
+import enum
 from config import config
 import sheets
 from chatbot import ChatBot
@@ -25,6 +26,10 @@ from os import getenv
 
 import string
 import random
+
+import re
+
+DISCORD_MESSAGE_MAX_LENGTH = 2000
 
 
 def dump(obj):
@@ -284,6 +289,7 @@ async def member(ctx):
 
 @member.command()
 @commands.has_role('Admin')
+
 @check_event
 async def delete(ctx, list_of_members: str):
     '''
@@ -328,7 +334,45 @@ async def edit(ctx, member: str, attribute: str, value: str):
     except ValueError as e:
         await ctx.send(f'Bad command! Error: {e}')
     except Exception as e:
-        await ctx.send(f'Fatal dataase error! --> {e}')
+        await ctx.send(f'Fatal database error! --> {e}')
+        raise
+
+@member.command()
+@commands.has_role('Admin')
+async def list(ctx):
+    '''
+    Lists all members.
+
+    Valid attributes are the column names in the database, which can be found in exported Google Sheets.
+    '''
+    tableName = 'members'
+    if not len(ctx.message.mentions) == 0:
+        await ctx.send('Command does not accept arguments. Ignoring args.')
+    
+    try:
+        columnString = ""
+        charLength = 0
+        
+        sql = f'SELECT ID, Name, Email FROM {tableName}'
+        cur = db.conn.cursor()
+        data = cur.execute(sql).fetchall()
+        if data:
+            for i in range(len(data)):
+                subString = '<@!' + data[i][0] + '>' + '\t' + data[i][1] + '\t' + data[i][2] + '\n'
+                charLength += len(subString)
+                if charLength > DISCORD_MESSAGE_MAX_LENGTH:
+                    await ctx.send(f'{columnString}')
+                    columnString = ""
+                    charLength = len(subString)
+                columnString += subString
+            await ctx.send(f'{columnString}')
+        else:
+            await ctx.send(f'Could not find columns in table "{tableName}". You may not have any members yet.')
+
+    except ValueError as e:
+        await ctx.send(f'Bad command! Error: {e}')
+    except Exception as e:
+        await ctx.send(f'Fatal database error! --> {e}')
         raise
 
 @bot.command()
@@ -361,30 +405,37 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
     if chatbot.chat_type == 'registration':
         responses['faction'] = 'human'
         responses['id'] = str(chatbot.member.id)
-
-        tag_code = ''
         try:
-            while True:
-                code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '015IOUDQVS'))
-                for n in range(6):
-                    tag_code += code_set[random.randint(0, len(code_set) - 1)]
-                if db.get_row('members', 'tag_code', tag_code) is None:
-                    break
-                else:
-                    tag_code = ''
-        except Exception as e:
-            chatbot.member.send('Could not generate your tag code. This is a bug! Contact an admin.')
-            log.error('Error generating tag code --> ', e)
-            return
+            tag_code = ''
+            try:
+                while True:
+                    code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '015IOUDQVS'))
+                    for n in range(6):
+                        tag_code += code_set[random.randint(0, len(code_set) - 1)]
+                    if db.get_row('members', 'tag_code', tag_code) is None:
+                        break
+                    else:
+                        tag_code = ''
+            except Exception as e:
+                chatbot.member.send('Could not generate your tag code. This is a bug! Contact an admin.')
+                log.error('Error generating tag code --> ', e)
+                return
 
-        responses['tag_code'] = tag_code
+            responses['tag_code'] = tag_code
 
-        db.add_row('members', responses)
-        sheets.export_to_sheet('members')  # I always update the Google sheet after changing a value in the db
+            db.add_row('members', responses)
+            try:
+                sheets.export_to_sheet('members')  # I always update the Google sheet after changing a value in the db
+            except Exception:
+                log.exception(f'Exception when calling export_to_sheet() from resolve_chat() User: {chatbot.member.name}')
 
-        await chatbot.member.add_roles(bot.roles['player'])
-        await chatbot.member.add_roles(bot.roles['human'])
-        return 1
+            await chatbot.member.add_roles(bot.roles['player'])
+            await chatbot.member.add_roles(bot.roles['human'])
+            return 1
+        except Exception:
+            name = responses['name']
+            log.exception(f'Exception when completing registration for {chatbot.member.name}, {name}')
+            await chatbot.member.send('Something went very wrong with the registration, and it was not successful. Please message Conner Anderson about it.')
 
     elif chatbot.chat_type == 'tag_logging':
 
