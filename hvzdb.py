@@ -114,7 +114,17 @@ class HvzDb():
             return result_row
 
     def edit_member(self, member, column, value):
+        '''
+        Edits an attribute of a member in the database
 
+        Parameters:
+                member (int or user): A user id or a discord.abc.User object
+                column (str): A string matching the column to change. Case sensitive.
+                value (any?): Value to change the cell to.
+
+        Returns:
+                result (bool): True if the edit was successful, False if it was not.
+        '''
         member_id = member
         if isinstance(member, discord.abc.User):
             member_id = member.id
@@ -128,7 +138,6 @@ class HvzDb():
         return result
 
 
-
     def __edit_row(self, table, search_column, search_value, target_column, target_value):
         updator = (
             update(table).where(search_column == search_value).
@@ -139,17 +148,9 @@ class HvzDb():
             return False
 
         with self.engine.begin() as conn:
-            result = conn.execute(updator)
-            return result
+            conn.execute(updator)
+            return True
 
-    def create_project(self, conn, project):
-        # Leftover example code
-        sql = ''' INSERT INTO projects(name,begin_date,end_date)
-                  VALUES(?,?,?) '''
-        cur = self.conn.cursor()
-        cur.execute(sql, project)
-        self.conn.commit()
-        return cur.lastrowid
 
     class DBError(Exception):
         pass
@@ -162,4 +163,4 @@ class HvzDb():
 if __name__ == '__main__':
     db = HvzDb()
     print(db.get_member(509173983132778506).Name)
-    print(db.edit_member(509173983132778506, 'Factio', 'Potato'))
+    print(db.edit_member(509173983132778506, 'Faction', 'human'))
