@@ -193,12 +193,7 @@ class HvzDb():
 # Below is just for testing when this file is run from the command line
 if __name__ == '__main__':
     db = HvzDb()
-    print(db.get_member('H9K9F-', 'Tag_Code').Name)
-    print(db.edit_member(509173983132778506, 'Faction', 'human'))
-    members = db.get_members()
-
-    for m in members:
-        msg = ''
-        for x in m:
-            msg += f'{x} '
-        print(msg)
+    member = db.get_member('293465952895631360')
+    print(member.Registration_Time)
+    print(type(member.Registration_Time))
+ 

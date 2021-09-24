@@ -53,7 +53,6 @@ def export_to_sheet(table_name):
 
     update_nicknames()
     table = DB.get_members()
-    log.info('Got table')
 
     # Temporary fix until we make the database system for variable
     sheet_names = {'members': config['members_sheet_name'], 'tag_logging': config['tag_log_sheet_name']}
@@ -64,31 +63,11 @@ def export_to_sheet(table_name):
     for y, row in enumerate(table):
         values.append([])
         for x, c in enumerate(order):
-            values[y].append(row[c])
+            if c == 'Registration_Time':
+                values[y].append(row[x].isoformat())
+            else:
+                values[y].append(row[c])
     values.insert(0, order)
-
-            # Reminder: Should just put nicknames and such in the database. 
-            # Need to have a way to create a database
-
-    
-
-
-    '''
-    # Bit of a quick and dirty fix. This whole thing needs a rework
-    if table_name == 'members':
-        name_index = values[0].index('Name')
-        id_index = values[0].index('ID')
-        values[0].insert(name_index + 1, 'Nickname')
-        values[0].insert(name_index + 2, 'Discord Name')
-
-        for i, row in enumerate(values[1:]):
-            new_row = list(row)
-            member_id = row[id_index]
-            member = BOT.guild.get_member(int(member_id))
-            new_row.insert(name_index + 1, member.nick)
-            new_row.insert(name_index + 2, member.name)
-            values[i + 1] = new_row
-    '''
 
 
     # Erases entire sheet below row 1!
@@ -123,7 +102,6 @@ def update_nicknames():
         try:
             nickname = BOT.guild.get_member(int(m.ID)).nick
             DB.edit_member(m.ID, 'Nickname', nickname)
-            log.info(f'Updated nickname for {m.Name} to {nickname}')
         except Exception as e:
             log.debug(f'Could not update {m.Name}\'s Nickname. --> {e}')
 
