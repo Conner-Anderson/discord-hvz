@@ -131,9 +131,10 @@ async def on_ready():
 
 
         log.critical(f'Discord-HvZ bot launched correctly! Logged in as: {bot.user.name} ------------------------------------------')
+        sheets.export_to_sheet('members')
 
     except Exception as e:
-        log.critical(f'Bot startup failed with this error --> {e}')
+        log.exception(f'Bot startup failed with this error --> {e}')
         await bot.close()
         time.sleep(1)
 
@@ -410,6 +411,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
     if chatbot.chat_type == 'registration':
         responses['Faction'] = 'human'
         responses['ID'] = str(chatbot.member.id)
+        responses['Discord_Name'] = chatbot.member.name
         try:
             tag_code = ''
             try:
@@ -444,27 +446,19 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
 
     elif chatbot.chat_type == 'tag_logging':
 
-        if bot.roles['human'] in chatbot.member.roles:
-            await chatbot.member.send('Hold up... you\'re a  human! You can\'t tag anyone. The zombie who tagged you may not have logged their tag')
-            return 0
+        tagged_member_data = db.get_member(responses['Tag_Code'], column='Tag_Code')
 
-        tagged_member_data = db.get_row('members', 'tag_code', responses['tag_code'])
-
-        if not tagged_member_data:
+        if tagged_member_data is None:
             await chatbot.member.send('That tag code doesn\'t match anyone! Try again.')
             return 0
 
-        tagged_user_id = int(tagged_member_data['id'])
-
-        if tagged_user_id == 0:
-            await chatbot.member.send('Something went wrong with the database... This is a bug! Please contact an admin.')
-            return 0
+        tagged_user_id = int(tagged_member_data['ID'])
 
         tagged_member = bot.guild.get_member(tagged_user_id)
 
         if tagged_member is None:
-            await chatbot.member.send('Couldn\'t find the user you tagged... This is a bug! Please contact an admin.')
-            return
+            await chatbot.member.send('Couldn\'t find the user you tagged... Are they still in the game? Please contact an admin.')
+            return 0
 
         if bot.roles['zombie'] in tagged_member.roles:
             await chatbot.member.send('%s is already a zombie! What are you up to?' % (tagged_member_data['Name']))
@@ -489,14 +483,15 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             await tagged_member.remove_roles(bot.roles['human'])
         except discord.HTTPException as e:
             chatbot.member.send('Couldn\'t change the tagged player\'s Discord role! Contact an admin.')
-            log.error('Tried to change user roles and failed --> ', e)
+            log.exception(e)
 
-        db.edit_member(tagged_member, 'faction', 'zombie')
+        db.edit_member(tagged_member, 'Faction', 'zombie')
         sheets.export_to_sheet('members')
 
         msg = f'<@{tagged_user_id}> has turned zombie!\nTagged by <@{chatbot.member.id}>\n'
         msg += tag_datetime.strftime('%A, at about %I:%M %p')
         await bot.channels['tag-announcements'].send(msg)
+
 
 
 

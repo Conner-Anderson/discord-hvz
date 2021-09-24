@@ -50,11 +50,30 @@ def setup(db, bot):
 
 
 def export_to_sheet(table_name):
-    values = DB.get_table(table_name)
+
+    update_nicknames()
+    table = DB.get_members()
+    log.info('Got table')
 
     # Temporary fix until we make the database system for variable
     sheet_names = {'members': config['members_sheet_name'], 'tag_logging': config['tag_log_sheet_name']}
 
+    # Let's turn the list of Rows into a list of lists. Google wants that.
+    order = ['ID', 'Name', 'Nickname', 'Discord_Name', 'Faction', 'CPO', 'Tag_Code', 'OZ_Desire', 'Email', 'Want_Bandana', 'Registration_Time']
+    values = []
+    for y, row in enumerate(table):
+        values.append([])
+        for x, c in enumerate(order):
+            values[y].append(row[c])
+    values.insert(0, order)
+
+            # Reminder: Should just put nicknames and such in the database. 
+            # Need to have a way to create a database
+
+    
+
+
+    '''
     # Bit of a quick and dirty fix. This whole thing needs a rework
     if table_name == 'members':
         name_index = values[0].index('Name')
@@ -69,6 +88,7 @@ def export_to_sheet(table_name):
             new_row.insert(name_index + 1, member.nick)
             new_row.insert(name_index + 2, member.name)
             values[i + 1] = new_row
+    '''
 
 
     # Erases entire sheet below row 1!
@@ -79,7 +99,7 @@ def export_to_sheet(table_name):
     try:
         result = SPREADSHEETS.values().update(spreadsheetId=SPREADSHEET_ID, range=f'\'{table_name}\'!A1:ZZZ', valueInputOption='USER_ENTERED', body=body).execute()
     except Exception as e:
-        log.error('There was an exception with the Google API request! Here it is: %s' % (e))
+        log.exception('There was an exception with the Google API request! Here it is: %s' % (e))
     else:
         log.debug('{0} cells updated.'.format(result.get('updatedCells')))
 
@@ -95,6 +115,18 @@ def read_sheet(sheet_name, range):
         return 0
     else:
         return result.get('values', 0)
+
+def update_nicknames():
+    members = DB.get_members()
+
+    for m in members:
+        try:
+            nickname = BOT.guild.get_member(int(m.ID)).nick
+            DB.edit_member(m.ID, 'Nickname', nickname)
+            log.info(f'Updated nickname for {m.Name} to {nickname}')
+        except Exception as e:
+            log.debug(f'Could not update {m.Name}\'s Nickname. --> {e}')
+
 
 
 # Formats a number as a bijective base N string. For converting to A1 notation. Might use later.

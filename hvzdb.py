@@ -1,29 +1,59 @@
 import discord
 import logging
+import os.path
 
 from sqlalchemy import create_engine
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from sqlalchemy import MetaData
-from sqlalchemy import Table, Column, Integer, String
+from sqlalchemy import Table, Column, Integer, String, DateTime
 from sqlalchemy import ForeignKey
 from sqlalchemy import insert, select
 from sqlalchemy import update
 from sqlalchemy import func, cast
+from sqlalchemy.exc import NoSuchTableError
 
 log = logging.getLogger(__name__)
 
 
 class HvzDb():
     def __init__(self):
+        new_file = False
+        self.metadata_obj = MetaData()
+        if not os.path.exists('hvzdb.db'):
+            new_file = True
 
         self.engine = create_engine("sqlite+pysqlite:///hvzdb.db", future=True)
-        self.metadata_obj = MetaData()
 
-        self.members_table = Table('members', self.metadata_obj, autoload_with=self.engine)
-        self.tag_logging_table = Table('tag_logging', self.metadata_obj, autoload_with=self.engine)
+        if new_file is False:
+            try:
+                self.members_table = Table('members', self.metadata_obj, autoload_with=self.engine)
+            except NoSuchTableError:
+                log.error('No such table')
+                new_file = True
 
- 
+        if new_file is True:
+            self.members_table = Table(
+                'members',
+                self.metadata_obj,
+                Column('ID', String, primary_key=True, nullable=False),
+                Column('Name', String),
+                Column('Nickname', String),
+                Column('Discord_Name', String),
+                Column('CPO', String),
+                Column('Faction', String),
+                Column('Tag_Code', String),
+                Column('OZ_Desire', String),
+                Column('Email', String),
+                Column('Want_Bandana', String),
+                Column('Registration_Time', DateTime)
+            )
+            self.metadata_obj.create_all(self.engine)
+
+
+        # self.tag_logging_table = Table('tag_logging', self.metadata_obj, autoload_with=self.engine)
+
+        
         selection = select(self.members_table)
         with self.engine.begin() as conn:
             result = conn.execute(selection)
@@ -163,7 +193,7 @@ class HvzDb():
 # Below is just for testing when this file is run from the command line
 if __name__ == '__main__':
     db = HvzDb()
-    print(db.get_member('H9K9FJ', 'Tag_Code').Name)
+    print(db.get_member('H9K9F-', 'Tag_Code').Name)
     print(db.edit_member(509173983132778506, 'Faction', 'human'))
     members = db.get_members()
 
