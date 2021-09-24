@@ -1,6 +1,5 @@
 #!/bin/python3
 
-import enum
 from config import config
 import sheets
 from chatbot import ChatBot
@@ -27,7 +26,8 @@ from os import getenv
 import string
 import random
 
-import re
+from sqlalchemy.exc import NoSuchColumnError
+
 
 DISCORD_MESSAGE_MAX_LENGTH = 2000
 
@@ -199,7 +199,7 @@ async def on_message(message):
 @check_dm_allowed
 async def register(ctx):
 
-    if len(db.get_member(ctx.author)) != 0:
+    if db.get_member(ctx.author) is not None:
         await ctx.author.send('You are already registered for HvZ! Contact an admin if you think this is wrong.')
         await ctx.edit_origin()
         return
@@ -246,10 +246,10 @@ async def on_member_update(before, after):
         human = bot.roles['human'] in after.roles
 
         if zombie and not human:
-            db.edit_member(after, 'faction', 'zombie')
+            db.edit_member(after, 'Faction', 'zombie')
             sheets.export_to_sheet('members')
         elif human and not zombie:
-            db.edit_member(after, 'faction', 'human')
+            db.edit_member(after, 'Faction', 'human')
             sheets.export_to_sheet('members')
 
 
@@ -289,7 +289,6 @@ async def member(ctx):
 
 @member.command()
 @commands.has_role('Admin')
-
 @check_event
 async def delete(ctx, list_of_members: str):
     '''
@@ -320,6 +319,7 @@ async def edit(ctx, member: str, attribute: str, value: str):
     Edits one attribute of a member
 
     Valid attributes are the column names in the database, which can be found in exported Google Sheets.
+    Case sensitive!
     There is no validation to check if the value you provide will work, so be careful! 
     '''
     if not len(ctx.message.mentions) == 1:
@@ -327,23 +327,26 @@ async def edit(ctx, member: str, attribute: str, value: str):
         return
     member = ctx.message.mentions[0]
     try:
-        original_value = db.get_row('members', 'ID', member.id)[attribute]
+        original_value = db.get_member(member)[attribute]
         db.edit_member(member, attribute, value)
         await ctx.send(f'The value of {attribute} for <@{member.id}> was changed from {original_value} to {value}.')
 
     except ValueError as e:
         await ctx.send(f'Bad command! Error: {e}')
+    except NoSuchColumnError as e:
+        await ctx.send(f'The attribute \"{attribute}\" you provided does not match a column in the database.')
+        log.exception(e)
     except Exception as e:
         await ctx.send(f'Fatal database error! --> {e}')
         raise
 
 @member.command()
 @commands.has_role('Admin')
+@check_event
 async def list(ctx):
     '''
     Lists all members.
 
-    Valid attributes are the column names in the database, which can be found in exported Google Sheets.
     '''
     tableName = 'members'
     if not len(ctx.message.mentions) == 0:
@@ -352,13 +355,12 @@ async def list(ctx):
     try:
         columnString = ""
         charLength = 0
+
+        data = db.get_members()
         
-        sql = f'SELECT ID, Name, Email FROM {tableName}'
-        cur = db.conn.cursor()
-        data = cur.execute(sql).fetchall()
         if data:
-            for i in range(len(data)):
-                subString = '<@!' + data[i][0] + '>' + '\t' + data[i][1] + '\t' + data[i][2] + '\n'
+            for m in data:
+                subString = '<@!' + m['ID'] + '>' + '\t' + m['Name'] + '\t' + m['Email'] + '\n'
                 charLength += len(subString)
                 if charLength > DISCORD_MESSAGE_MAX_LENGTH:
                     await ctx.send(f'{columnString}')
@@ -370,8 +372,11 @@ async def list(ctx):
             await ctx.send(f'Could not find columns in table "{tableName}". You may not have any members yet.')
 
     except ValueError as e:
+        log.exception(e)
         await ctx.send(f'Bad command! Error: {e}')
+
     except Exception as e:
+        log.exception(e)
         await ctx.send(f'Fatal database error! --> {e}')
         raise
 
@@ -403,8 +408,8 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
     log.debug(f'Responses recieved in resolve_chat() --> {responses}')
 
     if chatbot.chat_type == 'registration':
-        responses['faction'] = 'human'
-        responses['id'] = str(chatbot.member.id)
+        responses['Faction'] = 'human'
+        responses['ID'] = str(chatbot.member.id)
         try:
             tag_code = ''
             try:
@@ -412,7 +417,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
                     code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '015IOUDQVS'))
                     for n in range(6):
                         tag_code += code_set[random.randint(0, len(code_set) - 1)]
-                    if db.get_row('members', 'tag_code', tag_code) is None:
+                    if db.get_member(tag_code, column='Tag_Code') is None:
                         break
                     else:
                         tag_code = ''
@@ -421,9 +426,9 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
                 log.error('Error generating tag code --> ', e)
                 return
 
-            responses['tag_code'] = tag_code
+            responses['Tag_Code'] = tag_code
 
-            db.add_row('members', responses)
+            db.add_member(responses)
             try:
                 sheets.export_to_sheet('members')  # I always update the Google sheet after changing a value in the db
             except Exception:
@@ -433,7 +438,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             await chatbot.member.add_roles(bot.roles['human'])
             return 1
         except Exception:
-            name = responses['name']
+            name = responses['Name']
             log.exception(f'Exception when completing registration for {chatbot.member.name}, {name}')
             await chatbot.member.send('Something went very wrong with the registration, and it was not successful. Please message Conner Anderson about it.')
 

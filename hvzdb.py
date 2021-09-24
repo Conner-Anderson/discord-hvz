@@ -1,144 +1,97 @@
-import sqlite3
-from sqlite3 import Error
 import discord
 import logging
 
+from sqlalchemy import create_engine
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+from sqlalchemy import MetaData
+from sqlalchemy import Table, Column, Integer, String
+from sqlalchemy import ForeignKey
+from sqlalchemy import insert, select
+from sqlalchemy import update
+from sqlalchemy import func, cast
+
 log = logging.getLogger(__name__)
 
-# TODO: convert this to use SQLAlchemy, an ORM
 
 class HvzDb():
     def __init__(self):
-        database = r"hvzdb.db"
-        # Create databases. It would be nice to make this variable, but it is easier to code
-        # everything else if this is easy to read.
-        # There is some remnant code here from earlier tests
-        sql_create_members_table = """ CREATE TABLE IF NOT EXISTS members (
-                                            ID text PRIMARY KEY,
-                                            Name text NOT NULL,
-                                            CPO text,
-                                            Faction text,
-                                            Tag_Code text,
-                                            OZ_Desire text,
-                                            Email text,
-                                            Want_Bandana text
-                                        ); """
 
-        sql_create_tasks_table = """CREATE TABLE IF NOT EXISTS tag_logging (
-                                        Tag_Code text PRIMARY KEY,
-                                        Tag_Day text,
-                                        Tag_Time time,
-                                        Log_Time time
-                                    );"""
-        self.conn = self.create_connection(database)
-        # self.conn.row_factory = sqlite3.Row  # Queries of rows now return Row objects. They are similar to tuples, but with dict-like functions
+        self.engine = create_engine("sqlite+pysqlite:///hvzdb.db", future=True)
+        self.metadata_obj = MetaData()
 
-        if self.conn is not None:
+        self.members_table = Table('members', self.metadata_obj, autoload_with=self.engine)
+        self.tag_logging_table = Table('tag_logging', self.metadata_obj, autoload_with=self.engine)
 
-            self.create_table(self.conn, sql_create_members_table)
-            self.create_table(self.conn, sql_create_tasks_table)
-        else:
-            log.critical('Error! Cannot create this database connection!')
-            raise Exception('Could not connect to the database!')
+ 
+        selection = select(self.members_table)
+        with self.engine.begin() as conn:
+            result = conn.execute(selection)
+            self.members_table.keys = result.keys()
 
 
-    def create_connection(self, db_file):
-        """ create a database connection to a SQLite database """
-        conn = None
-        try:
-            conn = sqlite3.connect(db_file)
-        except Exception:
-            log.critical('Could not create database connection')
-            raise
+    def add_member(self, member_row):
+        result = self.__add_row(self.members_table, member_row)
+        return result
 
-        return conn
+    def __add_row(self, table, row):
 
-    def create_table(self, conn, create_table_sql):
+        with self.engine.begin() as conn:
+            result = conn.execute(insert(self.members_table), row)
+            return result
 
-        try:
-            c = conn.cursor()
-            c.execute(create_table_sql)
-            self.conn.commit()
-        except Error as e:
-            log.error(e)
 
-    def add_row(self, table, row):
-        # Assembles an SQL statement to make a new row (tag, member, etc.)
-        # Permits SQL injection attacks, but we can fix that later
-        columns = ''
-        values = ''
-        for key in row:
-            columns += ('\'' + key + '\',')
-            values += ('\'' + row[key] + '\',')
-        columns = columns[:-1]
-        values = values[:-1]
-
-        sql = f''' INSERT INTO {table}({columns})
-                  VALUES({values})'''
-
-        cur = self.conn.cursor()
-        cur.execute(sql)
-        self.conn.commit()
-        return cur.lastrowid
-
-    def delete_row(self, table, member):
-
-        member_id = member
-        if isinstance(member, discord.abc.User):
-            member_id = member.id
-
-        sql = f''' DELETE FROM {table}
-                WHERE ID = {member_id};
+    def get_member(self, value, column=None):
         '''
+        Returns a Row object that represents a single member in the database
 
-        cur = self.conn.cursor()
-        cur.execute(sql)
-        self.conn.commit()
-        return 1
+        Parameters:
+                member (int or user): A user id or a discord.abc.User object
 
-    def get_table(self, table):
-        cur = self.conn.cursor()
-        rows = cur.execute(f'SELECT * FROM {table}').fetchall()
-        columns = cur.description
-        rows.insert(0, [c[0] for c in columns])
-        return rows
+        Returns:
+                row (Row): Row object. Access rows in these ways: row.some_row, row['some_row']
+        '''
+        if column is not None:
+            search_value = value
+            search_column = column
+        else:
+            search_column = 'ID'
+            if isinstance(value, discord.abc.User):
+                search_value = value.id
+            else:
+                search_value = value
 
-    def get_member(self, member):
-        # Returns a row<list> from the database. Takes a member object or id.
-        output_row = {}
-        member_id = member
-        if isinstance(member, discord.abc.User):
-            member_id = member.id
 
-        sql = f'SELECT * FROM members WHERE ID = {member_id}'
-        cur = self.conn.cursor()
-        try:
-            row = cur.execute(sql).fetchone()
-            if row is not None:
-                columns = cur.description
-                for c, x in enumerate(row):
-                    output_row[columns[c][0]] = x
-        except sqlite3.OperationalError as e:
-            raise ValueError(e)
-        return output_row
+        member_row = self.__get_row(self.members_table, self.members_table.c[search_column], search_value)
+        return member_row
 
-    def get_row(self, table, column, value):
-        # Returns the first row that matches. The row is a dict, where the keys are column names
-        output = None
-        sql = f'''SELECT * FROM {table}
-                WHERE {column} = \'{value}\''''
-        cur = self.conn.cursor()
 
-        row = cur.execute(sql).fetchone()
-        if row is not None:
-            columns = cur.description
-            output = {}
-            for c, x in enumerate(row):
-                output[columns[c][0]] = x
+    def __get_row(self, table, column, value):
+        '''
+        Returns the first Row object where the specified value matches.
+        Meant to be used within the class.
 
-        return output
+        Parameters:
+                table (sqlalchemy.table): Table object
+                column (sqlalchemy.column): Column object to search for value
+                value (any): Value to search column for
 
-    def get_column(self, table:str, column:str):
+        Returns:
+                row (Row): Row object. Access rows in these ways: row.some_row, row['some_row']
+        '''
+        selection = select(table).where(column == value)
+        with self.engine.begin() as conn:
+            result_row = conn.execute(selection).first()
+            return result_row
+
+
+    def get_members(self):
+        selection = select(self.members_table)
+        with self.engine.begin() as conn:
+            members_result = conn.execute(selection).all()
+            return members_result
+
+    def get_column(self, table: str, column: str):
         # Returns the first column that matches. The column is a list.
         sql = f'SELECT {column} FROM {table}'
         cur = self.conn.cursor()
@@ -148,30 +101,53 @@ class HvzDb():
         return output
 
     def edit_member(self, member, column, value):
-        try:
-            member_id = member
-            if isinstance(member, discord.abc.User):
-                member_id = member.id
+        '''
+        Edits an attribute of a member in the database
 
-            sql = f'''UPDATE members
-                    SET {column} = \'{value}\'
-                    WHERE ID = \'{member_id}\'
-            '''
-            cur = self.conn.cursor()
-            cur.execute(sql)
-            self.conn.commit()
-        except sqlite3.OperationalError as e:
-            raise ValueError(e)
+        Parameters:
+                member (int or user): A user id or a discord.abc.User object
+                column (str): A string matching the column to change. Case sensitive.
+                value (any?): Value to change the cell to.
+
+        Returns:
+                result (bool): True if the edit was successful, False if it was not.
+        '''
+        member_id = member
+        if isinstance(member, discord.abc.User):
+            member_id = member.id
+        result = self.__edit_row(
+            self.members_table,
+            self.members_table.c.ID,
+            member_id,
+            column,
+            value
+        )
+        return result
 
 
-    def create_project(self, conn, project):
-        # Leftover example code
-        sql = ''' INSERT INTO projects(name,begin_date,end_date)
-                  VALUES(?,?,?) '''
-        cur = self.conn.cursor()
-        cur.execute(sql, project)
-        self.conn.commit()
-        return cur.lastrowid
+    def __edit_row(self, table, search_column, search_value, target_column, target_value):
+        updator = (
+            update(table).where(search_column == search_value).
+            values({target_column: target_value})
+        )
 
-    class DBError(Exception):
-        pass
+        if target_column not in table.keys:
+            return False
+
+        with self.engine.begin() as conn:
+            conn.execute(updator)
+            return True
+
+
+# Below is just for testing when this file is run from the command line
+if __name__ == '__main__':
+    db = HvzDb()
+    print(db.get_member('H9K9FJ', 'Tag_Code').Name)
+    print(db.edit_member(509173983132778506, 'Faction', 'human'))
+    members = db.get_members()
+
+    for m in members:
+        msg = ''
+        for x in m:
+            msg += f'{x} '
+        print(msg)
