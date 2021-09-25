@@ -187,7 +187,8 @@ async def on_message(message):
                     resolved_chat = await resolve_chat(chatbot)
                     if resolved_chat == 1:
                         await chatbot.end()
-                        awaiting_chatbots.pop(i)
+                    awaiting_chatbots.pop(i)
+
                 elif result == -1:
                     awaiting_chatbots.pop(i)
                 break
@@ -297,10 +298,10 @@ async def member(ctx):
     if ctx.invoked_subcommand is None:
         await ctx.send('Invalid command passed...')
 
-@member.command()
+@member.command(name='delete')
 @commands.has_role('Admin')
 @check_event
-async def delete(ctx, list_of_members: str):
+async def member_delete(ctx, list_of_members: str):
     '''
     Removes all @mentioned members from the game.
 
@@ -388,10 +389,61 @@ async def list(ctx):
         await ctx.send(f'Bad command! Error: {e}')
 
     except Exception as e:
-        log.exception(e)
-        await ctx.send(f'Fatal database error! --> {e}')
+        log.exception()
+        await ctx.send(e)
         raise
 
+@bot.group(description='A group of commands for interacting with tag logs.')
+@commands.has_role('Admin')
+@check_event
+async def tag(ctx):
+    '''
+    A group of commands to manage tag logs.
+
+    Example command: !member delete @Wookieguy
+    '''
+    if ctx.invoked_subcommand is None:
+        await ctx.send('Invalid command passed...')
+
+@tag.command(name='delete')
+@commands.has_role('Admin')
+@check_event
+async def tag_delete(ctx, tag_id: int):
+    '''
+    Removes the tag by its ID, reverting tagged member to human.
+
+    Takes a tag ID, which you can get from the Google sheet.
+    Removes the tag from the database. Also changes the tagged member back to
+    human if there aren't any remaining tags on them.
+    '''
+    try:
+        tag_row = db.get_tag(tag_id)
+        if tag_row is None:
+            await ctx.reply(f'Could not find a tag with ID \"{tag_id}\"')
+            return
+        db.delete_tag(tag_id)
+        sheets.export_to_sheet('tags')
+        msg = ''
+
+        tagged_member = bot.guild.get_member(int(tag_row.Tagged_ID))
+        existing_tag = db.get_tag(tag_row.Tagged_ID, column='Tagged_ID')
+        if existing_tag is None:
+            # Change to human if there are no previous tags on the tagged member
+            
+            # db.edit_member(tagged_member, 'Faction', 'human')
+            await tagged_member.add_roles(bot.roles['human'])
+            await tagged_member.remove_roles(bot.roles['zombie'])
+            msg += f'Changed <@{tagged_member} to human.>'
+        else:
+            msg += f'Left <@{tagged_member}> as zombie because <@{existing_tag.Tagger_ID}> still tagged them. ' 
+            f'(Tag ID: {existing_tag.Tagger_ID}'
+
+    except Exception as e:
+        log.exception(e)
+        await ctx.send(f'Command error! Error: {e}')
+    else:
+        msg = f'Tag {tag_id} deleted. ' + msg
+        await ctx.reply(msg)
 
 @bot.command()
 @commands.has_role('Admin')

@@ -8,8 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import MetaData
 from sqlalchemy import Table, Column, Integer, String, DateTime
 from sqlalchemy import ForeignKey
-from sqlalchemy import insert, select
-from sqlalchemy import update
+from sqlalchemy import insert, select, delete, update
 from sqlalchemy import func, cast
 from sqlalchemy.exc import NoSuchTableError
 
@@ -67,11 +66,12 @@ class HvzDb():
 
         # self.tag_logging_table = Table('tag_logging', self.metadata_obj, autoload_with=self.engine)
 
-        
-        selection = select(self.tables['members'])
-        with self.engine.begin() as conn:
-            result = conn.execute(selection)
-            self.tables['members'].keys = result.keys()
+        # Give each table a keys tuple which is all column names
+        for n, t in self.tables.items():
+            selection = select(t)
+            with self.engine.begin() as conn:
+                result = conn.execute(selection)
+                t.keys = result.keys()
 
 
     def add_member(self, member_row):
@@ -133,8 +133,29 @@ class HvzDb():
         member_row = self.__get_row(self.tables['members'], self.tables['members'].c[search_column], search_value)
         return member_row
 
+    def get_tag(self, value, column=None):
+        '''
+        Returns a Row object that represents a single tag in the database
 
-    def __get_row(self, table, column, value):
+        Parameters:
+                tag_id (int): A tag id, which you can find on the Tags Google sheet
+
+        Returns:
+                row (Row): Row object. Access rows in these ways: row.some_row, row['some_row']
+        '''
+        table = self.tables['tags']
+        if column is not None:
+            search_column = column
+            if search_column not in table.keys:
+                raise ValueError(f'{search_column} not a column in {table}')
+        else:
+            search_column = 'Tag_ID'
+
+        tag_row = self.__get_row(table, table.c[search_column], value)
+        return tag_row
+
+
+    def __get_row(self, table, search_column, search_value):
         '''
         Returns the first Row object where the specified value matches.
         Meant to be used within the class.
@@ -147,7 +168,9 @@ class HvzDb():
         Returns:
                 row (Row): Row object. Access rows in these ways: row.some_row, row['some_row']
         '''
-        selection = select(table).where(column == value)
+        
+
+        selection = select(table).where(search_column == search_value)
         with self.engine.begin() as conn:
             result_row = conn.execute(selection).first()
             return result_row
@@ -211,10 +234,42 @@ class HvzDb():
         )
 
         if target_column not in table.keys:
-            return False
+            raise ValueError(f'{search_column} not a column in {table}')
 
         with self.engine.begin() as conn:
             conn.execute(updator)
+            return True
+
+
+    def delete_member(self, member):
+        member_id = member
+        if isinstance(member, discord.abc.User):
+            member_id = member.id
+
+        self.__delete_row(
+            self.tables['members'],
+            self.tables['members'].c.ID,
+            member_id
+        )
+        return
+
+    def delete_tag(self, tag_id):
+        table = self.tables['tags']
+        self.__delete_row(
+            table,
+            table.c.Tag_ID,
+            tag_id
+        )
+        return
+
+    def __delete_row(self, table, search_column, search_value):
+
+        if search_column not in table.keys:
+            raise ValueError(f'{search_column} not a column in {table}')
+
+        deletor = delete(table).where(search_column == search_value)
+        with self.engine.begin() as conn:
+            conn.execute(deletor)
             return True
 
 
@@ -224,4 +279,3 @@ if __name__ == '__main__':
     member = db.get_member('293465952895631360')
     print(member.Registration_Time)
     print(type(member.Registration_Time))
- 
