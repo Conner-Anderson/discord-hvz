@@ -18,3 +18,13 @@ def make_tag_code(db):
 
 
     raise ValueError('Could not find valid tag code.')
+
+def extract_member_id(item, db):
+
+    options = ['ID', 'Discord_Name', 'Nickname', 'Name']
+
+    for o in options:
+        result = db.get_member(item, column=o)
+        if result is not None:
+            return result
+    return None

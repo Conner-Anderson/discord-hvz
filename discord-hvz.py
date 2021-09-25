@@ -127,6 +127,17 @@ async def on_ready():
         except KeyError as e:
             raise KeyError(f'Could not find the channel {e}!')  # A bit redundant
 
+        async def check(ctx):  # A guild check for the help command
+            try:
+                if ctx.guild.id == bot.guild.id:
+                    return True
+                else:
+                    return False
+            except Exception:
+                return False
+
+        bot.help_command.add_check(check)
+
 
         log.critical(f'Discord-HvZ bot launched correctly! Logged in as: {bot.user.name} ------------------------------------------')
         sheets.export_to_sheet('members')
@@ -154,8 +165,8 @@ def check_event(func):
             guild_id = ctx.guild.id
         if guild_id != bot.guild.id:
             return
-
         result = await func(ctx, *args, **kwargs)
+
         return result
     return inner
 
@@ -169,6 +180,16 @@ def check_dm_allowed(func):
             await ctx.send(content='Please check your settings for this server and turn on Allow Direct Messages.', hidden=True)
             return None
     return wrapper
+
+
+@bot.event
+#@check_event
+async def on_command_error(ctx, error):
+    if isinstance(error, discord.ext.commands.errors.MissingRequiredArgument):
+        await ctx.send("A parameter is missing.")
+    else:
+        await ctx.send(f'The command failed, and produced this error: {error}')
+        log.debug(error)
 
 @bot.listen()
 @check_event
@@ -257,7 +278,7 @@ async def on_member_update(before, after):
             db.edit_member(after, 'Faction', 'human')
             sheets.export_to_sheet('members')
     if not before.nick == after.nick:
-        db.edit_member(after, 'Nickname', before.nick)
+        db.edit_member(after, 'Nickname', after.nick)
         log.debug(f'{after.name} changed their nickname.')
         sheets.export_to_sheet('members')
         sheets.export_to_sheet('tags')
@@ -326,31 +347,39 @@ async def member_delete(ctx, list_of_members: str):
 @member.command()
 @commands.has_role('Admin')
 @check_event
-async def edit(ctx, member: str, attribute: str, value: str):
+async def edit(ctx, member_string: str, attribute: str, value: str):
     '''
     Edits one attribute of a member
-
+    
+    Any arguments with spaces must be "surrounded in quotes"
+    member_string must be an @mentioned member in the channel, an ID, a Discord_Name,
+    a Nickname, or a Name. 
     Valid attributes are the column names in the database, which can be found in exported Google Sheets.
-    Case sensitive!
+    Case-sensitive, exact matches only!
     There is no validation to check if the value you provide will work, so be careful! 
     '''
-    if not len(ctx.message.mentions) == 1:
-        await ctx.send('You must @mention a single member to edit.')
-        return
-    member = ctx.message.mentions[0]
     try:
-        original_value = db.get_member(member)[attribute]
-        db.edit_member(member, attribute, value)
-        await ctx.send(f'The value of {attribute} for <@{member.id}> was changed from {original_value} to {value}.')
+        member = ctx.message.mentions[0]
+        member_row = db.get_member(member)
+        if member_row is None:
+            await ctx.reply('That member isn\'t registered, or at least isn\'t in the database.')
+            return
 
-    except ValueError as e:
-        await ctx.send(f'Bad command! Error: {e}')
+    except IndexError:
+        member_row = util.extract_member_id(member_string, db)
+        if member_row is None:
+            await ctx.reply(f'Could not find a member that matched \"{member_string}\". Can be member ID, Name, Discord_Name, or Nickname.')
+            return
+        member = bot.guild.get_member(int(member_row.ID))
+
+    try:
+        original_value = member_row[attribute]
+        db.edit_member(member, attribute, value)
+        await ctx.send(f'The value of {attribute} for <@{member.id}> was changed from \"{original_value}\"" to \"{value}\"')
+
     except NoSuchColumnError as e:
         await ctx.send(f'The attribute \"{attribute}\" you provided does not match a column in the database.')
-        log.exception(e)
-    except Exception as e:
-        await ctx.send(f'Fatal database error! --> {e}')
-        raise
+        log.debug(e)
 
 
 @member.command()
@@ -393,6 +422,38 @@ async def list(ctx):
         await ctx.send(e)
         raise
 
+@member.command(name='register')
+@commands.has_role('Admin')
+@check_event
+async def member_register(ctx, member_string: str):
+    '''
+    Starts a registration chatbot on behalf of another member.
+
+    member_string must be an @mentioned member in the channel, or an ID
+    A registration chatbot will be started with the sender of this command,
+    but the discord user registered will be the one specified.
+    '''
+    try:
+        member = ctx.message.mentions[0]
+    except IndexError:
+        member = bot.guild.get_member(int(member_string))
+        if member is None:
+            ctx.reply(f'Member not found from \"{member_string}\"')
+            return
+    if db.get_member(member) is not None:
+        await ctx.reply(f'<@{member.id}> is already registered.')
+        return
+
+    for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
+        if (c.member == ctx.author) and c.chat_type == 'registration':
+            await ctx.author.send('**Restarting registration process...**')
+            awaiting_chatbots.pop(i)
+
+    chatbot = ChatBot(ctx.author, 'registration', target_member=member)
+    await ctx.author.send(f'The following registration is for <@{member.id}>.')
+    await chatbot.ask_question()
+    awaiting_chatbots.append(chatbot)
+
 @bot.group(description='A group of commands for interacting with tag logs.')
 @commands.has_role('Admin')
 @check_event
@@ -404,6 +465,39 @@ async def tag(ctx):
     '''
     if ctx.invoked_subcommand is None:
         await ctx.send('Invalid command passed...')
+
+@tag.command(name='create')
+@commands.has_role('Admin')
+@check_event
+async def tag_create(ctx, member_string: str):
+    try:
+        member = ctx.message.mentions[0]
+        member_row = db.get_member(member)
+        if member_row is None:
+            await ctx.reply('That member isn\'t registered, or at least isn\'t in the database.')
+            return
+
+    except IndexError:
+        member_row = util.extract_member_id(member_string, db)
+        if member_row is None:
+            await ctx.reply(f'Could not find a member that matched \"{member_string}\". Can be member ID, Name, Discord_Name, or Nickname.')
+            return
+        member = bot.guild.get_member(int(member_row.ID))
+
+    if db.get_member(member) is None:
+        await ctx.author.send(f'<@{member.id}> is not currently registered for HvZ, and so cannot tag.')
+
+    else:
+        for i, c in enumerate(awaiting_chatbots):  # Restart tag log if one is already in progress
+            if (c.member == ctx.author) and c.chat_type == 'tag_logging':
+                await ctx.author.send('**Restarting tag logging process...**')
+                awaiting_chatbots.pop(i)
+
+        chatbot = ChatBot(ctx.author, 'tag_logging', target_member=member)
+        await ctx.author.send(f'The following registration is for <@{member.id}>.')
+        await chatbot.ask_question()
+        awaiting_chatbots.append(chatbot)
+
 
 @tag.command(name='delete')
 @commands.has_role('Admin')
@@ -475,16 +569,16 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
 
     if chatbot.chat_type == 'registration':
         responses['Faction'] = 'human'
-        responses['ID'] = str(chatbot.member.id)
-        responses['Discord_Name'] = chatbot.member.name
+        responses['ID'] = str(chatbot.target_member.id)
+        responses['Discord_Name'] = chatbot.target_member.name
         responses['Registration_Time'] = datetime.today()
         
         try:
             responses['Tag_Code'] = util.make_tag_code(db)
 
             db.add_member(responses) 
-            await chatbot.member.add_roles(bot.roles['player'])
-            await chatbot.member.add_roles(bot.roles['human'])
+            await chatbot.target_member.add_roles(bot.roles['player'])
+            await chatbot.target_member.add_roles(bot.roles['human'])
             try:
                 sheets.export_to_sheet('members')
             except Exception as e:  # The registration can still succeed even if something is wrong with the sheet
@@ -493,7 +587,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             return 1
         except Exception:
             name = responses['Name']
-            log.exception(f'Exception when completing registration for {chatbot.member.name}, {name}')
+            log.exception(f'Exception when completing registration for {chatbot.target_member.name}, {name}')
             await chatbot.member.send('Something went very wrong with the registration, and it was not successful. Please message Conner Anderson about it.')
 
     elif chatbot.chat_type == 'tag_logging':
@@ -527,14 +621,16 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
                 chatbot.member.send('The tag time you stated is in the future. Try again.')
                 return 0
 
-            tagger_member_data = db.get_member(chatbot.member)
+            tagger_member_data = db.get_member(chatbot.target_member)
 
             responses['Tagged_ID'] = tagged_member_id
             responses['Tagged_Name'] = tagger_member_data.Name
             responses['Tagged_Discord_Name'] = tagger_member_data.Discord_Name
-            responses['Tagger_ID'] = chatbot.member.id
+            responses['Tagged_Nickname'] = tagged_member.nick
+            responses['Tagger_ID'] = chatbot.target_member.id
             responses['Tagger_Name'] = tagger_member_data.Name
             responses['Tagger_Discord_Name'] = tagger_member_data.Discord_Name
+            responses['Tagged_Nickname'] = chatbot.target_member.nick
 
             db.add_tag(responses)
             sheets.export_to_sheet('tags')
@@ -545,7 +641,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             db.edit_member(tagged_member, 'Faction', 'zombie')
             sheets.export_to_sheet('members')
 
-            msg = f'<@{tagged_member_id}> has turned zombie!\nTagged by <@{chatbot.member.id}>'
+            msg = f'<@{tagged_member_id}> has turned zombie!\nTagged by <@{chatbot.target_member.id}>'
             # msg += tag_datetime.strftime('\n%A, at about %I:%M %p')
             await bot.channels['tag-announcements'].send(msg)
             return 1

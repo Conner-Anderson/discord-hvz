@@ -6,10 +6,16 @@ log = logging.getLogger(__name__)
 
 class ChatBot:
 
-    def __init__(self, member, selection):
+    def __init__(self, member, selection, target_member=None):
         # Arguments: The member to ask the questions to,
         # and a string matching the question set this chatbot will use.
         self.member = member
+        if target_member is None:
+            self.target_member = member
+        else:
+            self.target_member = target_member
+
+        self.target_member = target_member
         self.next_question = 0
         self.questions = []
         self.verifying = False
