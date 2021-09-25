@@ -43,7 +43,7 @@ registration:
 
 tag_logging:
   beginning: Let's log a tag.
-  ending: Tag loged! Make sure your newly-brainless friend feels welcome in the hoard.
+  ending: Tag logged! Make sure your newly-brainless friend feels welcome in the hoard.
   questions:
   - name: Tag_Code
     display_name: Tag Code

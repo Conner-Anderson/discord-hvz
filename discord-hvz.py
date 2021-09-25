@@ -110,9 +110,9 @@ async def on_ready():
             else:
                 raise Exception(f'{x} channel not found!')
 
-        button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ! \nIf the button does nothing, please Allow Direct Messages in your settings for this server.', 
+        button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ!', 
                             create_button(style=ButtonStyle.green, label='Register for HvZ', custom_id='register')],
-                        'report-tags': ['---', 
+                        'report-tags': ['Use the button below and check your Direct Messages to log a tag.', 
                         create_button(style=ButtonStyle.green, label='Report Tag', custom_id='tag_log')]}
 
         try:
@@ -215,17 +215,22 @@ async def register(ctx):
     await chatbot.ask_question()
     awaiting_chatbots.append(chatbot)
 
+
 @slash.component_callback()
 @check_event
 @check_dm_allowed
 async def tag_log(ctx):
 
     if config['tag_logging_on'] is False:
-        ctx.author.send('The admin has no enabled tagging yet.')
+        ctx.author.send('The admin has not enabled tagging yet.')
+
     elif bot.roles['zombie'] not in ctx.author.roles:
         await ctx.author.send('Only zombies can make tags! Silly human with your silly brains.')
         await ctx.edit_origin()
-        return
+
+    elif db.get_member(ctx.author) is None:
+        await ctx.author.send('You are not currently registered for HvZ. Contact an admin if you think this is wrong.')
+
     else:
         for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
             if (c.member == ctx.author) and c.chat_type == 'tag_logging':
@@ -237,6 +242,7 @@ async def tag_log(ctx):
         awaiting_chatbots.append(chatbot)
 
     await ctx.edit_origin()  # Do this always to convince Discord that the button was successfull
+
 
 @bot.listen()
 @check_event
@@ -357,7 +363,7 @@ async def list(ctx):
         columnString = ""
         charLength = 0
 
-        data = db.get_members()
+        data = db.get_table('members')
         
         if data:
             for m in data:
@@ -404,7 +410,7 @@ async def shutdown(ctx):
 @commands.has_role('Admin')
 @check_event
 async def fakedates(ctx):
-    members = db.get_members()
+    members = db.get_table('members')
     for i, m in enumerate(members):
         if m.Registration_Time is None:
             date = datetime.today() + timedelta(minutes=i + 1)
@@ -465,31 +471,42 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             await chatbot.member.send('That tag code doesn\'t match anyone! Try again.')
             return 0
 
-        tagged_user_id = int(tagged_member_data['ID'])
+        tagged_member_id = int(tagged_member_data['ID'])
+        
 
-        tagged_member = bot.guild.get_member(tagged_user_id)
+        tagged_member = bot.guild.get_member(tagged_member_id)
 
         if tagged_member is None:
             await chatbot.member.send('Couldn\'t find the user you tagged... Are they still in the game? Please contact an admin.')
+            log.debug(f'Couldn\'t find member. Tagged_Member: {tagged_member} {tagged_member_id}')
             return 0
 
         if bot.roles['zombie'] in tagged_member.roles:
-            await chatbot.member.send('%s is already a zombie! What are you up to?' % (tagged_member_data['Name']))
+            await chatbot.member.send('%s is already a zombie! What are you up to?' % (tagged_member_data.Name))
             return 0
 
-        tag_day = datetime.today()
+        tag_time = datetime.today()
         if responses['Tag_Day'].casefold().find('yesterday'):  # Converts tag_day to the previous day
-            tag_day -= timedelta(days=1)
-        tag_datetime = parser.parse(responses['Tag_Time'] + ' and 0 seconds', default=tag_day)
-        responses['Tag_Time'] = tag_datetime.isoformat()
-        responses['Log_Time'] = datetime.today().isoformat()
+            tag_time -= timedelta(days=1)
+        tag_datetime = parser.parse(responses['Tag_Time'] + ' and 0 seconds', default=tag_time)
+        responses['Tag_Time'] = tag_datetime
+        responses['Report_Time'] = datetime.today()
 
         if tag_datetime > datetime.today():
             chatbot.member.send('The tag time you stated is in the future. Try again.')
             return 0
 
-        db.add_row('tag_logging', responses)
-        sheets.export_to_sheet('tag_logging')
+        tagger_member_data = db.get_member(chatbot.member)
+
+        responses['Tagged_ID'] = tagged_member_id
+        responses['Tagged_Name'] = tagger_member_data.Name
+        responses['Tagged_Discord_Name'] = tagger_member_data.Discord_Name
+        responses['Tagger_ID'] = chatbot.member.id
+        responses['Tagger_Name'] = tagger_member_data.Name
+        responses['Tagger_Discord_Name'] = tagger_member_data.Discord_Name
+
+        db.add_tag(responses)
+        sheets.export_to_sheet('tags')
 
         try:
             await tagged_member.add_roles(bot.roles['zombie'])
@@ -501,9 +518,10 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
         db.edit_member(tagged_member, 'Faction', 'zombie')
         sheets.export_to_sheet('members')
 
-        msg = f'<@{tagged_user_id}> has turned zombie!\nTagged by <@{chatbot.member.id}>\n'
-        msg += tag_datetime.strftime('%A, at about %I:%M %p')
+        msg = f'<@{tagged_member_id}> has turned zombie!\nTagged by <@{chatbot.member.id}>'
+        # msg += tag_datetime.strftime('\n%A, at about %I:%M %p')
         await bot.channels['tag-announcements'].send(msg)
+        return 1
 
 
 

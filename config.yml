@@ -20,8 +20,36 @@ tag_logging_on: True
 sheet_ids:
   letu: 1q-2H32CRpIDCbP94rBPbIKwGSJ-dHDZjL9SCHCUAaPo
   dev: 1fLYdmc_sp-Rx25794zmPekp48I02lbctyqiLvaLDIwQ
-members_sheet_name: Members
-tag_log_sheet_name: Tag Log
+
+sheet_settings:
+  members:
+    sheet_name: Members
+    column_order:
+      - ID
+      - Name
+      - Nickname
+      - Discord_Name
+      - Faction
+      - CPO
+      - Tag_Code
+      - OZ_Desire
+      - Email
+      - Want_Bandana
+      - Registration_Time
+  tags:
+    sheet_name: Tags
+    column_order:
+      - Tag_ID
+      - Tagger_ID
+      - Tagger_Name
+      - Tagger_Nickname
+      - Tagger_Discord_Name
+      - Tagged_ID
+      - Tagged_Name
+      - Tagged_Nickname
+      - Tagged_Discord_Name
+      - Tag_Time
+      - Report_Time
 
 # Assign the real channel names on the right to the variables on the left
 channel_names:

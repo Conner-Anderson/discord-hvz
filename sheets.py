@@ -6,6 +6,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 import logging
+from datetime import datetime
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 log = logging.getLogger(__name__)
 
@@ -51,32 +52,32 @@ def setup(db, bot):
 
 def export_to_sheet(table_name):
 
-    update_nicknames()
-    table = DB.get_members()
+    update_nicknames(table_name)
+    table = DB.get_table(table_name)
 
-    # Temporary fix until we make the database system for variable
-    sheet_names = {'members': config['members_sheet_name'], 'tag_logging': config['tag_log_sheet_name']}
+    sheet_settings = config['sheet_settings'][table_name]
 
     # Let's turn the list of Rows into a list of lists. Google wants that.
-    order = ['ID', 'Name', 'Nickname', 'Discord_Name', 'Faction', 'CPO', 'Tag_Code', 'OZ_Desire', 'Email', 'Want_Bandana', 'Registration_Time']
+    
     values = []
     for y, row in enumerate(table):
         values.append([])
-        for x, c in enumerate(order):
-            if (c == 'Registration_Time') and (row[c] is not None):
+        for x, c in enumerate(sheet_settings['column_order']):
+            if isinstance(row[x], datetime):
                 values[y].append(row[c].isoformat())
             else:
                 values[y].append(row[c])
-    values.insert(0, order)
 
+    values.insert(0, sheet_settings['column_order'])
+    sheet_name = sheet_settings['sheet_name']
 
     # Erases entire sheet below row 1!
-    SPREADSHEETS.values().clear(spreadsheetId=SPREADSHEET_ID, range=f'\'{sheet_names[table_name]}\'!A1:ZZZ').execute()
+    SPREADSHEETS.values().clear(spreadsheetId=SPREADSHEET_ID, range=f'\'{sheet_name}\'!A1:ZZZ').execute()
 
     body = {'values': values}
 
     try:
-        result = SPREADSHEETS.values().update(spreadsheetId=SPREADSHEET_ID, range=f'\'{table_name}\'!A1:ZZZ', valueInputOption='USER_ENTERED', body=body).execute()
+        result = SPREADSHEETS.values().update(spreadsheetId=SPREADSHEET_ID, range=f'\'{sheet_name}\'!A1:ZZZ', valueInputOption='USER_ENTERED', body=body).execute()
     except Exception as e:
         log.exception('There was an exception with the Google API request! Here it is: %s' % (e))
     else:
@@ -95,16 +96,31 @@ def read_sheet(sheet_name, range):
     else:
         return result.get('values', 0)
 
-def update_nicknames():
-    members = DB.get_members()
+def update_nicknames(table):
+    id_pairs = (('Nickname', 'ID'), ('Tagger_Nickname', 'Tagger_ID'), ('Tagged_Nickname', 'Tagged_ID'))
 
-    for m in members:
+
+    rows = DB.get_table(table)
+    for r in rows:
+        for pair in id_pairs:
+            try:
+                ID = r[pair[1]]
+                member = BOT.guild.get_member(int(ID))
+                DB.edit_member(member, pair[0], member.nick)
+                log.debug(f'Updated {member.name}\'s nickname.')
+            except Exception:
+                pass
+
+
+
+'''
         try:
             member = BOT.guild.get_member(int(m.ID))
             nickname = member.nick
             DB.edit_member(m.ID, 'Nickname', nickname)
         except Exception as e:
             log.debug(f'Could not update {m.Name}\'s Nickname. --> {e}')
+'''
 
 
 

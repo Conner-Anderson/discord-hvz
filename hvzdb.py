@@ -18,46 +18,60 @@ log = logging.getLogger(__name__)
 
 class HvzDb():
     def __init__(self):
-        new_file = False
         self.metadata_obj = MetaData()
-        if not os.path.exists('hvzdb.db'):
-            new_file = True
-
         self.engine = create_engine("sqlite+pysqlite:///hvzdb.db", future=True)
+        
+        self.tables = {'members': None, 'tags': None}
+        for n in self.tables:
 
-        if new_file is False:
             try:
-                self.members_table = Table('members', self.metadata_obj, autoload_with=self.engine)
+                self.tables[n] = Table(n, self.metadata_obj, autoload_with=self.engine)
             except NoSuchTableError:
-                log.error('No such table')
-                new_file = True
-
-        if new_file is True:
-            self.members_table = Table(
-                'members',
-                self.metadata_obj,
-                Column('ID', String, primary_key=True, nullable=False),
-                Column('Name', String),
-                Column('Nickname', String),
-                Column('Discord_Name', String),
-                Column('CPO', String),
-                Column('Faction', String),
-                Column('Tag_Code', String),
-                Column('OZ_Desire', String),
-                Column('Email', String),
-                Column('Want_Bandana', String),
-                Column('Registration_Time', DateTime)
-            )
-            self.metadata_obj.create_all(self.engine)
+                if n == 'members':
+                    log.critical('There is no members table, so I\'m making it.')
+                    self.tables[n] = Table(
+                        'members',
+                        self.metadata_obj,
+                        Column('ID', String, primary_key=True, nullable=False),
+                        Column('Name', String),
+                        Column('Nickname', String),
+                        Column('Discord_Name', String),
+                        Column('CPO', String),
+                        Column('Faction', String),
+                        Column('Tag_Code', String),
+                        Column('OZ_Desire', String),
+                        Column('Email', String),
+                        Column('Want_Bandana', String),
+                        Column('Registration_Time', DateTime)
+                    )
+                elif n == 'tags':
+                    log.critical('There is no tags table, so I\'m making it.')
+                    self.tables[n] = Table(
+                        'tags',
+                        self.metadata_obj,
+                        Column('Tag_ID', Integer, primary_key=True, nullable=False, autoincrement=True),
+                        Column('Tagger_ID', String),
+                        Column('Tagger_Name', String),
+                        Column('Tagger_Nickname', String),
+                        Column('Tagger_Discord_Name', String),
+                        Column('Tagged_ID', String),
+                        Column('Tagged_Name', String),
+                        Column('Tagged_Nickname', String),
+                        Column('Tagged_Discord_Name', String),
+                        Column('Tag_Time', DateTime),
+                        Column('Report_Time', DateTime)
+                    )
+        
+        self.metadata_obj.create_all(self.engine)
 
 
         # self.tag_logging_table = Table('tag_logging', self.metadata_obj, autoload_with=self.engine)
 
         
-        selection = select(self.members_table)
+        selection = select(self.tables['members'])
         with self.engine.begin() as conn:
             result = conn.execute(selection)
-            self.members_table.keys = result.keys()
+            self.tables['members'].keys = result.keys()
 
 
     def add_member(self, member_row):
@@ -71,13 +85,27 @@ class HvzDb():
         Returns:
                 result (result object?): This needs work.
         '''
-        result = self.__add_row(self.members_table, member_row)
+        result = self.__add_row(self.tables['members'], member_row)
+        return result
+
+    def add_tag(self, tag_row):
+        '''
+        Adds a tag to the database
+
+        Parameters:
+                tag_row (dict): A dict with pairs of column_name:value. Example:
+                                    {'Tag_ID': 'George Soros', 'CPO': 9001, ...}
+
+        Returns:
+                result (result object?): This needs work.
+        '''
+        result = self.__add_row(self.tables['tags'], tag_row)
         return result
 
     def __add_row(self, table, row):
 
         with self.engine.begin() as conn:
-            result = conn.execute(insert(self.members_table), row)
+            result = conn.execute(insert(table), row)
             return result
 
 
@@ -102,7 +130,7 @@ class HvzDb():
                 search_value = value
 
 
-        member_row = self.__get_row(self.members_table, self.members_table.c[search_column], search_value)
+        member_row = self.__get_row(self.tables['members'], self.tables['members'].c[search_column], search_value)
         return member_row
 
 
@@ -125,21 +153,21 @@ class HvzDb():
             return result_row
 
 
-    def get_members(self):
+    def get_table(self, table):
         '''
         Returns a list of all members in the database
 
         Parameters:
-                none
+                table (str): The name of the table to fetch. Lower case
 
         Returns:
-                members_result (list[Row]): List of Rows. Rows are like tuples, but with dictionary
+                result (list[Row]): List of Rows. Rows are like tuples, but with dictionary
                                                 keys. Like this: row['Name'] or row.Name
         '''
-        selection = select(self.members_table)
+        selection = select(self.tables[table])
         with self.engine.begin() as conn:
-            members_result = conn.execute(selection).all()
-            return members_result
+            result = conn.execute(selection).all()
+            return result
 
     # Legacy method left in here for reference
     def get_column(self, table: str, column: str):
@@ -167,8 +195,8 @@ class HvzDb():
         if isinstance(member, discord.abc.User):
             member_id = member.id
         result = self.__edit_row(
-            self.members_table,
-            self.members_table.c.ID,
+            self.tables['members'],
+            self.tables['members'].c.ID,
             member_id,
             column,
             value
