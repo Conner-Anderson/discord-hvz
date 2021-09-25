@@ -404,17 +404,6 @@ async def shutdown(ctx):
             msg += f'<@{c.member.id}> has a chatbot of type {c.chat_type}\n'
         await ctx.reply(msg)
 
-@bot.command()
-@commands.has_role('Admin')
-@check_event
-async def fakedates(ctx):
-    members = db.get_table('members')
-    for i, m in enumerate(members):
-        if m.Registration_Time is None:
-            date = datetime.today() + timedelta(minutes=i + 1)
-            db.edit_member(m.ID, 'Registration_Time', date)
-            log.info(f'Faked date for {m.Name} to {date.isoformat()}')
-
 
 async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it is done
 
