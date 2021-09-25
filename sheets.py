@@ -63,8 +63,8 @@ def export_to_sheet(table_name):
     for y, row in enumerate(table):
         values.append([])
         for x, c in enumerate(order):
-            if c == 'Registration_Time':
-                values[y].append(row[x].isoformat())
+            if (c == 'Registration_Time') and (row[c] is not None):
+                values[y].append(row[c].isoformat())
             else:
                 values[y].append(row[c])
     values.insert(0, order)
@@ -100,7 +100,8 @@ def update_nicknames():
 
     for m in members:
         try:
-            nickname = BOT.guild.get_member(int(m.ID)).nick
+            member = BOT.guild.get_member(int(m.ID))
+            nickname = member.nick
             DB.edit_member(m.ID, 'Nickname', nickname)
         except Exception as e:
             log.debug(f'Could not update {m.Name}\'s Nickname. --> {e}')
