@@ -4,6 +4,7 @@ from config import config
 import sheets
 from chatbot import ChatBot
 from hvzdb import HvzDb
+import utilities as util
 
 import logging
 import coloredlogs
@@ -22,9 +23,6 @@ from discord_slash import SlashCommand
 from discord_slash.context import InteractionContext
 from dotenv import load_dotenv
 from os import getenv
-
-import string
-import random
 
 from sqlalchemy.exc import NoSuchColumnError
 
@@ -431,32 +429,18 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
         responses['ID'] = str(chatbot.member.id)
         responses['Discord_Name'] = chatbot.member.name
         responses['Registration_Time'] = datetime.today()
+        
         try:
-            tag_code = ''
-            try:
-                while True:
-                    code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '015IOUDQVS'))
-                    for n in range(6):
-                        tag_code += code_set[random.randint(0, len(code_set) - 1)]
-                    if db.get_member(tag_code, column='Tag_Code') is None:
-                        break
-                    else:
-                        tag_code = ''
-            except Exception as e:
-                chatbot.member.send('Could not generate your tag code. This is a bug! Contact an admin.')
-                log.error('Error generating tag code --> ', e)
-                return
+            responses['Tag_Code'] = util.make_tag_code(db)
 
-            responses['Tag_Code'] = tag_code
-
-            db.add_member(responses)
-            try:
-                sheets.export_to_sheet('members')  # I always update the Google sheet after changing a value in the db
-            except Exception:
-                log.exception(f'Exception when calling export_to_sheet() from resolve_chat() User: {chatbot.member.name}')
-
+            db.add_member(responses) 
             await chatbot.member.add_roles(bot.roles['player'])
             await chatbot.member.add_roles(bot.roles['human'])
+            try:
+                sheets.export_to_sheet('members')
+            except Exception as e:  # The registration can still succeed even if something is wrong with the sheet
+                log.exception(e)
+
             return 1
         except Exception:
             name = responses['Name']
@@ -464,69 +448,61 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             await chatbot.member.send('Something went very wrong with the registration, and it was not successful. Please message Conner Anderson about it.')
 
     elif chatbot.chat_type == 'tag_logging':
-
-        tagged_member_data = db.get_member(responses['Tag_Code'], column='Tag_Code')
-
-        if tagged_member_data is None:
-            await chatbot.member.send('That tag code doesn\'t match anyone! Try again.')
-            return 0
-
-        tagged_member_id = int(tagged_member_data['ID'])
-        
-
-        tagged_member = bot.guild.get_member(tagged_member_id)
-
-        if tagged_member is None:
-            await chatbot.member.send('Couldn\'t find the user you tagged... Are they still in the game? Please contact an admin.')
-            log.debug(f'Couldn\'t find member. Tagged_Member: {tagged_member} {tagged_member_id}')
-            return 0
-
-        if bot.roles['zombie'] in tagged_member.roles:
-            await chatbot.member.send('%s is already a zombie! What are you up to?' % (tagged_member_data.Name))
-            return 0
-
-        tag_time = datetime.today()
-        if responses['Tag_Day'].casefold().find('yesterday'):  # Converts tag_day to the previous day
-            tag_time -= timedelta(days=1)
-        tag_datetime = parser.parse(responses['Tag_Time'] + ' and 0 seconds', default=tag_time)
-        responses['Tag_Time'] = tag_datetime
-        responses['Report_Time'] = datetime.today()
-
-        if tag_datetime > datetime.today():
-            chatbot.member.send('The tag time you stated is in the future. Try again.')
-            return 0
-
-        tagger_member_data = db.get_member(chatbot.member)
-
-        responses['Tagged_ID'] = tagged_member_id
-        responses['Tagged_Name'] = tagger_member_data.Name
-        responses['Tagged_Discord_Name'] = tagger_member_data.Discord_Name
-        responses['Tagger_ID'] = chatbot.member.id
-        responses['Tagger_Name'] = tagger_member_data.Name
-        responses['Tagger_Discord_Name'] = tagger_member_data.Discord_Name
-
-        db.add_tag(responses)
-        sheets.export_to_sheet('tags')
-
         try:
+            tagged_member_data = db.get_member(responses['Tag_Code'], column='Tag_Code')
+
+            if tagged_member_data is None:
+                await chatbot.member.send('That tag code doesn\'t match anyone! Try again.')
+                return 0
+
+            tagged_member_id = int(tagged_member_data['ID'])
+            tagged_member = bot.guild.get_member(tagged_member_id)
+
+            if tagged_member is None:
+                await chatbot.member.send('Couldn\'t find the user you tagged... Are they still in the game? Please contact an admin.')
+                log.debug(f'Couldn\'t find member. Tagged_Member: {tagged_member} {tagged_member_id}')
+                return 0
+
+            if bot.roles['zombie'] in tagged_member.roles:
+                await chatbot.member.send('%s is already a zombie! What are you up to?' % (tagged_member_data.Name))
+                return 0
+
+            tag_time = datetime.today()
+            if responses['Tag_Day'].casefold().find('yesterday'):  # Converts tag_day to the previous day
+                tag_time -= timedelta(days=1)
+            tag_datetime = parser.parse(responses['Tag_Time'] + ' and 0 seconds', default=tag_time)
+            responses['Tag_Time'] = tag_datetime
+            responses['Report_Time'] = datetime.today()
+
+            if tag_datetime > datetime.today():
+                chatbot.member.send('The tag time you stated is in the future. Try again.')
+                return 0
+
+            tagger_member_data = db.get_member(chatbot.member)
+
+            responses['Tagged_ID'] = tagged_member_id
+            responses['Tagged_Name'] = tagger_member_data.Name
+            responses['Tagged_Discord_Name'] = tagger_member_data.Discord_Name
+            responses['Tagger_ID'] = chatbot.member.id
+            responses['Tagger_Name'] = tagger_member_data.Name
+            responses['Tagger_Discord_Name'] = tagger_member_data.Discord_Name
+
+            db.add_tag(responses)
+            sheets.export_to_sheet('tags')
+
             await tagged_member.add_roles(bot.roles['zombie'])
             await tagged_member.remove_roles(bot.roles['human'])
-        except discord.HTTPException as e:
-            chatbot.member.send('Couldn\'t change the tagged player\'s Discord role! Contact an admin.')
-            log.exception(e)
+            
+            db.edit_member(tagged_member, 'Faction', 'zombie')
+            sheets.export_to_sheet('members')
 
-        db.edit_member(tagged_member, 'Faction', 'zombie')
-        sheets.export_to_sheet('members')
+            msg = f'<@{tagged_member_id}> has turned zombie!\nTagged by <@{chatbot.member.id}>'
+            # msg += tag_datetime.strftime('\n%A, at about %I:%M %p')
+            await bot.channels['tag-announcements'].send(msg)
+            return 1
 
-        msg = f'<@{tagged_member_id}> has turned zombie!\nTagged by <@{chatbot.member.id}>'
-        # msg += tag_datetime.strftime('\n%A, at about %I:%M %p')
-        await bot.channels['tag-announcements'].send(msg)
-        return 1
-
-
-
-
-
-
+        except Exception:
+            log.exception(f'Tag log for {chatbot.member.name} failed.')
+            await chatbot.member.send('The tag log failed! This is likely a bug. Please message Conner Anderson about it.')
 
 bot.run(token)
