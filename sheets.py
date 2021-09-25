@@ -52,7 +52,6 @@ def setup(db, bot):
 
 def export_to_sheet(table_name):
 
-    update_nicknames(table_name)
     table = DB.get_table(table_name)
 
     sheet_settings = config['sheet_settings'][table_name]
@@ -96,6 +95,8 @@ def read_sheet(sheet_name, range):
     else:
         return result.get('values', 0)
 
+
+''' Old method of updating nicknames. Might want it later
 def update_nicknames(table):
     id_pairs = (('Nickname', 'ID'), ('Tagger_Nickname', 'Tagger_ID'), ('Tagged_Nickname', 'Tagged_ID'))
 
@@ -107,22 +108,10 @@ def update_nicknames(table):
                 ID = r[pair[1]]
                 member = BOT.guild.get_member(int(ID))
                 DB.edit_member(member, pair[0], member.nick)
-                log.debug(f'Updated {member.name}\'s nickname.')
+                log.debug(f'Updated {member.name} nickname.')
             except Exception:
                 pass
-
-
-
 '''
-        try:
-            member = BOT.guild.get_member(int(m.ID))
-            nickname = member.nick
-            DB.edit_member(m.ID, 'Nickname', nickname)
-        except Exception as e:
-            log.debug(f'Could not update {m.Name}\'s Nickname. --> {e}')
-'''
-
-
 
 # Formats a number as a bijective base N string. For converting to A1 notation. Might use later.
 def bijective(n, base):

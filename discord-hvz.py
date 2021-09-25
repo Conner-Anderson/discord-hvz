@@ -245,17 +245,21 @@ async def tag_log(ctx):
 @bot.listen()
 @check_event
 async def on_member_update(before, after):
-
+    # When roles or nicknames change, update the database and sheet.
     if not before.roles == after.roles:
         zombie = bot.roles['zombie'] in after.roles
         human = bot.roles['human'] in after.roles
-
         if zombie and not human:
             db.edit_member(after, 'Faction', 'zombie')
             sheets.export_to_sheet('members')
         elif human and not zombie:
             db.edit_member(after, 'Faction', 'human')
             sheets.export_to_sheet('members')
+    if not before.nick == after.nick:
+        db.edit_member(after, 'Nickname', before.nick)
+        log.debug(f'{after.name} changed their nickname.')
+        sheets.export_to_sheet('members')
+        sheets.export_to_sheet('tags')
 
 
 @bot.command()
@@ -279,6 +283,7 @@ async def add(ctx, left: int, right: int):  # A command for testing
     action_row = create_actionrow(*buttons)
     await ctx.send(left + right, components=[action_row])
     await ctx.send(left + right)
+
 
 @bot.group(description='A group of commands for interacting with members.')
 @commands.has_role('Admin')
@@ -316,6 +321,7 @@ async def delete(ctx, list_of_members: str):
         log.error(e)
         await ctx.send(f'Command error! Let an admin know. Error: {e}')
 
+
 @member.command()
 @commands.has_role('Admin')
 @check_event
@@ -344,6 +350,7 @@ async def edit(ctx, member: str, attribute: str, value: str):
     except Exception as e:
         await ctx.send(f'Fatal database error! --> {e}')
         raise
+
 
 @member.command()
 @commands.has_role('Admin')
@@ -384,6 +391,7 @@ async def list(ctx):
         log.exception(e)
         await ctx.send(f'Fatal database error! --> {e}')
         raise
+
 
 @bot.command()
 @commands.has_role('Admin')
