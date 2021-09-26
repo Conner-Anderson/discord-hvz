@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from sqlalchemy import MetaData
-from sqlalchemy import Table, Column, Integer, String, DateTime
+from sqlalchemy import Table, Column, Integer, String, DateTime, Boolean
 from sqlalchemy import ForeignKey
 from sqlalchemy import insert, select, delete, update
 from sqlalchemy import func, cast
@@ -41,7 +41,8 @@ class HvzDb():
                         Column('OZ_Desire', String),
                         Column('Email', String),
                         Column('Want_Bandana', String),
-                        Column('Registration_Time', DateTime)
+                        Column('Registration_Time', DateTime),
+                        Column('OZ', Boolean)
                     )
                 elif n == 'tags':
                     log.critical('There is no tags table, so I\'m making it.')

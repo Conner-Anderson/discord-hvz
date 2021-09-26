@@ -36,6 +36,7 @@ sheet_settings:
       - Email
       - Want_Bandana
       - Registration_Time
+      - OZ
   tags:
     sheet_name: Tags
     column_order:

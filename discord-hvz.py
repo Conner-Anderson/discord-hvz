@@ -298,6 +298,23 @@ async def member(ctx):
     if ctx.invoked_subcommand is None:
         await ctx.send('Invalid command passed...')
 
+
+@member.command(name='oz')
+@commands.has_role('Admin')
+@check_event
+async def member_oz(ctx, member_string: str, setting: bool = None):
+    member_row = util.member_from_string(member_string, db, ctx=ctx)
+    if setting is None:
+        await ctx.message.reply(f'{member_row.Name}\'s OZ status is {member_row.OZ}')
+        return
+    success = db.edit_member(member_row.ID, 'OZ', setting)
+    sheets.export_to_sheet('members')
+    if success:
+        await ctx.message.reply(f'Changed {member_row.Name}\'s OZ status to {setting}')
+    else:
+        await ctx.message.reply('Failed to edit member.')
+
+
 @member.command(name='delete')
 @commands.has_role('Admin')
 @check_event
@@ -309,37 +326,25 @@ async def member_delete(ctx, member_string: str):
     a Nickname, or a Name. 
     After deletion, the member still remains on the server and in tag records.
     If they are still in the tag records, there could be unknown side effects down the road.
+    Deletion works even on players who have left the server.
     '''
-    try:
-        member = ctx.message.mentions[0]
-        member_row = db.get_member(member)
-        if member_row is None:
-            await ctx.message.reply('That member isn\'t registered, or at least isn\'t in the database.')
-            return
+    member_row = util.member_from_string(member_string, db, ctx=ctx)
+    db.delete_member(member_row.ID)
 
-    except IndexError:
-        member_row = util.extract_member_id(member_string, db)
-        if member_row is None:
-            await ctx.message.reply(f'Could not find a member that matched \"{member_string}\". Can be member ID, Name, Discord_Name, or Nickname.')
-            return
-        member = bot.guild.get_member(int(member_row.ID))
-
-    if db.get_member(member) is None:
-        await ctx.author.send(f'<@{member.id}> is not currently registered for HvZ, and so cannot be deleted.')
-
-
-    await member.remove_roles(bot.roles['human'])
-    await member.remove_roles(bot.roles['zombie'])
-    await member.remove_roles(bot.roles['player'])
-    db.delete_member(member)
-    await ctx.message.reply(f'<@{member.id}> deleted from the game. Roles revoked, expunged from the database. Any tags will still exist.')
+    member = bot.guild.get_member(int(member_row.ID))
+    if member is not None:
+        await member.remove_roles(bot.roles['human'])
+        await member.remove_roles(bot.roles['zombie'])
+        await member.remove_roles(bot.roles['player'])
+    
+    await ctx.message.reply(f'<@{member_row.ID}> deleted from the game. Roles revoked, expunged from the database. Any tags will still exist.')
     sheets.export_to_sheet('members')
 
 
-@member.command()
+@member.command(name='edit')
 @commands.has_role('Admin')
 @check_event
-async def edit(ctx, member_string: str, attribute: str, value: str):
+async def member_edit(ctx, member_string: str, attribute: str, value: str):
     '''
     Edits one attribute of a member
     
@@ -350,24 +355,13 @@ async def edit(ctx, member_string: str, attribute: str, value: str):
     Case-sensitive, exact matches only!
     There is no validation to check if the value you provide will work, so be careful! 
     '''
-    try:
-        member = ctx.message.mentions[0]
-        member_row = db.get_member(member)
-        if member_row is None:
-            await ctx.message.reply('That member isn\'t registered, or at least isn\'t in the database.')
-            return
-
-    except IndexError:
-        member_row = util.extract_member_id(member_string, db)
-        if member_row is None:
-            await ctx.message.reply(f'Could not find a member that matched \"{member_string}\". Can be member ID, Name, Discord_Name, or Nickname.')
-            return
-        member = bot.guild.get_member(int(member_row.ID))
+    member_row = util.member_from_string(member_string, db, ctx=ctx)
 
     try:
         original_value = member_row[attribute]
-        db.edit_member(member, attribute, value)
-        await ctx.send(f'The value of {attribute} for <@{member.id}> was changed from \"{original_value}\"" to \"{value}\"')
+        db.edit_member(member_row.ID, attribute, value)
+        await ctx.send(f'The value of {attribute} for <@{member_row.ID}> was changed from \"{original_value}\"" to \"{value}\"')
+        sheets.export_to_sheet('members')
 
     except NoSuchColumnError as e:
         await ctx.send(f'The attribute \"{attribute}\" you provided does not match a column in the database.')
@@ -414,6 +408,7 @@ async def list(ctx):
         await ctx.send(e)
         raise
 
+
 @member.command(name='register')
 @commands.has_role('Admin')
 @check_event
@@ -446,6 +441,7 @@ async def member_register(ctx, member_string: str):
     await chatbot.ask_question()
     awaiting_chatbots.append(chatbot)
 
+
 @bot.group(description='A group of commands for interacting with tag logs.')
 @commands.has_role('Admin')
 @check_event
@@ -457,6 +453,7 @@ async def tag(ctx):
     '''
     if ctx.invoked_subcommand is None:
         await ctx.send('Invalid command passed...')
+
 
 @tag.command(name='create')
 @commands.has_role('Admin')
@@ -470,33 +467,21 @@ async def tag_create(ctx, member_string: str):
     but the discord user actually making the tag will be the one specified.
     Does not check the faction membership of the tagger.
     '''
-    try:
-        member = ctx.message.mentions[0]
-        member_row = db.get_member(member)
-        if member_row is None:
-            await ctx.message.reply('That member isn\'t registered, or at least isn\'t in the database.')
-            return
+    member_row = util.member_from_string(member_string, db, ctx=ctx)
+    
+    member = bot.guild.get_member(int(member_row.ID))
+    if member is None:
+        raise ValueError(f'{member_row.Discord_Name} is not on the server anymore.')
 
-    except IndexError:
-        member_row = util.extract_member_id(member_string, db)
-        if member_row is None:
-            await ctx.message.reply(f'Could not find a member that matched \"{member_string}\". Can be member ID, Name, Discord_Name, or Nickname.')
-            return
-        member = bot.guild.get_member(int(member_row.ID))
+    for i, c in enumerate(awaiting_chatbots):  # Restart tag log if one is already in progress
+        if (c.member == ctx.author) and c.chat_type == 'tag_logging':
+            await ctx.author.send('**Restarting tag logging process...**')
+            awaiting_chatbots.pop(i)
 
-    if db.get_member(member) is None:
-        await ctx.author.send(f'<@{member.id}> is not currently registered for HvZ, and so cannot tag.')
-
-    else:
-        for i, c in enumerate(awaiting_chatbots):  # Restart tag log if one is already in progress
-            if (c.member == ctx.author) and c.chat_type == 'tag_logging':
-                await ctx.author.send('**Restarting tag logging process...**')
-                awaiting_chatbots.pop(i)
-
-        chatbot = ChatBot(ctx.author, 'tag_logging', target_member=member)
-        await ctx.author.send(f'The following registration is for <@{member.id}>.')
-        await chatbot.ask_question()
-        awaiting_chatbots.append(chatbot)
+    chatbot = ChatBot(ctx.author, 'tag_logging', target_member=member)
+    await ctx.author.send(f'The following registration is for <@{member.id}>.')
+    await chatbot.ask_question()
+    awaiting_chatbots.append(chatbot)
 
 
 @tag.command(name='delete')
@@ -538,6 +523,7 @@ async def tag_delete(ctx, tag_id: int):
     else:
         msg = f'Tag {tag_id} deleted. ' + msg
         await ctx.message.reply(msg)
+        sheets.export_to_sheet('tags')
 
 @bot.command()
 @commands.has_role('Admin')
@@ -571,6 +557,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
         responses['ID'] = str(chatbot.target_member.id)
         responses['Discord_Name'] = chatbot.target_member.name
         responses['Registration_Time'] = datetime.today()
+        responses['OZ'] = False
         
         try:
             responses['Tag_Code'] = util.make_tag_code(db)
