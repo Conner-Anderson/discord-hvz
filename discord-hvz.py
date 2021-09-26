@@ -183,7 +183,6 @@ def check_dm_allowed(func):
 
 
 @bot.event
-#@check_event
 async def on_command_error(ctx, error):
     if isinstance(error, discord.ext.commands.errors.MissingRequiredArgument):
         await ctx.send("A parameter is missing.")
@@ -284,29 +283,6 @@ async def on_member_update(before, after):
         sheets.export_to_sheet('tags')
 
 
-@bot.command()
-@commands.has_role('Admin')  # This means of checking the role is nice, but isn't flexible
-@check_event
-async def add(ctx, left: int, right: int):  # A command for testing
-    '''
-    This is a test command.
-
-    :param param1: this is a first param
-    :param param2: this is a second param
-    :returns: this is a description of what is returned
-    :raise
-    '''
-    buttons = [
-        create_button(
-            style=ButtonStyle.green,
-            label="A Green Button"
-        ),
-    ]
-    action_row = create_actionrow(*buttons)
-    await ctx.send(left + right, components=[action_row])
-    await ctx.send(left + right)
-
-
 @bot.group(description='A group of commands for interacting with members.')
 @commands.has_role('Admin')
 @check_event
@@ -322,26 +298,39 @@ async def member(ctx):
 @member.command(name='delete')
 @commands.has_role('Admin')
 @check_event
-async def member_delete(ctx, list_of_members: str):
+async def member_delete(ctx, member_string: str):
     '''
-    Removes all @mentioned members from the game.
+    Removes the specified member from the game. Dangerous!
 
-    Take any number of @mentioned Discord users and both removes them from the game database
-    and revokes their human/zombie roles. They still remain on the server and in tag records.
+    member_string must be a @mentioned member in the channel, an ID, a Discord_Name,
+    a Nickname, or a Name. 
+    After deletion, the member still remains on the server and in tag records.
+    If they are still in the tag records, there could be unknown side effects down the road.
     '''
     try:
-        if not len(ctx.message.mentions) == 0:
-            for member in ctx.message.mentions:
-                await member.remove_roles(bot.roles['human'])
-                await member.remove_roles(bot.roles['zombie'])
-                await member.remove_roles(bot.roles['player'])
-                db.delete_row('members', member)
-                sheets.export_to_sheet('members')
-        else:
-            await ctx.send('You must @mention a list of server members to delete them.')
-    except Exception as e:
-        log.error(e)
-        await ctx.send(f'Command error! Let an admin know. Error: {e}')
+        member = ctx.message.mentions[0]
+        member_row = db.get_member(member)
+        if member_row is None:
+            await ctx.message.reply('That member isn\'t registered, or at least isn\'t in the database.')
+            return
+
+    except IndexError:
+        member_row = util.extract_member_id(member_string, db)
+        if member_row is None:
+            await ctx.message.reply(f'Could not find a member that matched \"{member_string}\". Can be member ID, Name, Discord_Name, or Nickname.')
+            return
+        member = bot.guild.get_member(int(member_row.ID))
+
+    if db.get_member(member) is None:
+        await ctx.author.send(f'<@{member.id}> is not currently registered for HvZ, and so cannot be deleted.')
+
+
+    await member.remove_roles(bot.roles['human'])
+    await member.remove_roles(bot.roles['zombie'])
+    await member.remove_roles(bot.roles['player'])
+    db.delete_member(member)
+    await ctx.message.reply(f'<@{member.id}> deleted from the game. Roles revoked, expunged from the database. Any tags will still exist.')
+    sheets.export_to_sheet('members')
 
 
 @member.command()
@@ -362,13 +351,13 @@ async def edit(ctx, member_string: str, attribute: str, value: str):
         member = ctx.message.mentions[0]
         member_row = db.get_member(member)
         if member_row is None:
-            await ctx.reply('That member isn\'t registered, or at least isn\'t in the database.')
+            await ctx.message.reply('That member isn\'t registered, or at least isn\'t in the database.')
             return
 
     except IndexError:
         member_row = util.extract_member_id(member_string, db)
         if member_row is None:
-            await ctx.reply(f'Could not find a member that matched \"{member_string}\". Can be member ID, Name, Discord_Name, or Nickname.')
+            await ctx.message.reply(f'Could not find a member that matched \"{member_string}\". Can be member ID, Name, Discord_Name, or Nickname.')
             return
         member = bot.guild.get_member(int(member_row.ID))
 
@@ -438,10 +427,10 @@ async def member_register(ctx, member_string: str):
     except IndexError:
         member = bot.guild.get_member(int(member_string))
         if member is None:
-            ctx.reply(f'Member not found from \"{member_string}\"')
+            ctx.message.reply(f'Member not found from \"{member_string}\"')
             return
     if db.get_member(member) is not None:
-        await ctx.reply(f'<@{member.id}> is already registered.')
+        await ctx.message.reply(f'<@{member.id}> is already registered.')
         return
 
     for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
@@ -461,7 +450,7 @@ async def tag(ctx):
     '''
     A group of commands to manage tag logs.
 
-    Example command: !member delete @Wookieguy
+    Example command: !tag delete 13
     '''
     if ctx.invoked_subcommand is None:
         await ctx.send('Invalid command passed...')
@@ -470,17 +459,25 @@ async def tag(ctx):
 @commands.has_role('Admin')
 @check_event
 async def tag_create(ctx, member_string: str):
+    '''
+    Starts a tag log chatbot on behalf of another member.
+
+    member_string must be an @mentioned member in the channel, or an ID
+    A tag logging chatbot will be started with the sender of this command,
+    but the discord user actually making the tag will be the one specified.
+    Does not check the faction membership of the tagger.
+    '''
     try:
         member = ctx.message.mentions[0]
         member_row = db.get_member(member)
         if member_row is None:
-            await ctx.reply('That member isn\'t registered, or at least isn\'t in the database.')
+            await ctx.message.reply('That member isn\'t registered, or at least isn\'t in the database.')
             return
 
     except IndexError:
         member_row = util.extract_member_id(member_string, db)
         if member_row is None:
-            await ctx.reply(f'Could not find a member that matched \"{member_string}\". Can be member ID, Name, Discord_Name, or Nickname.')
+            await ctx.message.reply(f'Could not find a member that matched \"{member_string}\". Can be member ID, Name, Discord_Name, or Nickname.')
             return
         member = bot.guild.get_member(int(member_row.ID))
 
@@ -513,7 +510,7 @@ async def tag_delete(ctx, tag_id: int):
     try:
         tag_row = db.get_tag(tag_id)
         if tag_row is None:
-            await ctx.reply(f'Could not find a tag with ID \"{tag_id}\"')
+            await ctx.message.reply(f'Could not find a tag with ID \"{tag_id}\"')
             return
         db.delete_tag(tag_id)
         sheets.export_to_sheet('tags')
@@ -537,7 +534,7 @@ async def tag_delete(ctx, tag_id: int):
         await ctx.send(f'Command error! Error: {e}')
     else:
         msg = f'Tag {tag_id} deleted. ' + msg
-        await ctx.reply(msg)
+        await ctx.message.reply(msg)
 
 @bot.command()
 @commands.has_role('Admin')
@@ -548,7 +545,7 @@ async def shutdown(ctx):
 
     '''
     if len(awaiting_chatbots) == 0:
-        await ctx.reply('Shutting Down')
+        await ctx.message.reply('Shutting Down')
         log.critical('Shutting Down\n. . .\n\n')
         await bot.close()
         time.sleep(1)
@@ -556,7 +553,7 @@ async def shutdown(ctx):
         msg = 'These chatbots are active:\n'
         for c in awaiting_chatbots:
             msg += f'<@{c.member.id}> has a chatbot of type {c.chat_type}\n'
-        await ctx.reply(msg)
+        await ctx.message.reply(msg)
 
 
 async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it is done
