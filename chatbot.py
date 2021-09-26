@@ -15,7 +15,6 @@ class ChatBot:
         else:
             self.target_member = target_member
 
-        self.target_member = target_member
         self.next_question = 0
         self.questions = []
         self.verifying = False

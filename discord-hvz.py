@@ -186,9 +186,12 @@ def check_dm_allowed(func):
 async def on_command_error(ctx, error):
     if isinstance(error, discord.ext.commands.errors.MissingRequiredArgument):
         await ctx.send("A parameter is missing.")
+    if isinstance(error, commands.errors.CheckFailure):
+        log.debug(error)
+
     else:
         await ctx.send(f'The command failed, and produced this error: {error}')
-        log.debug(error)
+        log.info(error)
 
 @bot.listen()
 @check_event
@@ -557,7 +560,6 @@ async def shutdown(ctx):
 
 
 async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it is done
-
     responses = {}
     for question in chatbot.questions:
         responses[question['name']] = question['response']
