@@ -15,7 +15,7 @@ registration: true
 tag_logging: true
 
 
-silent_oz: true
+silent_oz: false
 
 # The IDs of the Google Sheets that the bot will send its data to.
 # The ID can be found in the URL, like this: https://docs.google.com/spreadsheets/d/1YUXeRoEpV9MukZ7B_xVlBkc-D6DNEfVxLBmJlf1Fm-0/edit#gid=0
