@@ -71,12 +71,12 @@ def export_to_sheet(table_name):
     sheet_name = sheet_settings['sheet_name']
 
     # Erases entire sheet below row 1!
-    SPREADSHEETS.values().clear(spreadsheetId=SPREADSHEET_ID, range=f'\'{sheet_name}\'!A1:ZZZ').execute()
+    SPREADSHEETS.values().clear(spreadsheetId=SPREADSHEET_ID, range=f'\'{sheet_name}\'!A1:L').execute()
 
     body = {'values': values}
 
     try:
-        result = SPREADSHEETS.values().update(spreadsheetId=SPREADSHEET_ID, range=f'\'{sheet_name}\'!A1:ZZZ', valueInputOption='USER_ENTERED', body=body).execute()
+        result = SPREADSHEETS.values().update(spreadsheetId=SPREADSHEET_ID, range=f'\'{sheet_name}\'!A1:L', valueInputOption='USER_ENTERED', body=body).execute()
     except Exception as e:
         log.exception('There was an exception with the Google API request! Here it is: %s' % (e))
     else:
