@@ -99,7 +99,7 @@ async def on_ready():
                 raise Exception(f'{x} role not found!')
 
         bot.channels = {}
-        needed_channels = ['tag-announcements', 'report-tags', 'landing'] 
+        needed_channels = ['tag-announcements', 'report-tags', 'landing', 'zombie-chat'] 
         for i, x in enumerate(needed_channels):
             for c in bot.guild.channels:
                 if c.name.lower() == config['channel_names'][x]:
@@ -141,6 +141,7 @@ async def on_ready():
 
         log.critical(f'Discord-HvZ bot launched correctly! Logged in as: {bot.user.name} ------------------------------------------')
         sheets.export_to_sheet('members')
+        sheets.export_to_sheet('tags')
 
     except Exception as e:
         log.exception(f'Bot startup failed with this error --> {e}')
@@ -243,27 +244,27 @@ async def register(ctx):
 @check_dm_allowed
 async def tag_log(ctx):
 
-    if config['tag_logging_on'] is False:
-        ctx.author.send('The admin has not enabled tagging yet.')
-
-    elif bot.roles['zombie'] not in ctx.author.roles:
-        await ctx.author.send('Only zombies can make tags! Silly human with your silly brains.')
-        await ctx.edit_origin()
-
-    elif db.get_member(ctx.author) is None:
-        await ctx.author.send('You are not currently registered for HvZ. Contact an admin if you think this is wrong.')
-
+    if config['tag_logging'] is False:
+        await ctx.author.send('The admin has not enabled tagging yet.')
+    try:
+        member = db.get_member(ctx.author)
+    except Exception as e:
+        await ctx.author.send('Something failed in the tag logging system. Contact Conner Anderson.')
+        log.exception(e)
     else:
-        for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
-            if (c.member == ctx.author) and c.chat_type == 'tag_logging':
-                await ctx.author.send('**Restarting tag logging process...**')
-                awaiting_chatbots.pop(i)
+        if member is None:
+            await ctx.author.send('You are not currently registered for HvZ. Contact an admin if you think this is wrong.')
+        else:
+            for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
+                if (c.member == ctx.author) and c.chat_type == 'tag_logging':
+                    await ctx.author.send('**Restarting tag logging process...**')
+                    awaiting_chatbots.pop(i)
 
-        chatbot = ChatBot(ctx.author, 'tag_logging')
-        await chatbot.ask_question()
-        awaiting_chatbots.append(chatbot)
-
-    await ctx.edit_origin()  # Do this always to convince Discord that the button was successfull
+            chatbot = ChatBot(ctx.author, 'tag_logging')
+            await chatbot.ask_question()
+            awaiting_chatbots.append(chatbot)
+    finally:
+        await ctx.edit_origin()  # Do this always to convince Discord that the button was successfull
 
 
 @bot.listen()
@@ -286,7 +287,7 @@ async def on_member_update(before, after):
         sheets.export_to_sheet('tags')
 
 
-@bot.group(description='A group of commands for interacting with members.')
+@bot.group()
 @commands.has_role('Admin')
 @check_event
 async def member(ctx):
@@ -299,10 +300,20 @@ async def member(ctx):
         await ctx.send('Invalid command passed...')
 
 
-@member.command(name='oz')
+@bot.command(name='oz')
 @commands.has_role('Admin')
 @check_event
-async def member_oz(ctx, member_string: str, setting: bool = None):
+async def oz(ctx, member_string: str, setting: bool = None):
+    '''
+    Sets a member as an OZ, letting them access the zombie tag & chat channels.
+
+    member_string must be a @mentioned member in the channel, an ID, a Discord_Name,
+    a Nickname, or a Name. 
+    If 'setting' is not provided, the commands prints the member's OZ state.
+    If 'setting' is True or False, the member's OZ status is set accordingly.
+    When OZ goes True, the member can access the tag & chat channels even when human.
+    Make sure to give the OZs the zombie role after the secret is out.
+    '''
     member_row = util.member_from_string(member_string, db, ctx=ctx)
     if setting is None:
         await ctx.message.reply(f'{member_row.Name}\'s OZ status is {member_row.OZ}')
@@ -313,6 +324,19 @@ async def member_oz(ctx, member_string: str, setting: bool = None):
         await ctx.message.reply(f'Changed {member_row.Name}\'s OZ status to {setting}')
     else:
         await ctx.message.reply('Failed to edit member.')
+    try:
+        member = bot.guild.get_member(int(member_row.ID))
+        t_channel = bot.channels['report-tags']
+        c_channel = bot.channels['zombie-chat']
+        if setting is True:
+            await t_channel.set_permissions(member, read_messages=True)
+            await c_channel.set_permissions(member, read_messages=True)
+        else:
+            await t_channel.set_permissions(member, overwrite=None)
+            await c_channel.set_permissions(member, overwrite=None)
+    except Exception as e:
+        await ctx.message.reply('Could not change permissions in the report-tags channel.')
+        log.exception(e)
 
 
 @member.command(name='delete')
@@ -442,7 +466,7 @@ async def member_register(ctx, member_string: str):
     awaiting_chatbots.append(chatbot)
 
 
-@bot.group(description='A group of commands for interacting with tag logs.')
+@bot.group()
 @commands.has_role('Admin')
 @check_event
 async def tag(ctx):
@@ -465,7 +489,7 @@ async def tag_create(ctx, member_string: str):
     member_string must be an @mentioned member in the channel, or an ID
     A tag logging chatbot will be started with the sender of this command,
     but the discord user actually making the tag will be the one specified.
-    Does not check the faction membership of the tagger.
+    Does not check the faction membership of the tagger or if tag logging is on.
     '''
     member_row = util.member_from_string(member_string, db, ctx=ctx)
     
@@ -524,6 +548,48 @@ async def tag_delete(ctx, tag_id: int):
         msg = f'Tag {tag_id} deleted. ' + msg
         await ctx.message.reply(msg)
         sheets.export_to_sheet('tags')
+
+'''
+@bot.group(name='config')
+@commands.has_role('Admin')
+@check_event
+async def config_command(ctx):
+
+    if ctx.invoked_subcommand is None:
+        await ctx.send('Invalid command passed...')
+'''
+
+@bot.command(name='config')
+@commands.has_role('Admin')
+@check_event
+async def config_command(ctx, setting: str, choice: bool = None):
+    '''
+    Views or edits configuration settings.
+
+    If only 'setting' is provided, prints the current setting.
+    If 'choice' is True or False, the config setting is set.
+    Current 'setting' options:
+        'registration' Is the registration button enabled?
+        'tag_logging' Is the tag log button enabled?
+        'silent_oz' Are tag announcements made for OZ tags?
+    '''
+    if setting.casefold() not in ('registration', 'tag_logging', 'silent_oz'):
+        await ctx.message.reply('Conner has not implemented full config access yet. Do !help config')
+        return
+
+    try:
+        found_setting = config[setting]
+    except KeyError:
+        await ctx.message.reply(f'\"{setting}\" did not match any configuration settings. Case-sensitive.')
+        return
+
+    if choice is None:
+        await ctx.message.reply(f'The config setting \"{setting}\" is set to \"{found_setting}\"')
+    else:
+        config[setting] = choice
+        await ctx.message.reply(f'Set \"{setting}\" to \"{found_setting}\"')
+
+
 
 @bot.command()
 @commands.has_role('Admin')
@@ -617,6 +683,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             responses['Tagger_Name'] = tagger_member_data.Name
             responses['Tagger_Discord_Name'] = tagger_member_data.Discord_Name
             responses['Tagged_Nickname'] = chatbot.target_member.nick
+            responses['Revoked_Tag'] = False
 
             db.add_tag(responses)
             sheets.export_to_sheet('tags')
@@ -626,8 +693,9 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             
             db.edit_member(tagged_member, 'Faction', 'zombie')
             sheets.export_to_sheet('members')
-
-            msg = f'<@{tagged_member_id}> has turned zombie!\nTagged by <@{chatbot.target_member.id}>'
+            msg = f'<@{tagged_member_id}> has turned zombie!'
+            if not config['silent_oz']:
+                msg += f'\nTagged by <@{chatbot.target_member.id}>'
             # msg += tag_datetime.strftime('\n%A, at about %I:%M %p')
             await bot.channels['tag-announcements'].send(msg)
             return 1

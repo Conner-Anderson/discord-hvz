@@ -9,8 +9,13 @@ available_servers:
   dev: 767126786617114635
   letu: 760568283723202630
 
+registration: true
+
 # Is tag logging enabled on the server? Useful for making sure the game doesn't start too early.
-tag_logging_on: True
+tag_logging: true
+
+
+silent_oz: true
 
 # The IDs of the Google Sheets that the bot will send its data to.
 # The ID can be found in the URL, like this: https://docs.google.com/spreadsheets/d/1YUXeRoEpV9MukZ7B_xVlBkc-D6DNEfVxLBmJlf1Fm-0/edit#gid=0
@@ -25,37 +30,39 @@ sheet_settings:
   members:
     sheet_name: Members
     column_order:
-      - ID
-      - Name
-      - Nickname
-      - Discord_Name
-      - Faction
-      - CPO
-      - Tag_Code
-      - OZ_Desire
-      - Email
-      - Want_Bandana
-      - Registration_Time
-      - OZ
+    - ID
+    - Name
+    - Nickname
+    - Discord_Name
+    - Faction
+    - CPO
+    - Tag_Code
+    - OZ_Desire
+    - Email
+    - Want_Bandana
+    - Registration_Time
+    - OZ
   tags:
     sheet_name: Tags
     column_order:
-      - Tag_ID
-      - Tagger_ID
-      - Tagger_Name
-      - Tagger_Nickname
-      - Tagger_Discord_Name
-      - Tagged_ID
-      - Tagged_Name
-      - Tagged_Nickname
-      - Tagged_Discord_Name
-      - Tag_Time
-      - Report_Time
+    - Tag_ID
+    - Tagger_ID
+    - Tagger_Name
+    - Tagger_Nickname
+    - Tagger_Discord_Name
+    - Tagged_ID
+    - Tagged_Name
+    - Tagged_Nickname
+    - Tagged_Discord_Name
+    - Tag_Time
+    - Report_Time
+    - Revoked_Tag
 
 # Assign the real channel names on the right to the variables on the left
 channel_names:
   tag-announcements: tag-announcements
   report-tags: report-tags
   landing: hvz-first-things-first
+  zombie-chat: zombie-chat
 
 

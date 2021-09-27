@@ -59,7 +59,8 @@ class HvzDb():
                         Column('Tagged_Nickname', String),
                         Column('Tagged_Discord_Name', String),
                         Column('Tag_Time', DateTime),
-                        Column('Report_Time', DateTime)
+                        Column('Report_Time', DateTime),
+                        Column('Revoked_Tag', Boolean)
                     )
         
         self.metadata_obj.create_all(self.engine)
