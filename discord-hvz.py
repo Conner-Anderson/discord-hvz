@@ -353,11 +353,12 @@ async def member_delete(ctx, member_string: str):
     member_row = util.member_from_string(member_string, db, ctx=ctx)
     db.delete_member(member_row.ID)
 
-    member = bot.guild.get_member(int(member_row.ID))
 
-    await member.remove_roles(bot.roles['human'])
-    await member.remove_roles(bot.roles['zombie'])
-    await member.remove_roles(bot.roles['player'])
+    member = bot.guild.get_member(int(member_row.ID))
+    if member is not None:
+        await member.remove_roles(bot.roles['human'])
+        await member.remove_roles(bot.roles['zombie'])
+        await member.remove_roles(bot.roles['player'])
     
     await ctx.message.reply(f'<@{member_row.ID}> deleted from the game. Roles revoked, expunged from the database. Any tags will still exist.')
     sheets.export_to_sheet('members')
@@ -532,57 +533,74 @@ async def tag_delete(ctx, tag_id: int):
     await ctx.message.reply(msg)
     sheets.export_to_sheet('tags')
 
-'''
+
 @tag.command(name='revoke')
 @commands.has_role('Admin')
 @check_event
 async def tag_revoke(ctx, tag_id: int):
-    
-    Removes the tag by its ID, reverting tagged member to human.
+    '''
+    Sets Tag_Revoked for a tag to True. Changes roles.
 
     Takes a tag ID, which you can get from the Google sheet.
-    Removes the tag from the database. Also changes the tagged member back to
-    human if there aren't any remaining tags on them.
+    Sets the tag to Revoked, but leaves it in the database.
+    Restores the tagged member to human if there isn't another
+    tag that makes them a zombie.
+    '''
+    tag_row = db.get_tag(tag_id)
+
+    db.edit_tag(tag_id, 'Revoked_Tag', True)
+    
+    msg = ''
     
     try:
-        tag_row = db.get_tag(tag_id)
-        if tag_row is None:
-            await ctx.message.reply(f'Could not find a tag with ID \"{tag_id}\"')
-            return
-        db.edit
-        sheets.export_to_sheet('tags')
-        msg = ''
-
         tagged_member = bot.guild.get_member(int(tag_row.Tagged_ID))
-        existing_tag = db.get_tag(tag_row.Tagged_ID, column='Tagged_ID')
-        if existing_tag is None:
+        try:
+            existing_tag = db.get_tag(tag_row.Tagged_ID, column='Tagged_ID')
             # Change to human if there are no previous tags on the tagged member
-            
-            # db.edit_member(tagged_member, 'Faction', 'human')
-            await tagged_member.add_roles(bot.roles['human'])
-            await tagged_member.remove_roles(bot.roles['zombie'])
-            msg += f'Changed <@{tagged_member} to human.>'
-        else:
             msg += f'Left <@{tagged_member}> as zombie because <@{existing_tag.Tagger_ID}> still tagged them. ' 
             f'(Tag ID: {existing_tag.Tagger_ID}'
-
+        except ValueError:
+            await tagged_member.add_roles(bot.roles['human'])
+            await tagged_member.remove_roles(bot.roles['zombie'])
+            msg += f'Changed <@{tagged_member}> to human.'
     except Exception as e:
+        await ctx.message.reply('Could not set roles correctly. Try it manually.')
         log.exception(e)
-        await ctx.send(f'Command error! Error: {e}')
-    else:
-        msg = f'Tag {tag_id} deleted. ' + msg
-        await ctx.message.reply(msg)
-        sheets.export_to_sheet('tags')
+    msg = f'Tag {tag_id} revoked. ' + msg
+    await ctx.message.reply(msg)
+    sheets.export_to_sheet('tags')
 
 
-@bot.group(name='config')
+@tag.command(name='restore')
 @commands.has_role('Admin')
 @check_event
-async def config_command(ctx):
+async def tag_restore(ctx, tag_id: int):
+    '''
+    Sets Tag_Revoked for a tag to False. Changes roles.
 
-    if ctx.invoked_subcommand is None:
-        await ctx.send('Invalid command passed...')
-'''
+    Takes a tag ID, which you can get from the Google sheet.
+    Restores a revoked tag in the database.
+    Restores the tagged member to zombie.
+    '''
+    tag_row = db.get_tag(tag_id)
+
+    db.edit_tag(tag_id, 'Revoked_Tag', False)
+    
+    msg = ''
+    try:
+        tagged_member = bot.guild.get_member(int(tag_row.Tagged_ID))
+
+        await tagged_member.add_roles(bot.roles['zombie'])
+        await tagged_member.remove_roles(bot.roles['human'])
+        msg += f'Changed <@{tagged_member}> to zombie.'
+    except Exception as e:
+        await ctx.message.reply('Could not set roles correctly. Try it manually.')
+        log.exception(e)
+
+    msg = f'Tag {tag_id} restored. ' + msg
+    await ctx.message.reply(msg)
+    sheets.export_to_sheet('tags')
+
 
 @bot.command(name='config')
 @commands.has_role('Admin')

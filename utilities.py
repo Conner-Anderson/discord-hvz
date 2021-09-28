@@ -28,9 +28,11 @@ def member_from_string(member_string, db, ctx=None):
         if member_row is not None:
             return member_row
     for o in options:
-        member_row = db.get_member(member_string, column=o)
-        if member_row is not None:
+        try:
+            member_row = db.get_member(member_string, column=o)
             return member_row
+        except ValueError:
+            pass
     raise ValueError(f'Could not find a member that matched \"{member_string}\". Can be member ID, Name, Discord_Name, or Nickname.')
 
 
