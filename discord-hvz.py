@@ -781,6 +781,12 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             if not config['silent_oz']:
                 msg += f'\nTagged by <@{chatbot.target_member.id}>'
             # msg += tag_datetime.strftime('\n%A, at about %I:%M %p')
+            try:
+                human_role = bot.roles['human']
+                zombie_role = bot.roles['zombie']
+                msg += f'\nThere are now {len(human_role.members)} humans and {len(zombie_role.members)} zombies.'
+            except Exception as e:
+                log.exception(e)
             await bot.channels['tag-announcements'].send(msg)
             return 1
 
