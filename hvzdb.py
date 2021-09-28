@@ -11,6 +11,7 @@ from sqlalchemy import ForeignKey
 from sqlalchemy import insert, select, delete, update
 from sqlalchemy import func, cast
 from sqlalchemy.exc import NoSuchTableError
+from sqlalchemy import and_
 
 log = logging.getLogger(__name__)
 
@@ -134,7 +135,7 @@ class HvzDb():
         member_row = self.__get_row(self.tables['members'], self.tables['members'].c[search_column], search_value)
         return member_row
 
-    def get_tag(self, value, column=None):
+    def get_tag(self, value, column=None, filter_revoked=False):
         '''
         Returns a Row object that represents a single tag in the database
 
@@ -152,11 +153,15 @@ class HvzDb():
         else:
             search_column = 'Tag_ID'
 
-        tag_row = self.__get_row(table, table.c[search_column], value)
+        if filter_revoked is False:
+            tag_row = self.__get_row(table, table.c[search_column], value)
+        else:
+            tag_row = self.__get_row(table, table.c[search_column], value,
+                exclusion_column=table.c['Revoked_Tag'], exclusion_value=True)
         return tag_row
 
 
-    def __get_row(self, table, search_column, search_value):
+    def __get_row(self, table, search_column, search_value, exclusion_column=None, exclusion_value=None):
         '''
         Returns the first Row object where the specified value matches.
         Meant to be used within the class.
@@ -165,11 +170,17 @@ class HvzDb():
                 table (sqlalchemy.table): Table object
                 column (sqlalchemy.column): Column object to search for value
                 value (any): Value to search column for
+                exclusion_column (sqlalchemy.column) Optional. Reject rows where this column equals exclusion_value
+                exclusion_value (any) Optional. Required if exclusion_column is provided.
 
         Returns:
                 row (Row): Row object. Access rows in these ways: row.some_row, row['some_row']
         '''
         selection = select(table).where(search_column == search_value)
+        if (exclusion_column is not None):
+            if exclusion_value is None:
+                raise ValueError('No exclusion value provided.')
+            selection = selection.where(exclusion_column != exclusion_value)
         with self.engine.begin() as conn:
             result_row = conn.execute(selection).first()
         if result_row is None:
@@ -303,4 +314,5 @@ class HvzDb():
 # Below is just for testing when this file is run from the command line
 if __name__ == '__main__':
     db = HvzDb()
-    print(db.get_member(458121521685331980, column='IV'))
+    result = db.get_tag('Wookieguy', column='Tagger_Discord_Name', filter_revoked=True)
+    print(result)

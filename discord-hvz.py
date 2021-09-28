@@ -386,10 +386,10 @@ async def member_edit(ctx, member_string: str, attribute: str, value: str):
     sheets.export_to_sheet('members')
 
 
-@member.command()
+@member.command(name='list')
 @commands.has_role('Admin')
 @check_event
-async def list(ctx):
+async def member_list(ctx):
     '''
     Lists all members.
 
@@ -480,7 +480,8 @@ async def tag_create(ctx, member_string: str):
     '''
     Starts a tag log chatbot on behalf of another member.
 
-    member_string must be an @mentioned member in the channel, or an ID
+    member_string must be an @mentioned member in the channel, an ID, a Discord_Name,
+    a Nickname, or a Name.
     A tag logging chatbot will be started with the sender of this command,
     but the discord user actually making the tag will be the one specified.
     Does not check the faction membership of the tagger or if tag logging is on.
@@ -520,7 +521,7 @@ async def tag_delete(ctx, tag_id: int):
 
     tagged_member = bot.guild.get_member(int(tag_row.Tagged_ID))
     try:
-        existing_tag = db.get_tag(tag_row.Tagged_ID, column='Tagged_ID')
+        existing_tag = db.get_tag(tag_row.Tagged_ID, column='Tagged_ID', filter_revoked=True)
         # Change to human if there are no previous tags on the tagged member
         msg += f'Left <@{tagged_member}> as zombie because <@{existing_tag.Tagger_ID}> still tagged them. ' 
         f'(Tag ID: {existing_tag.Tagger_ID}'
@@ -532,6 +533,27 @@ async def tag_delete(ctx, tag_id: int):
     msg = f'Tag {tag_id} deleted. ' + msg
     await ctx.message.reply(msg)
     sheets.export_to_sheet('tags')
+
+
+@tag.command(name='edit')
+@commands.has_role('Admin')
+@check_event
+async def tag_edit(ctx, tag_id: str, attribute: str, value: str):
+    '''
+    Edits one attribute of a tag
+    
+    Any arguments with spaces must be "surrounded in quotes"
+    Takes a tag ID, which you can get from the Google sheet.
+    Valid attributes are the column names in the database, which can be found in exported Google Sheets.
+    Case-sensitive, exact matches only!
+    There is no validation to check if the value you provide will work, so be careful! 
+    '''
+    tag_row = db.get_tag(tag_id)
+
+    original_value = tag_row[attribute]
+    db.edit_tag(tag_row.Tag_ID, attribute, value)
+    await ctx.send(f'The value of {attribute} for tag {tag_row.Tag_ID} was changed from \"{original_value}\"" to \"{value}\"')
+    sheets.export_to_sheet('members')
 
 
 @tag.command(name='revoke')
@@ -555,9 +577,9 @@ async def tag_revoke(ctx, tag_id: int):
     try:
         tagged_member = bot.guild.get_member(int(tag_row.Tagged_ID))
         try:
-            existing_tag = db.get_tag(tag_row.Tagged_ID, column='Tagged_ID')
+            existing_tag = db.get_tag(tag_row.Tagged_ID, column='Tagged_ID', filter_revoked=True)
             # Change to human if there are no previous tags on the tagged member
-            msg += f'Left <@{tagged_member}> as zombie because <@{existing_tag.Tagger_ID}> still tagged them. ' 
+            msg += f'Left <@{tagged_member.id}> as zombie because <@{existing_tag.Tagger_ID}> still tagged them in tag {existing_tag.Tag_ID}' 
             f'(Tag ID: {existing_tag.Tagger_ID}'
         except ValueError:
             await tagged_member.add_roles(bot.roles['human'])
@@ -592,7 +614,7 @@ async def tag_restore(ctx, tag_id: int):
 
         await tagged_member.add_roles(bot.roles['zombie'])
         await tagged_member.remove_roles(bot.roles['human'])
-        msg += f'Changed <@{tagged_member}> to zombie.'
+        msg += f'Changed <@{tagged_member.id}> to zombie.'
     except Exception as e:
         await ctx.message.reply('Could not set roles correctly. Try it manually.')
         log.exception(e)
