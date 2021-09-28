@@ -131,7 +131,6 @@ class HvzDb():
             else:
                 search_value = value
 
-
         member_row = self.__get_row(self.tables['members'], self.tables['members'].c[search_column], search_value)
         return member_row
 
@@ -170,12 +169,12 @@ class HvzDb():
         Returns:
                 row (Row): Row object. Access rows in these ways: row.some_row, row['some_row']
         '''
-        
-
         selection = select(table).where(search_column == search_value)
         with self.engine.begin() as conn:
             result_row = conn.execute(selection).first()
-            return result_row
+        if result_row is None:
+            raise ValueError(f'Could not find a row where \"{search_column}\" is \"{search_value}\"')
+        return result_row
 
 
     def get_table(self, table):
@@ -228,6 +227,29 @@ class HvzDb():
         )
         return result
 
+    def edit_tag(self, tag_id, column, value):
+        '''
+        Edits an attribute of a tag in the database
+
+        Parameters:
+                tag_id (int or user): A tag ID
+                column (str): A string matching the column to change. Case sensitive.
+                value (any?): Value to change the cell to.
+
+        Returns:
+                result (bool): True if the edit was successful, False if it was not.
+        '''
+
+        result = self.__edit_row(
+            self.tables['tags'],
+            self.tables['tags'].c.Tag_ID,
+            tag_id,
+            column,
+            value
+        )
+        return result
+
+
 
     def __edit_row(self, table, search_column, search_value, target_column, target_value):
         updator = (
@@ -239,8 +261,11 @@ class HvzDb():
             raise ValueError(f'{search_column} not a column in {table}')
 
         with self.engine.begin() as conn:
-            conn.execute(updator)
+            result = conn.execute(updator)
+        if result.rowcount > 0:
             return True
+        else:
+            raise ValueError(f'\"{search_value}\" not found in \"{search_column}\" column.')
 
 
     def delete_member(self, member):
@@ -278,6 +303,4 @@ class HvzDb():
 # Below is just for testing when this file is run from the command line
 if __name__ == '__main__':
     db = HvzDb()
-    member = db.get_member('293465952895631360')
-    print(member.Registration_Time)
-    print(type(member.Registration_Time))
+    print(db.get_member(458121521685331980, column='IV'))

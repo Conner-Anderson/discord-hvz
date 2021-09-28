@@ -222,21 +222,23 @@ async def on_message(message):
 @check_event
 @check_dm_allowed
 async def register(ctx):
-
-    if db.get_member(ctx.author) is not None:
+    try:
+        db.get_member(ctx.author)
         await ctx.author.send('You are already registered for HvZ! Contact an admin if you think this is wrong.')
-        await ctx.edit_origin()
-        return
-
-    for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
-        if (c.member == ctx.author) and c.chat_type == 'registration':
-            await ctx.author.send('**Restarting registration process...**')
-            awaiting_chatbots.pop(i)
-
-    chatbot = ChatBot(ctx.author, 'registration')
-    await ctx.edit_origin()  # Appeases the component system into thinking the component succeeded. 
-    await chatbot.ask_question()
-    awaiting_chatbots.append(chatbot)
+    except ValueError:
+        pass
+    else:
+        for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
+            if (c.member == ctx.author) and c.chat_type == 'registration':
+                await ctx.author.send('**Restarting registration process...**')
+                awaiting_chatbots.pop(i)
+        chatbot = ChatBot(ctx.author, 'registration')
+        await chatbot.ask_question()
+        awaiting_chatbots.append(chatbot)
+    finally:
+        await ctx.edit_origin()  # Appeases the component system into thinking the component succeeded. 
+        
+    
 
 
 @slash.component_callback()
@@ -247,22 +249,19 @@ async def tag_log(ctx):
     if config['tag_logging'] is False:
         await ctx.author.send('The admin has not enabled tagging yet.')
     try:
-        member = db.get_member(ctx.author)
-    except Exception as e:
-        await ctx.author.send('Something failed in the tag logging system. Contact Conner Anderson.')
-        log.exception(e)
+        db.get_member(ctx.author)
+    except ValueError as e:
+        await ctx.author.send('You are not currently registered for HvZ, or something has gone very wrong.')
+        log.debug(e)
     else:
-        if member is None:
-            await ctx.author.send('You are not currently registered for HvZ. Contact an admin if you think this is wrong.')
-        else:
-            for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
-                if (c.member == ctx.author) and c.chat_type == 'tag_logging':
-                    await ctx.author.send('**Restarting tag logging process...**')
-                    awaiting_chatbots.pop(i)
+        for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
+            if (c.member == ctx.author) and c.chat_type == 'tag_logging':
+                await ctx.author.send('**Restarting tag logging process...**')
+                awaiting_chatbots.pop(i)
 
-            chatbot = ChatBot(ctx.author, 'tag_logging')
-            await chatbot.ask_question()
-            awaiting_chatbots.append(chatbot)
+        chatbot = ChatBot(ctx.author, 'tag_logging')
+        await chatbot.ask_question()
+        awaiting_chatbots.append(chatbot)
     finally:
         await ctx.edit_origin()  # Do this always to convince Discord that the button was successfull
 
@@ -318,16 +317,14 @@ async def oz(ctx, member_string: str, setting: bool = None):
     if setting is None:
         await ctx.message.reply(f'{member_row.Name}\'s OZ status is {member_row.OZ}')
         return
-    success = db.edit_member(member_row.ID, 'OZ', setting)
-    sheets.export_to_sheet('members')
-    if success:
-        await ctx.message.reply(f'Changed {member_row.Name}\'s OZ status to {setting}')
-    else:
-        await ctx.message.reply('Failed to edit member.')
+    db.edit_member(member_row.ID, 'OZ', setting)
+
+    await ctx.message.reply(f'Changed <@{member_row.ID}>\'s OZ status to {setting}')
+
+    member = bot.guild.get_member(int(member_row.ID))
+    t_channel = bot.channels['report-tags']
+    c_channel = bot.channels['zombie-chat']
     try:
-        member = bot.guild.get_member(int(member_row.ID))
-        t_channel = bot.channels['report-tags']
-        c_channel = bot.channels['zombie-chat']
         if setting is True:
             await t_channel.set_permissions(member, read_messages=True)
             await c_channel.set_permissions(member, read_messages=True)
@@ -335,8 +332,9 @@ async def oz(ctx, member_string: str, setting: bool = None):
             await t_channel.set_permissions(member, overwrite=None)
             await c_channel.set_permissions(member, overwrite=None)
     except Exception as e:
-        await ctx.message.reply('Could not change permissions in the report-tags channel.')
-        log.exception(e)
+        await ctx.message.reply('Could not change permissions in the channels. Please give the bot permission to.')
+        log.warning(e)
+    sheets.export_to_sheet('members')
 
 
 @member.command(name='delete')
@@ -356,10 +354,10 @@ async def member_delete(ctx, member_string: str):
     db.delete_member(member_row.ID)
 
     member = bot.guild.get_member(int(member_row.ID))
-    if member is not None:
-        await member.remove_roles(bot.roles['human'])
-        await member.remove_roles(bot.roles['zombie'])
-        await member.remove_roles(bot.roles['player'])
+
+    await member.remove_roles(bot.roles['human'])
+    await member.remove_roles(bot.roles['zombie'])
+    await member.remove_roles(bot.roles['player'])
     
     await ctx.message.reply(f'<@{member_row.ID}> deleted from the game. Roles revoked, expunged from the database. Any tags will still exist.')
     sheets.export_to_sheet('members')
@@ -381,15 +379,10 @@ async def member_edit(ctx, member_string: str, attribute: str, value: str):
     '''
     member_row = util.member_from_string(member_string, db, ctx=ctx)
 
-    try:
-        original_value = member_row[attribute]
-        db.edit_member(member_row.ID, attribute, value)
-        await ctx.send(f'The value of {attribute} for <@{member_row.ID}> was changed from \"{original_value}\"" to \"{value}\"')
-        sheets.export_to_sheet('members')
-
-    except NoSuchColumnError as e:
-        await ctx.send(f'The attribute \"{attribute}\" you provided does not match a column in the database.')
-        log.debug(e)
+    original_value = member_row[attribute]
+    db.edit_member(member_row.ID, attribute, value)
+    await ctx.send(f'The value of {attribute} for <@{member_row.ID}> was changed from \"{original_value}\"" to \"{value}\"')
+    sheets.export_to_sheet('members')
 
 
 @member.command()
@@ -451,19 +444,19 @@ async def member_register(ctx, member_string: str):
         if member is None:
             ctx.message.reply(f'Member not found from \"{member_string}\"')
             return
-    if db.get_member(member) is not None:
+    try:
+        db.get_member(member)
         await ctx.message.reply(f'<@{member.id}> is already registered.')
-        return
+    except ValueError:
+        for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
+            if (c.member == ctx.author) and c.chat_type == 'registration':
+                await ctx.author.send('**Restarting registration process...**')
+                awaiting_chatbots.pop(i)
 
-    for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
-        if (c.member == ctx.author) and c.chat_type == 'registration':
-            await ctx.author.send('**Restarting registration process...**')
-            awaiting_chatbots.pop(i)
-
-    chatbot = ChatBot(ctx.author, 'registration', target_member=member)
-    await ctx.author.send(f'The following registration is for <@{member.id}>.')
-    await chatbot.ask_question()
-    awaiting_chatbots.append(chatbot)
+        chatbot = ChatBot(ctx.author, 'registration', target_member=member)
+        await ctx.author.send(f'The following registration is for <@{member.id}>.')
+        await chatbot.ask_question()
+        awaiting_chatbots.append(chatbot)
 
 
 @bot.group()
@@ -492,20 +485,20 @@ async def tag_create(ctx, member_string: str):
     Does not check the faction membership of the tagger or if tag logging is on.
     '''
     member_row = util.member_from_string(member_string, db, ctx=ctx)
-    
-    member = bot.guild.get_member(int(member_row.ID))
-    if member is None:
-        raise ValueError(f'{member_row.Discord_Name} is not on the server anymore.')
+    try:
+        member = bot.guild.get_member(int(member_row.ID))
+    except ValueError:
+        raise ValueError(f'<@{member_row.ID}> is not on the server anymore.')
+    else:
+        for i, c in enumerate(awaiting_chatbots):  # Restart tag log if one is already in progress
+            if (c.member == ctx.author) and c.chat_type == 'tag_logging':
+                await ctx.author.send('**Restarting tag logging process...**')
+                awaiting_chatbots.pop(i)
 
-    for i, c in enumerate(awaiting_chatbots):  # Restart tag log if one is already in progress
-        if (c.member == ctx.author) and c.chat_type == 'tag_logging':
-            await ctx.author.send('**Restarting tag logging process...**')
-            awaiting_chatbots.pop(i)
-
-    chatbot = ChatBot(ctx.author, 'tag_logging', target_member=member)
-    await ctx.author.send(f'The following registration is for <@{member.id}>.')
-    await chatbot.ask_question()
-    awaiting_chatbots.append(chatbot)
+        chatbot = ChatBot(ctx.author, 'tag_logging', target_member=member)
+        await ctx.author.send(f'The following registration is for <@{member.id}>.')
+        await chatbot.ask_question()
+        awaiting_chatbots.append(chatbot)
 
 
 @tag.command(name='delete')
@@ -519,35 +512,25 @@ async def tag_delete(ctx, tag_id: int):
     Removes the tag from the database. Also changes the tagged member back to
     human if there aren't any remaining tags on them.
     '''
+
+    tag_row = db.get_tag(tag_id)
+    db.delete_tag(tag_id)
+    msg = ''
+
+    tagged_member = bot.guild.get_member(int(tag_row.Tagged_ID))
     try:
-        tag_row = db.get_tag(tag_id)
-        if tag_row is None:
-            await ctx.message.reply(f'Could not find a tag with ID \"{tag_id}\"')
-            return
-        db.delete_tag(tag_id)
-        sheets.export_to_sheet('tags')
-        msg = ''
-
-        tagged_member = bot.guild.get_member(int(tag_row.Tagged_ID))
         existing_tag = db.get_tag(tag_row.Tagged_ID, column='Tagged_ID')
-        if existing_tag is None:
-            # Change to human if there are no previous tags on the tagged member
-            
-            # db.edit_member(tagged_member, 'Faction', 'human')
-            await tagged_member.add_roles(bot.roles['human'])
-            await tagged_member.remove_roles(bot.roles['zombie'])
-            msg += f'Changed <@{tagged_member} to human.>'
-        else:
-            msg += f'Left <@{tagged_member}> as zombie because <@{existing_tag.Tagger_ID}> still tagged them. ' 
-            f'(Tag ID: {existing_tag.Tagger_ID}'
+        # Change to human if there are no previous tags on the tagged member
+        msg += f'Left <@{tagged_member}> as zombie because <@{existing_tag.Tagger_ID}> still tagged them. ' 
+        f'(Tag ID: {existing_tag.Tagger_ID}'
+    except ValueError:
+        await tagged_member.add_roles(bot.roles['human'])
+        await tagged_member.remove_roles(bot.roles['zombie'])
+        msg += f'Changed <@{tagged_member}> to human.'
 
-    except Exception as e:
-        log.exception(e)
-        await ctx.send(f'Command error! Error: {e}')
-    else:
-        msg = f'Tag {tag_id} deleted. ' + msg
-        await ctx.message.reply(msg)
-        sheets.export_to_sheet('tags')
+    msg = f'Tag {tag_id} deleted. ' + msg
+    await ctx.message.reply(msg)
+    sheets.export_to_sheet('tags')
 
 '''
 @tag.command(name='revoke')
@@ -631,6 +614,20 @@ async def config_command(ctx, setting: str, choice: bool = None):
         config[setting] = choice
         await ctx.message.reply(f'Set \"{setting}\" to \"{found_setting}\"')
 
+@bot.command()
+@commands.has_role('Player')
+@check_event
+async def code(ctx):
+    '''
+    Gives a player their tag code in a private message.
+
+    '''
+    try:
+        code = db.get_member(ctx.author).Tag_Code
+        await ctx.author.send(f'Your tag code is: {code}\nHave this ready to give to a zombie who tags you.')
+    except Exception as e:
+        await ctx.author.send('Sorry, something went wrong with that command. Derp.')
+        log.exception(e)
 
 
 @bot.command()
@@ -686,26 +683,26 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
 
     elif chatbot.chat_type == 'tag_logging':
         try:
-            tagged_member_data = db.get_member(responses['Tag_Code'], column='Tag_Code')
-
-            if tagged_member_data is None:
+            try:
+                tagged_member_data = db.get_member(responses['Tag_Code'], column='Tag_Code')
+            except ValueError:
                 await chatbot.member.send('That tag code doesn\'t match anyone! Try again.')
                 return 0
 
             tagged_member_id = int(tagged_member_data['ID'])
-            tagged_member = bot.guild.get_member(tagged_member_id)
-
-            if tagged_member is None:
-                await chatbot.member.send('Couldn\'t find the user you tagged... Are they still in the game? Please contact an admin.')
-                log.debug(f'Couldn\'t find member. Tagged_Member: {tagged_member} {tagged_member_id}')
+            try:
+                tagged_member = bot.guild.get_member(tagged_member_id)
+            except ValueError:
+                await chatbot.member.send('The member you tagged isn\'t on the server anymore.')
+                log.error('Someone tried to tag a member who isn\'t on the server anymore.')
                 return 0
 
             if bot.roles['zombie'] in tagged_member.roles:
-                await chatbot.member.send('%s is already a zombie! What are you up to?' % (tagged_member_data.Name))
+                await chatbot.member.send('<@%s> is already a zombie! What are you up to?' % (tagged_member_data.ID))
                 return 0
 
             tag_time = datetime.today()
-            if responses['Tag_Day'].casefold().find('yesterday'):  # Converts tag_day to the previous day
+            if not responses['Tag_Day'].casefold().find('yesterday') == -1:  # Converts tag_day to the previous day
                 tag_time -= timedelta(days=1)
             tag_datetime = parser.parse(responses['Tag_Time'] + ' and 0 seconds', default=tag_time)
             responses['Tag_Time'] = tag_datetime
@@ -718,8 +715,8 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             tagger_member_data = db.get_member(chatbot.target_member)
 
             responses['Tagged_ID'] = tagged_member_id
-            responses['Tagged_Name'] = tagger_member_data.Name
-            responses['Tagged_Discord_Name'] = tagger_member_data.Discord_Name
+            responses['Tagged_Name'] = tagged_member_data.Name
+            responses['Tagged_Discord_Name'] = tagged_member_data.Discord_Name
             responses['Tagged_Nickname'] = tagged_member.nick
             responses['Tagger_ID'] = chatbot.target_member.id
             responses['Tagger_Name'] = tagger_member_data.Name
@@ -728,13 +725,17 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             responses['Revoked_Tag'] = False
 
             db.add_tag(responses)
-            sheets.export_to_sheet('tags')
 
             await tagged_member.add_roles(bot.roles['zombie'])
             await tagged_member.remove_roles(bot.roles['human'])
             
             db.edit_member(tagged_member, 'Faction', 'zombie')
-            sheets.export_to_sheet('members')
+            try:
+                sheets.export_to_sheet('tags')
+                sheets.export_to_sheet('members')
+            except Exception as e:
+                log.exception(e)
+            
 
             msg = f'<@{tagged_member_id}> has turned zombie!'
             if not config['silent_oz']:
