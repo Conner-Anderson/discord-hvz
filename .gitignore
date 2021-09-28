@@ -13,3 +13,6 @@ hvzdb.db
 pyvenv.cfg
 sqalchemytest.py
 *.db
+build
+*.exe
+*.spec
