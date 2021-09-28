@@ -761,7 +761,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             responses['Tagger_ID'] = chatbot.target_member.id
             responses['Tagger_Name'] = tagger_member_data.Name
             responses['Tagger_Discord_Name'] = tagger_member_data.Discord_Name
-            responses['Tagged_Nickname'] = chatbot.target_member.nick
+            responses['Tagger_Nickname'] = chatbot.target_member.nick
             responses['Revoked_Tag'] = False
 
             db.add_tag(responses)
