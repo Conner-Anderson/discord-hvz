@@ -35,4 +35,36 @@ def member_from_string(member_string, db, ctx=None):
             pass
     raise ValueError(f'Could not find a member that matched \"{member_string}\". Can be member ID, Name, Discord_Name, or Nickname.')
 
+def generate_tag_tree(db):
 
+    oz_table = db.get_rows('members', 'OZ', True)
+
+    def loop(table, level):
+        output = ''
+        for r in table:
+            output += '\n'
+            for x in range(level):
+                output += '    '
+            output += f'- <@{r.ID}>'
+            if level == 0:
+                output += ' (OZ)'
+            try:
+                tags = db.get_rows('tags', 'Tagger_ID', r.ID, exclusion_column='Revoked_Tag', exclusion_value=True)
+
+            except ValueError:
+                pass
+            else:
+
+                output += f', {len(tags)} tag'
+                if len(tags) > 1:
+                    output += 's'
+                output += ':'
+                tagged_members = []
+                for t in tags:
+                    tagged_members.append(db.get_member(t.Tagged_ID))
+
+                output += loop(tagged_members, level + 1)
+                
+        return output
+
+    return loop(oz_table, 0)

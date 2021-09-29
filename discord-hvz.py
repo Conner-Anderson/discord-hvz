@@ -669,6 +669,31 @@ async def code(ctx):
         await ctx.author.send('Sorry, something went wrong with that command. Derp.')
         log.exception(e)
 
+@tag.command(name='tree')
+@commands.has_role('Admin')
+@check_event
+async def tag_tree(ctx):
+    '''
+    Sends a message with a family tree of the zombies in the game.
+
+    The command message is deleted too.
+    '''
+    tree = util.generate_tag_tree(db).splitlines(True)
+    buffer = '**THE ZOMBIE FAMILY TREE\n**'
+    for i, x in enumerate(tree):
+        buffer += x
+        try:
+            next_length = len(tree[i + 1]) + len(buffer)
+        except IndexError:
+            await ctx.send(buffer)
+        else:
+            if next_length > 3000:
+                await ctx.send(buffer)
+                buffer = ''
+
+    await ctx.message.delete()
+
+
 
 @bot.command()
 @commands.has_role('Admin')
