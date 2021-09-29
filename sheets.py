@@ -49,8 +49,18 @@ def setup(db, bot):
     global BOT
     BOT = bot
 
+def check_creds():
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        if creds.valid:
+            return
+    setup(DB, BOT)      
+
+
 
 def export_to_sheet(table_name):
+
+    check_creds()
 
     table = DB.get_table(table_name)
 

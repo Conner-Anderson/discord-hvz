@@ -749,7 +749,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
             responses['Report_Time'] = datetime.today()
 
             if tag_datetime > datetime.today():
-                chatbot.member.send('The tag time you stated is in the future. Try again.')
+                await chatbot.member.send('The tag time you stated is in the future. Try again.')
                 return 0
 
             tagger_member_data = db.get_member(chatbot.target_member)
