@@ -749,7 +749,7 @@ async def resolve_chat(chatbot):  # Called when a ChatBot returns 1, showing it 
     elif chatbot.chat_type == 'tag_logging':
         try:
             try:
-                tagged_member_data = db.get_member(responses['Tag_Code'], column='Tag_Code')
+                tagged_member_data = db.get_member(responses['Tag_Code'].upper(), column='Tag_Code')
             except ValueError:
                 await chatbot.member.send('That tag code doesn\'t match anyone! Try again.')
                 return 0
