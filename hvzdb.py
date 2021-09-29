@@ -310,9 +310,36 @@ class HvzDb():
             conn.execute(deletor)
             return True
 
+    def get_rows(self, table, search_column, search_value, exclusion_column=None, exclusion_value=None):
+        '''
+        Returns the first Row object where the specified value matches.
+        Meant to be used within the class.
+
+        Parameters:
+                table (sqlalchemy.table): Table object
+                column (sqlalchemy.column): Column object to search for value
+                value (any): Value to search column for
+                exclusion_column (sqlalchemy.column) Optional. Reject rows where this column equals exclusion_value
+                exclusion_value (any) Optional. Required if exclusion_column is provided.
+
+        Returns:
+                row (Row): Row object. Access rows in these ways: row.some_row, row['some_row']
+        '''
+        the_table = self.tables[table]
+        selection = select(the_table).where(the_table.c[search_column] == search_value)
+        if (exclusion_column is not None):
+            if exclusion_value is None:
+                raise ValueError('No exclusion value provided.')
+            selection = selection.where(the_table.c[exclusion_column] != exclusion_value)
+        with self.engine.begin() as conn:
+            result_rows = conn.execute(selection).all()
+        if len(result_rows) == 0:
+            raise ValueError(f'Could not find rows where \"{search_column}\" is \"{search_value}\"')
+        return result_rows
+
 
 # Below is just for testing when this file is run from the command line
 if __name__ == '__main__':
     db = HvzDb()
-    result = db.get_tag('Wookieguy', column='Tagger_Discord_Name', filter_revoked=True)
+    result = db.get_rows('members', 'OZ', True)
     print(result)
