@@ -107,7 +107,7 @@ async def on_ready():
                     break
             else:
                 raise Exception(f'{x} channel not found!')
-
+        
         button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ!', 
                             create_button(style=ButtonStyle.green, label='Register for HvZ', custom_id='register')],
                         'report-tags': ['Use the button below and check your Direct Messages to log a tag.', 
@@ -126,7 +126,7 @@ async def on_ready():
                     await bot.channels[channel].send(content=content, components=[action_row])
         except KeyError as e:
             raise KeyError(f'Could not find the channel {e}!')  # A bit redundant
-
+        
         async def check(ctx):  # A guild check for the help command
             try:
                 if ctx.guild.id == bot.guild.id:
@@ -138,7 +138,6 @@ async def on_ready():
 
         bot.help_command.add_check(check)
 
-
         log.critical(f'Discord-HvZ bot launched correctly! Logged in as: {bot.user.name} ------------------------------------------')
         sheets.export_to_sheet('members')
         sheets.export_to_sheet('tags')
@@ -147,6 +146,7 @@ async def on_ready():
         log.exception(f'Bot startup failed with this error --> {e}')
         await bot.close()
         time.sleep(1)
+
 
 def check_event(func):
     '''
@@ -170,6 +170,7 @@ def check_event(func):
 
         return result
     return inner
+
 
 def check_dm_allowed(func):
     '''A decorator for component callbacks. Catches the issue of users not allowing bot DMs.'''
@@ -226,8 +227,6 @@ async def register(ctx):
         db.get_member(ctx.author)
         await ctx.author.send('You are already registered for HvZ! Contact an admin if you think this is wrong.')
     except ValueError:
-        pass
-    else:
         for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
             if (c.member == ctx.author) and c.chat_type == 'registration':
                 await ctx.author.send('**Restarting registration process...**')
@@ -238,8 +237,6 @@ async def register(ctx):
     finally:
         await ctx.edit_origin()  # Appeases the component system into thinking the component succeeded. 
         
-    
-
 
 @slash.component_callback()
 @check_event
