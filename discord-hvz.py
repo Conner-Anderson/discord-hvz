@@ -270,6 +270,10 @@ async def tag_log(ctx):
 @check_event
 async def on_member_update(before, after):
     # When roles or nicknames change, update the database and sheet.
+    try:
+        db.get_member(before.id)
+    except ValueError:
+        return
     if not before.roles == after.roles:
         zombie = bot.roles['zombie'] in after.roles
         human = bot.roles['human'] in after.roles
@@ -441,9 +445,10 @@ async def member_register(ctx, member_string: str):
     try:
         member = ctx.message.mentions[0]
     except IndexError:
-        member = bot.guild.get_member(int(member_string))
-        if member is None:
-            ctx.message.reply(f'Member not found from \"{member_string}\"')
+        try:
+            member = bot.guild.get_member(int(member_string))
+        except ValueError:
+            ctx.message.reply(f'Member not found from \"{member_string}.\" Must be either a Discord ID, or an @mention.')
             return
     try:
         db.get_member(member)
