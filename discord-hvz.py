@@ -584,7 +584,7 @@ async def tag_revoke(ctx, tag_id: int):
         except ValueError:
             await tagged_member.add_roles(bot.roles['human'])
             await tagged_member.remove_roles(bot.roles['zombie'])
-            msg += f'Changed <@{tagged_member}> to human.'
+            msg += f'Changed <@{tagged_member.id}> to human.'
     except Exception as e:
         await ctx.message.reply('Could not set roles correctly. Try it manually.')
         log.exception(e)
