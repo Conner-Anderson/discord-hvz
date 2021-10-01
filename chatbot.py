@@ -81,8 +81,8 @@ class ChatBot:
             await self.ask_question()  # Otherwise, ask the next question
 
     async def verify(self):
-        message = ('Please check over the info you provided. If it\'s good, type "Yes".'
-            '\nIf not, type the name of what you want to change, such as "%s".\n\n' % (self.questions[0]['display_name']))
+        message = ('**Type "yes" to submit.**'
+            '\nOr type the name of what you want to change, such as "%s".\n\n' % (self.questions[0]['display_name']))
         for q in self.questions:  # Build a list of the questions and their responses
             message += (q['display_name'] + ': ' + q['response'] + '\n')
         await self.member.send(message)
