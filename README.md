@@ -37,7 +37,7 @@ Stores player email, full name, and more in the database.
 
 ## Design Case
 Below is the Discord and game setup that the bot was designed for. Using it outside of these contexts
-opens you up to the caveats in the Personalization section below.
+where not supported by the Personalization section below will require source code edits.
 * The bot has broad access permission to manage roles, channels, and messages.
 * Zombies and humans have their own roles, and all players have a Player role. Those not registered have none of these.
 * The human, zombie, and player roles control channel access and the ability to see the tag reporting channel.
