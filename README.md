@@ -2,7 +2,7 @@
   <img src="/images/avatar_icon.ico" />
 </p>
 
-
+[![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/release/python-390/) ![Code status](https://www.code-inspector.com/project/29256/status/svg) ![Release Date](https://img.shields.io/github/release-date/Conner-Anderson/discord-hvz) ![MIT](https://img.shields.io/github/license/conner-anderson/discord-hvz)
 # discord-hvz
 
 A Discord bot designed to help run a Humans vs. Zombies game. Information about HvZ: https://humansvszombies.org/
