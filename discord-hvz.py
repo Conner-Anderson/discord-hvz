@@ -13,14 +13,12 @@ import functools
 
 import discord
 from discord.ext import commands
+from discord.commands.commands import slash_command
 
 from datetime import timedelta
 from datetime import datetime
 from dateutil import parser
-from discord_slash.utils.manage_components import create_button, create_actionrow
-from discord_slash.model import ButtonStyle
-from discord_slash import SlashCommand
-from discord_slash.context import InteractionContext
+
 from dotenv import load_dotenv
 from os import getenv
 
@@ -64,7 +62,7 @@ log = logging.getLogger(__name__)
 intents = discord.Intents.default()
 intents.members = True
 bot = commands.Bot(command_prefix='!', description='Discord HvZ Bot!', intents=intents)
-slash = SlashCommand(bot, sync_commands=True)  # Declares slash commands through the client.
+#slash = SlashCommand(bot, sync_commands=True)  # Declares slash commands through the client.
 
 db = HvzDb()
 
@@ -109,21 +107,24 @@ async def on_ready():
                 raise Exception(f'{x} channel not found!')
         
         button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ!', 
-                            create_button(style=ButtonStyle.green, label='Register for HvZ', custom_id='register')],
+                            HVZButton(style=discord.enums.ButtonStyle.red, label='Register for HvZ', custom_id='register', callback_func=register)],
                         'report-tags': ['Use the button below and check your Direct Messages to log a tag.', 
-                        create_button(style=ButtonStyle.green, label='Report Tag', custom_id='tag_log')]}
+                        HVZButton(style=discord.enums.ButtonStyle.red, label='Report Tag', custom_id='tag_log', callback_func=tag_log)]}
 
         try:
             for channel, buttons in button_messages.items():
                 messages = await bot.channels[channel].history(limit=100).flatten()
                 content = buttons.pop(0)
-                action_row = create_actionrow(*buttons)
+
+                view = discord.ui.View(timeout=None)
+                for button in buttons:
+                    view.add_item(button)
                 for i, m in enumerate(messages):
                     if bot.user == m.author:
-                        await m.edit(content=content, components=[action_row])
+                        await m.edit(content=content, view=view)
                         break
                 else:  # If there is no message to edit, make one.
-                    await bot.channels[channel].send(content=content, components=[action_row])
+                    await bot.channels[channel].send(content=content)
         except KeyError as e:
             raise KeyError(f'Could not find the channel {e}!')  # A bit redundant
         
@@ -155,7 +156,7 @@ def check_event(func):
     '''
     @functools.wraps(func)
     async def inner(ctx, *args, **kwargs):
-        if isinstance(ctx, InteractionContext):
+        if isinstance(ctx, discord.Interaction):
             guild_id = ctx.guild_id
         elif isinstance(ctx, discord.Message):
             if ctx.channel.type == discord.ChannelType.private:
@@ -182,6 +183,20 @@ def check_dm_allowed(func):
             await ctx.send(content='Please check your settings for this server and turn on Allow Direct Messages.', hidden=True)
             return None
     return wrapper
+
+class HVZButton(discord.ui.Button):
+    def __init__(self, label, style, custom_id, callback_func):
+
+        self.callback_func = callback_func
+        super().__init__(
+            label=label,
+            style=style,
+            custom_id=custom_id,
+
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.callback_func(interaction)
 
 
 @bot.event
@@ -219,48 +234,46 @@ async def on_message(message):
                 break
 
 
-@slash.component_callback()
 @check_event
 @check_dm_allowed
 async def register(ctx):
     try:
-        db.get_member(ctx.author)
-        await ctx.author.send('You are already registered for HvZ! Contact an admin if you think this is wrong.')
+        db.get_member(ctx.user)
+        await ctx.user.send('You are already registered for HvZ! Contact an admin if you think this is wrong.')
     except ValueError:
         for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
-            if (c.member == ctx.author) and c.chat_type == 'registration':
+            if (c.member == ctx.user) and c.chat_type == 'registration':
                 await ctx.author.send('**Restarting registration process...**')
                 awaiting_chatbots.pop(i)
-        chatbot = ChatBot(ctx.author, 'registration')
+        chatbot = ChatBot(ctx.user, 'registration')
         await chatbot.ask_question()
         awaiting_chatbots.append(chatbot)
     finally:
-        await ctx.edit_origin()  # Appeases the component system into thinking the component succeeded. 
+        await ctx.response.defer()  # Appeases the component system into thinking the component succeeded. 
         
 
-@slash.component_callback()
 @check_event
 @check_dm_allowed
 async def tag_log(ctx):
 
     if config['tag_logging'] is False:
-        await ctx.author.send('The admin has not enabled tagging yet.')
+        await ctx.user.send('The admin has not enabled tagging yet.')
     try:
-        db.get_member(ctx.author)
+        db.get_member(ctx.user)
     except ValueError as e:
-        await ctx.author.send('You are not currently registered for HvZ, or something has gone very wrong.')
+        await ctx.user.send('You are not currently registered for HvZ, or something has gone very wrong.')
         log.debug(e)
     else:
         for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
-            if (c.member == ctx.author) and c.chat_type == 'tag_logging':
-                await ctx.author.send('**Restarting tag logging process...**')
+            if (c.member == ctx.user) and c.chat_type == 'tag_logging':
+                await ctx.user.send('**Restarting tag logging process...**')
                 awaiting_chatbots.pop(i)
 
-        chatbot = ChatBot(ctx.author, 'tag_logging')
+        chatbot = ChatBot(ctx.user, 'tag_logging')
         await chatbot.ask_question()
         awaiting_chatbots.append(chatbot)
     finally:
-        await ctx.edit_origin()  # Do this always to convince Discord that the button was successfull
+        await ctx.response.defer()  # Do this always to convince Discord that the button was successfull
 
 
 @bot.listen()
