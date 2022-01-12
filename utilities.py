@@ -1,5 +1,9 @@
 import logging
 
+import functools
+import discord
+from discord.ext import commands
+
 import string
 import random
 
