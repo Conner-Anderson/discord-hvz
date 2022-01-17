@@ -26,8 +26,6 @@ from os import getenv
 from sqlalchemy.exc import NoSuchColumnError
 
 
-DISCORD_MESSAGE_MAX_LENGTH = 2000
-
 
 def dump(obj):
     '''Prints the passed object in a very detailed form for debugging'''
@@ -207,6 +205,7 @@ class HVZBot(commands.Bot):
         @self.event
         @self.check_event
         async def on_command_error(ctx, error):
+            dump(ctx)
             if isinstance(error, discord.ext.commands.errors.MissingRequiredArgument):
                 await ctx.send("A parameter is missing.")
             if isinstance(error, commands.errors.CheckFailure):
@@ -298,7 +297,7 @@ class HVZBot(commands.Bot):
                     self.sheets_interface.export_to_sheet('members')
                 elif human and not zombie:
                     self.db.edit_member(after, 'Faction', 'human')
-                    sheets.export_to_sheet('members')
+                    self.sheets_interface.export_to_sheet('members')
             if not before.nick == after.nick:
                 self.db.edit_member(after, 'Nickname', after.nick)
                 log.debug(f'{after.name} changed their nickname.')
