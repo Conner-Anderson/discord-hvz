@@ -30,7 +30,7 @@ from sqlalchemy.exc import NoSuchColumnError
 def dump(obj):
     '''Prints the passed object in a very detailed form for debugging'''
     for attr in dir(obj):
-        log.debug("obj.%s = %r" % (attr, getattr(obj, attr)))
+        print("obj.%s = %r" % (attr, getattr(obj, attr)))
 
 
 load_dotenv()  # Load the Discord token from the .env file
@@ -70,13 +70,16 @@ class HVZBot(commands.Bot):
             my_guild_id = self.guild.id
             if isinstance(ctx, discord.Interaction):
                 guild_id = ctx.guild_id
-            elif isinstance(ctx, discord.Message):
+            elif isinstance(ctx, discord.message.Message):
                 if ctx.channel.type == discord.ChannelType.private:
                     guild_id = my_guild_id  # Treat private messages as if they are part of this guild
                 else:
                     guild_id = self.guild.id
-            elif isinstance(ctx, discord.Member) | isinstance(ctx, commands.Context):
+            elif isinstance(ctx, discord.Member):
                 guild_id = ctx.guild.id
+            elif isinstance(ctx, commands.Context):
+                print('It was a context object')
+                guild_id = my_guild_id
             if guild_id != my_guild_id:
                 return
             result = await func(ctx, *args, **kwargs)
@@ -168,6 +171,7 @@ class HVZBot(commands.Bot):
                 
                 async def check(ctx):  # A guild check for the help command
                     try:
+                        print('Trying to get guild id')
                         if ctx.guild.id == self.guild.id:
                             return True
                         else:
@@ -205,7 +209,6 @@ class HVZBot(commands.Bot):
         @self.event
         @self.check_event
         async def on_command_error(ctx, error):
-            dump(ctx)
             if isinstance(error, discord.ext.commands.errors.MissingRequiredArgument):
                 await ctx.send("A parameter is missing.")
             if isinstance(error, commands.errors.CheckFailure):
@@ -214,6 +217,7 @@ class HVZBot(commands.Bot):
             else:
                 await ctx.send(f'The command failed, and produced this error: {error}')
                 log.info(error)
+
 
         @self.listen()
         @self.check_event
