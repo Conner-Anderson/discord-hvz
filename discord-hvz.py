@@ -78,7 +78,6 @@ class HVZBot(commands.Bot):
             elif isinstance(ctx, discord.Member):
                 guild_id = ctx.guild.id
             elif isinstance(ctx, commands.Context):
-                print('It was a context object')
                 guild_id = my_guild_id
             if guild_id != my_guild_id:
                 return
@@ -171,7 +170,6 @@ class HVZBot(commands.Bot):
                 
                 async def check(ctx):  # A guild check for the help command
                     try:
-                        print('Trying to get guild id')
                         if ctx.guild.id == self.guild.id:
                             return True
                         else:

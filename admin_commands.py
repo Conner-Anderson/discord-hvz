@@ -90,7 +90,7 @@ class AdminCommands(commands.Cog):
             except Exception as e:
                 await ctx.message.reply('Could not change permissions in the channels. Please give the bot permission to.')
                 log.warning(e)
-            bot.sheets.export_to_sheet('members')
+            bot.sheets_interface.export_to_sheet('members')
 
 
         @member.command(name='delete')
