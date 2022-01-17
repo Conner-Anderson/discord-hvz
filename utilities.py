@@ -1,19 +1,26 @@
 import logging
 
+import functools
+import discord
+from discord.ext import commands
+
 import string
 import random
 
 log = logging.getLogger(__name__)
 
 def make_tag_code(db):
-    code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '015IOUDQVS'))
+    code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '0125IOUDQVSZ'))
 
     tag_code = ''
-    for n in range(6):
-        tag_code += code_set[random.randint(0, len(code_set) - 1)]
+    # Try generating the code three times. If it can't do it in three, something's wrong
+    for i in range(3):
+        for n in range(6):
+            tag_code += code_set[random.randint(0, len(code_set) - 1)]
         try:
             db.get_member(tag_code, column='Tag_Code')
         except ValueError:
+            print(tag_code)
             return tag_code
 
 
