@@ -108,6 +108,7 @@ class HVZBot(commands.Bot):
 
         self.db = HvzDb()
         self.awaiting_chatbots = []
+        self.sheets_interface = sheets.SheetsInterface(self)
 
         @self.listen()  # Always using listen() because it allows multiple events to respond to one thing
         async def on_ready():
@@ -119,8 +120,6 @@ class HVZBot(commands.Bot):
                             break
                 except Exception as e:
                     raise Exception(f'Cannot find a valid server. Check config.yml. Error --> {e}')
-
-                sheets.setup(self.db, self)
                
                 # Updates the cache with all members and channels and roles
                 await self.guild.fetch_members(limit=500).flatten()
@@ -181,8 +180,8 @@ class HVZBot(commands.Bot):
                 self.help_command.add_check(check)
 
                 log.critical(f'Discord-HvZ self launched correctly! Logged in as: {self.user.name} ------------------------------------------')
-                sheets.export_to_sheet('members')
-                sheets.export_to_sheet('tags')
+                self.sheets_interface.export_to_sheet('members')
+                self.sheets_interface.export_to_sheet('tags')
 
             except Exception as e:
                 log.exception(f'self startup failed with this error --> {e}')
@@ -222,7 +221,7 @@ class HVZBot(commands.Bot):
         async def on_message(message):
 
             if (message.channel.type == discord.ChannelType.private):
-                for i, chatbot in enumerate(awaiting_chatbots):  # Check if the message could be part of an ongoing chat conversation
+                for i, chatbot in enumerate(self.awaiting_chatbots):  # Check if the message could be part of an ongoing chat conversation
                     if chatbot.member == message.author:
                         try:
                             result = await chatbot.take_response(message)
@@ -234,10 +233,10 @@ class HVZBot(commands.Bot):
                             resolved_chat = await resolve_chat(chatbot)
                             if resolved_chat == 1:
                                 await chatbot.end()
-                            awaiting_chatbots.pop(i)
+                            self.awaiting_chatbots.pop(i)
 
                         elif result == -1:
-                            awaiting_chatbots.pop(i)
+                            self.awaiting_chatbots.pop(i)
                         break
 
 
@@ -271,14 +270,14 @@ class HVZBot(commands.Bot):
                 await ctx.user.send('You are not currently registered for HvZ, or something has gone very wrong.')
                 log.debug(e)
             else:
-                for i, c in enumerate(awaiting_chatbots):  # Restart registration if one is already in progress
+                for i, c in enumerate(self.awaiting_chatbots):  # Restart registration if one is already in progress
                     if (c.member == ctx.user) and c.chat_type == 'tag_logging':
                         await ctx.user.send('**Restarting tag logging process...**')
-                        awaiting_chatbots.pop(i)
+                        self.awaiting_chatbots.pop(i)
 
-                chatbot = Chatself(ctx.user, 'tag_logging')
+                chatbot = ChatBot(ctx.user, 'tag_logging')
                 await chatbot.ask_question()
-                awaiting_chatbots.append(chatbot)
+                self.awaiting_chatbots.append(chatbot)
             finally:
                 await ctx.response.defer()  # Do this always to convince Discord that the button was successfull
 
@@ -296,15 +295,15 @@ class HVZBot(commands.Bot):
                 human = self.roles['human'] in after.roles
                 if zombie and not human:
                     self.db.edit_member(after, 'Faction', 'zombie')
-                    sheets.export_to_sheet('members')
+                    self.sheets_interface.export_to_sheet('members')
                 elif human and not zombie:
                     self.db.edit_member(after, 'Faction', 'human')
                     sheets.export_to_sheet('members')
             if not before.nick == after.nick:
                 self.db.edit_member(after, 'Nickname', after.nick)
                 log.debug(f'{after.name} changed their nickname.')
-                sheets.export_to_sheet('members')
-                sheets.export_to_sheet('tags')
+                self.sheets_interface.export_to_sheet('members')
+                self.sheets_interface.export_to_sheet('tags')
 
         @self.command()
         @self.check_event
@@ -333,7 +332,7 @@ class HVZBot(commands.Bot):
                     await chatbot.target_member.add_roles(self.roles['player'])
                     await chatbot.target_member.add_roles(self.roles['human'])
                     try:
-                        sheets.export_to_sheet('members')
+                        self.sheets_interface.export_to_sheet('members')
                     except Exception as e:  # The registration can still succeed even if something is wrong with the sheet
                         log.exception(e)
 
@@ -393,8 +392,8 @@ class HVZBot(commands.Bot):
                     
                     self.db.edit_member(tagged_member, 'Faction', 'zombie')
                     try:
-                        sheets.export_to_sheet('tags')
-                        sheets.export_to_sheet('members')
+                        self.sheets_interface.export_to_sheet('tags')
+                        self.sheets_interface.export_to_sheet('members')
                     except Exception as e:
                         log.exception(e)
                     
