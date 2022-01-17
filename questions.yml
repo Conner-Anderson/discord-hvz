@@ -50,7 +50,7 @@ tag_logging:
     query: What is the tag code of the human you tagged?
     valid_regex: '[a-zA-Z\d]{6}'
     rejection_response: 'The tag code is 6 characters of numbers and capital
-      letters. None of these: 0 O Q I 1 D V U 5 S'
+      letters. None of these: 0 O Q I 1 D V U 5 S 2 Z'
   - name: Tag_Day
     display_name: Tag Day
     query: Did the tag happen "today" or "yesterday"?
