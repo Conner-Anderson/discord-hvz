@@ -55,10 +55,10 @@ class AdminCommands(commands.Cog):
                 await ctx.send('Invalid command passed...')
 
 
-        @bot.command(name='oz')
+        @self.bot.slash_command(guild_ids=[config['available_servers'][config['active_server']]], name='oz')
         @commands.has_role('Admin')
-        @self.check_event
-        async def oz(ctx, member_string: str, setting: bool = None):
+        #@self.check_event
+        async def oz(ctx, member: discord.Member, setting: bool = None):
             '''
             Sets a member as an OZ, letting them access the zombie tag & chat channels.
 
@@ -69,13 +69,13 @@ class AdminCommands(commands.Cog):
             When OZ goes True, the member can access the tag & chat channels even when human.
             Make sure to give the OZs the zombie role after the secret is out.
             '''
-            member_row = util.member_from_string(member_string, bot.db, ctx=ctx)
+            member_row = bot.db.get_member(member)
             if setting is None:
-                await ctx.message.reply(f'{member_row.Name}\'s OZ status is {member_row.OZ}')
+                await ctx.respond(f'{member_row.Name}\'s OZ status is {member_row.OZ}')
                 return
             bot.db.edit_member(member_row.ID, 'OZ', setting)
 
-            await ctx.message.reply(f'Changed <@{member_row.ID}>\'s OZ status to {setting}')
+            await ctx.respond(f'Changed <@{member_row.ID}>\'s OZ status to {setting}')
 
             member = bot.guild.get_member(int(member_row.ID))
             t_channel = bot.channels['report-tags']
@@ -88,7 +88,7 @@ class AdminCommands(commands.Cog):
                     await t_channel.set_permissions(member, overwrite=None)
                     await c_channel.set_permissions(member, overwrite=None)
             except Exception as e:
-                await ctx.message.reply('Could not change permissions in the channels. Please give the bot permission to.')
+                await ctx.respond('Could not change permissions in the channels. Please give the bot permission to.')
                 log.warning(e)
             bot.sheets_interface.export_to_sheet('members')
 
