@@ -388,6 +388,9 @@ class HVZBot(commands.Bot):
 
                     self.db.add_tag(responses)
 
+                    new_human_count = len(self.roles['human'].members) - 1
+                    new_zombie_count = len(self.roles['zombie'].members) + 1
+
                     await tagged_member.add_roles(self.roles['zombie'])
                     await tagged_member.remove_roles(self.roles['human'])
                     
@@ -397,18 +400,14 @@ class HVZBot(commands.Bot):
                         self.sheets_interface.export_to_sheet('members')
                     except Exception as e:
                         log.exception(e)
-                    
 
                     msg = f'<@{tagged_member_id}> has turned zombie!'
                     if not config['silent_oz']:
                         msg += f'\nTagged by <@{chatbot.target_member.id}>'
                     # msg += tag_datetime.strftime('\n%A, at about %I:%M %p')
-                    try:
-                        human_role = self.roles['human']
-                        zombie_role = self.roles['zombie']
-                        msg += f'\nThere are now {len(human_role.members)} humans and {len(zombie_role.members)} zombies.'
-                    except Exception as e:
-                        log.exception(e)
+
+                    msg += f'\nThere are now {new_human_count} humans and {new_zombie_count} zombies.'
+
                     await self.channels['tag-announcements'].send(msg)
                     return 1
 
