@@ -58,7 +58,7 @@ discord_logger.addHandler(file_handler)
 
 log = logging.getLogger(__name__)
 
-class HVZBot(commands.Bot):
+class HVZBot(discord.Bot):
 
     def check_event(self, func):
         '''
@@ -101,7 +101,6 @@ class HVZBot(commands.Bot):
         intents = discord.Intents.default()
         intents.members = True
         super().__init__(
-            command_prefix='!', 
             description='Discord HvZ self!', 
             intents=intents
         )
@@ -168,16 +167,6 @@ class HVZBot(commands.Bot):
                 except KeyError as e:
                     raise KeyError(f'Could not find the channel {e}!')  # A bit redundant
                 
-                async def check(ctx):  # A guild check for the help command
-                    try:
-                        if ctx.guild.id == self.guild.id:
-                            return True
-                        else:
-                            return False
-                    except Exception:
-                        return False
-
-                self.help_command.add_check(check)
 
                 log.critical(f'Discord-HvZ self launched correctly! Logged in as: {self.user.name} ------------------------------------------')
                 self.sheets_interface.export_to_sheet('members')
@@ -306,12 +295,8 @@ class HVZBot(commands.Bot):
                 self.sheets_interface.export_to_sheet('members')
                 self.sheets_interface.export_to_sheet('tags')
 
-        @self.command()
-        @self.check_event
-        async def test(ctx):
-            await ctx.reply('Test complete')
 
-        @self.slash_command(guild_ids=[config['available_servers'][config['active_server']]])  # create a slash command for the supplied guilds
+        @self.command(guild_ids=[config['available_servers'][config['active_server']]])  # create a slash command for the supplied guilds
         async def hello(ctx):
             """Say hello to the bot"""  # the command description can be supplied as the docstring
             await ctx.respond(f"Hello {ctx.author}!")
@@ -319,7 +304,7 @@ class HVZBot(commands.Bot):
             # interaction response within 3 seconds in your slash command code, otherwise the
             # interaction will fail.
 
-        @self.slash_command(guild_ids=[config['available_servers'][config['active_server']]])
+        @self.command(guild_ids=[config['available_servers'][config['active_server']]])
         async def joined(ctx, member: discord.Member = None):
             user = member or ctx.author
             await ctx.respond(f'{user.name} joined at {discord.utils.format_dt(user.joined_at)}')
