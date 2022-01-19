@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 from discord.commands import SlashCommandGroup, CommandPermission
 from discord.commands import permissions
+from discord.commands import Option
 import logging
 import functools
 import time
@@ -57,7 +58,11 @@ class AdminCommands(commands.Cog):
 
         @self.bot.command(guild_ids=guild_id_list, name='oz')
         @permissions.has_role('Admin')
-        async def oz(ctx, member: discord.Member, setting: bool = None):
+        async def oz(
+                ctx, 
+                member: Option(discord.Member, 'Member to query or set.'), 
+                setting: Option(bool, 'OZ setting.', default=None, required=False)
+        ):
             '''
             Gives a member access to zombie channels when human. Must be manually given the zombie role later.
 
@@ -100,7 +105,10 @@ class AdminCommands(commands.Cog):
 
         @member_group.command(guild_ids=guild_id_list, name='delete')
         @permissions.has_role('Admin')
-        async def member_delete(ctx, member: discord.Member):
+        async def member_delete(
+                ctx, 
+                member: Option(discord.Member, 'Member to delete from the database. Stays on server.')
+        ):
             '''
             Removes the specified member from the game. Dangerous!
 
@@ -126,7 +134,12 @@ class AdminCommands(commands.Cog):
 
         @member_group.command(guild_ids=guild_id_list, name='edit')
         @permissions.has_role('Admin')
-        async def member_edit(ctx, member: discord.Member, attribute: str, value: str):
+        async def member_edit(
+                ctx, 
+                member: Option(discord.Member, 'The member to edit.'), 
+                attribute: Option(str, 'Database column to change. Exact match required.'), 
+                value: Option(str, 'Value to change to. Does not check validity!')
+        ):
             '''
             Edits one attribute of a member in the database.
             
@@ -196,9 +209,12 @@ class AdminCommands(commands.Cog):
 
         @member_group.command(guild_ids=guild_id_list, name='register')
         @permissions.has_role('Admin')
-        async def member_register(ctx, member: discord.Member):
+        async def member_register(
+                ctx, 
+                member: Option(discord.Member, 'The Discord user to register as a member.')
+        ):
             '''
-            Starts a registration chatbot on behalf of another member.
+            Starts a registration chatbot on behalf of another Discord user.
 
             member_string must be an @mentioned member in the channel, or an ID
             A registration chatbot will be started with the sender of this command,
@@ -250,7 +266,10 @@ class AdminCommands(commands.Cog):
 
         @tag_group.command(guild_ids=guild_id_list, name='delete')
         @permissions.has_role('Admin')
-        async def tag_delete(ctx, tag_id: int):
+        async def tag_delete(
+                ctx, 
+                tag_id: Option(int, 'Tag ID from the Google Sheet')
+        ):
             '''
             Removes the tag by its ID, reverting tagged member to human.
 
@@ -281,7 +300,12 @@ class AdminCommands(commands.Cog):
 
         @tag_group.command(guild_ids=guild_id_list, name='edit')
         @permissions.has_role('Admin')
-        async def tag_edit(ctx, tag_id: str, attribute: str, value: str):
+        async def tag_edit(
+                ctx, 
+                tag_id: Option(str, 'ID from Google Sheet of the tag.'), 
+                attribute: Option(str, 'Column in the database to edit. Exact only.'), 
+                value: Option(str, 'Value to change to. Does not verify validity!')
+        ):
             '''
             Edits one attribute of a tag
             
@@ -301,7 +325,10 @@ class AdminCommands(commands.Cog):
 
         @tag_group.command(guild_ids=guild_id_list, name='revoke')
         @permissions.has_role('Admin')
-        async def tag_revoke(ctx, tag_id: int):
+        async def tag_revoke(
+                ctx, 
+                tag_id: Option(int, 'Tag ID from Google sheet to revoke.')
+        ):
             '''
             Sets Tag_Revoked for a tag to True. Changes roles.
 
@@ -337,7 +364,10 @@ class AdminCommands(commands.Cog):
 
         @tag_group.command(guild_ids=guild_id_list, name='restore')
         @permissions.has_role('Admin')
-        async def tag_restore(ctx, tag_id: int):
+        async def tag_restore(
+                ctx, 
+                tag_id: Option(int, 'Tag ID from Google Sheet to restore.')
+        ):
             '''
             Sets Tag_Revoked for a tag to False. Changes roles.
 
@@ -367,7 +397,15 @@ class AdminCommands(commands.Cog):
 
         @bot.command(guild_ids=guild_id_list, name='config')
         @permissions.has_role('Admin')
-        async def config_command(ctx, setting: str, choice: bool = None):
+        async def config_command(
+                ctx, 
+                setting: Option(
+                    str, 
+                    'Config setting to change or view.', 
+                    choices=['registration', 'tag_logging', 'silent_oz']
+                ), 
+                choice: Option(bool, 'What to change the setting to.')
+        ):
             '''
             Views or edits configuration settings. registration, tag_logging, silent_oz
 
@@ -398,12 +436,12 @@ class AdminCommands(commands.Cog):
         @permissions.has_role('Player')
         async def code(ctx):
             '''
-            Gives a player their tag code in a private message.
+            Gives you your tag code in a private reply.
 
             '''
             try:
                 code = bot.db.get_member(ctx.author).Tag_Code
-                await ctx.author.send(f'Your tag code is: {code}\nHave this ready to give to a zombie who tags you.')
+                await ctx.respond(f'Your tag code is: {code}\nHave this ready to give to a zombie who tags you.', ephemeral=True)
             except Exception as e:
                 await ctx.author.send('Sorry, something went wrong with that command. Derp.')
                 log.exception(e)
