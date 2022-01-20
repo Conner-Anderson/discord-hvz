@@ -52,8 +52,22 @@ class AdminCommands(commands.Cog):
         self.bot = bot
 
 
-        member_group = bot.create_group('member', description='Commands for dealing with members.')
-        tag_group = bot.create_group('tag', description='Commands for dealing with tags.')
+        # The below gorup creation method is a patch until the devs implement a better way.
+
+        member_group = SlashCommandGroup(
+            name='member', 
+            description='Commands for dealing with members.', 
+            guild_ids=guild_id_list,
+            permissions=[permissions.CommandPermission('Admin', 1, True, guild_id_list[0])]
+        )
+        tag_group = SlashCommandGroup(
+            name='tag', 
+            description='Commands for dealing with tags.', 
+            guild_ids=guild_id_list,
+            permissions=[permissions.CommandPermission('Admin', 1, True, guild_id_list[0])]
+        )
+        bot.add_application_command(member_group)
+        bot.add_application_command(tag_group)
 
 
         @self.bot.command(guild_ids=guild_id_list, name='oz')
