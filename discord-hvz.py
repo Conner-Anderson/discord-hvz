@@ -11,6 +11,7 @@ import logging
 import coloredlogs
 import time
 import functools
+import traceback
 
 import discord
 from discord.ext import commands
@@ -58,7 +59,7 @@ discord_logger.addHandler(file_handler)
 
 log = logging.getLogger(__name__)
 
-class HVZBot(commands.Bot):
+class HVZBot(discord.Bot):
 
     def check_event(self, func):
         '''
@@ -102,7 +103,6 @@ class HVZBot(commands.Bot):
         intents = discord.Intents.default()
         intents.members = True
         super().__init__(
-            command_prefix='!', 
             description='Discord HvZ self!', 
             intents=intents
         )
@@ -169,16 +169,6 @@ class HVZBot(commands.Bot):
                 except KeyError as e:
                     raise KeyError(f'Could not find the channel {e}!')  # A bit redundant
                 
-                async def check(ctx):  # A guild check for the help command
-                    try:
-                        if ctx.guild.id == self.guild.id:
-                            return True
-                        else:
-                            return False
-                    except Exception:
-                        return False
-
-                self.help_command.add_check(check)
 
                 log.critical(f'Discord-HvZ self launched correctly! Logged in as: {self.user.name} ------------------------------------------')
                 self.sheets_interface.export_to_sheet('members')
@@ -205,17 +195,27 @@ class HVZBot(commands.Bot):
                 await self.callback_func(interaction)
 
 
-        @self.event
-        @self.check_event
-        async def on_command_error(ctx, error):
-            if isinstance(error, discord.ext.commands.errors.MissingRequiredArgument):
-                await ctx.send("A parameter is missing.")
-            if isinstance(error, commands.errors.CheckFailure):
-                log.debug(error)
+        @self.listen()
+        async def on_application_command_error(ctx, error):
+            error = getattr(error, 'original', error)
+            log_function = None
+            trace = False
 
+            if isinstance(error, NoSuchColumnError):
+                log_function = log.warning
+            elif isinstance(error, ValueError):
+                log_function = log.warning
             else:
-                await ctx.send(f'The command failed, and produced this error: {error}')
-                log.info(error)
+                log_function = log.error
+                trace = True
+
+            if log_function is not None:
+                if trace:
+                    trace = error
+
+                log_function(f'{error.__class__.__name__} exception in command {ctx.command}: {error}', exc_info=trace)
+
+            await ctx.respond(f'The command at least partly failed: {error}')
 
 
         @self.listen()
@@ -316,10 +316,19 @@ class HVZBot(commands.Bot):
                 self.sheets_interface.export_to_sheet('members')
                 self.sheets_interface.export_to_sheet('tags')
 
-        @self.command()
-        @self.check_event
-        async def test(ctx):
-            await ctx.reply('Test complete')
+
+        @self.command(guild_ids=[config['available_servers'][config['active_server']]])  # create a slash command for the supplied guilds
+        async def hello(ctx):
+            """Say hello to the bot"""  # the command description can be supplied as the docstring
+            await ctx.respond(f"Hello {ctx.author}!")
+            # Please note that you MUST respond with ctx.respond(), ctx.defer(), or any other
+            # interaction response within 3 seconds in your slash command code, otherwise the
+            # interaction will fail.
+
+        @self.command(guild_ids=[config['available_servers'][config['active_server']]])
+        async def joined(ctx, member: discord.Member = None):
+            user = member or ctx.author
+            await ctx.respond(f'{user.name} joined at {discord.utils.format_dt(user.joined_at)}')
 
 
         async def resolve_chat(chatbot):  # Called when a Chatself returns 1, showing it is done
@@ -424,6 +433,11 @@ class HVZBot(commands.Bot):
                 except Exception:
                     log.exception(f'Tag log for {chatbot.member.name} failed.')
                     await chatbot.member.send('The tag log failed! This is likely a bug. Please message Conner Anderson about it.')
+
+    def get_member(self, user_id: int):
+        member = self.guild.get_member(user_id)
+        return member
+
 
 
 bot = HVZBot()
