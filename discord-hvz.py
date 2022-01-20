@@ -92,8 +92,9 @@ class HVZBot(commands.Bot):
         async def wrapper(ctx):
             try:
                 return await func(ctx)
-            except discord.errors.Forbidden:
-                await ctx.send(content='Please check your settings for this server and turn on Allow Direct Messages.', hidden=True)
+            except discord.Forbidden:
+                await ctx.response.send_message(content='Please check your settings for this server and turn on Allow Direct Messages.', ephemeral=True)
+                log.info('Chatbot ended because the user does not have DMs turned on for the server.')
                 return None
         return wrapper
 
@@ -243,20 +244,29 @@ class HVZBot(commands.Bot):
 
         @self.check_event
         @self.check_dm_allowed
-        async def register(ctx):
+        async def register(interaction: discord.Interaction):
             try:
-                self.db.get_member(ctx.user)
-                await ctx.user.send('You are already registered for HvZ! Contact an admin if you think this is wrong.')
+                self.db.get_member(interaction.user)
+                await interaction.response.send_message(
+                    'You are already registered for HvZ! Contact an admin if you think this is wrong.', 
+                    ephemeral=True
+                )
             except ValueError:
                 for i, c in enumerate(self.awaiting_chatbots):  # Restart registration if one is already in progress
-                    if (c.member == ctx.user) and c.chat_type == 'registration':
-                        await ctx.author.send('**Restarting registration process...**')
+                    if (c.member == interaction.user) and c.chat_type == 'registration':
+                        await interaction.user.send('**Restarting registration process...**')
                         self.awaiting_chatbots.pop(i)
-                chatbot = ChatBot(ctx.user, 'registration')
+                chatbot = ChatBot(interaction.user, 'registration')
                 await chatbot.ask_question()
+                await interaction.response.send_message(
+                    'You\'ve been sent a Direct Message to start registration.', 
+                    ephemeral=True
+                )
                 self.awaiting_chatbots.append(chatbot)
+                '''
             finally:
                 await ctx.response.defer()  # Appeases the component system into thinking the component succeeded. 
+                '''
                 
 
         @self.check_event
