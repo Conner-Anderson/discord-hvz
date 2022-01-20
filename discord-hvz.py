@@ -11,6 +11,7 @@ import logging
 import coloredlogs
 import time
 import functools
+import traceback
 
 import discord
 from discord.ext import commands
@@ -193,17 +194,27 @@ class HVZBot(discord.Bot):
                 await self.callback_func(interaction)
 
 
-        @self.event
-        @self.check_event
-        async def on_command_error(ctx, error):
-            if isinstance(error, discord.ext.commands.errors.MissingRequiredArgument):
-                await ctx.send("A parameter is missing.")
-            if isinstance(error, commands.errors.CheckFailure):
-                log.debug(error)
+        @self.listen()
+        async def on_application_command_error(ctx, error):
+            error = getattr(error, 'original', error)
+            log_function = None
+            trace = False
 
+            if isinstance(error, NoSuchColumnError):
+                log_function = log.warning
+            elif isinstance(error, ValueError):
+                log_function = log.warning
             else:
-                await ctx.send(f'The command failed, and produced this error: {error}')
-                log.info(error)
+                log_function = log.error
+                trace = True
+
+            if log_function is not None:
+                if trace:
+                    trace = error
+
+                log_function(f'{error.__class__.__name__} exception in command {ctx.command}: {error}', exc_info=trace)
+
+            await ctx.respond(f'The command at least partly failed: {error}')
 
 
         @self.listen()
@@ -412,6 +423,11 @@ class HVZBot(discord.Bot):
                 except Exception:
                     log.exception(f'Tag log for {chatbot.member.name} failed.')
                     await chatbot.member.send('The tag log failed! This is likely a bug. Please message Conner Anderson about it.')
+
+    def get_member(self, user_id: int):
+        member = self.guild.get_member(user_id)
+        return member
+
 
 
 bot = HVZBot()
