@@ -12,5 +12,6 @@ class DiscordStream(io.TextIOBase):
 
 
     async def write(self, s: str):
-        await self.channel.send(f'```{s}```')
+        output = s.split('Traceback (most', 1)
+        await self.channel.send(f'```{output[0]}```')
         return len(s)

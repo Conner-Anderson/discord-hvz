@@ -250,22 +250,25 @@ class HVZBot(discord.Bot):
         @self.listen()
         async def on_application_command_error(ctx, error):
             error = getattr(error, 'original', error)
-            log_function = None
+            log_level = None
             trace = False
 
             if isinstance(error, NoSuchColumnError):
-                log_function = log.warning
+                log_level = 'warning'
             elif isinstance(error, ValueError):
-                log_function = log.warning
+                log_level = 'warning'
             else:
-                log_function = log.error
+                log_level = 'error'
                 trace = True
 
-            if log_function is not None:
+            if log_level is not None:
                 if trace:
                     trace = error
 
-                log_function(f'{error.__class__.__name__} exception in command {ctx.command}: {error}', exc_info=trace)
+                #log_function(f'{error.__class__.__name__} exception in command {ctx.command}: {error}', exc_info=trace)
+
+                getattr(log.opt(exception=trace), log_level)(f'{error.__class__.__name__} exception in command {ctx.command}: {error}')
+                
 
             await ctx.respond(f'The command at least partly failed: {error}')
 
