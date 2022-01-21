@@ -45,6 +45,8 @@ log = logger
 logger.remove()
 logger.add(sys.stderr, level="INFO")
 
+logger.add('logs/discord-hvz_{time}.log', rotation='1 week', level='DEBUG', mode='a')
+
 discord_handler = logging.getLogger('discord')
 
 class InterceptHandler(logging.Handler):
@@ -66,13 +68,8 @@ class InterceptHandler(logging.Handler):
 
 discord_logger = logging.getLogger('discord')
 discord_logger.propagate = False
-discord_logger.setLevel(logging.INFO)
+discord_logger.setLevel(logging.WARNING)
 discord_logger.addHandler(InterceptHandler())
-
-
-
-
-
 
 
 
