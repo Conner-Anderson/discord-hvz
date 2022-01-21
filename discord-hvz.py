@@ -263,34 +263,35 @@ class HVZBot(discord.Bot):
                     ephemeral=True
                 )
                 self.awaiting_chatbots.append(chatbot)
-                '''
-            finally:
-                await ctx.response.defer()  # Appeases the component system into thinking the component succeeded. 
-                '''
                 
 
         @self.check_event
         @self.check_dm_allowed
-        async def tag_log(ctx):
+        async def tag_log(interaction: discord.Interaction):
 
             if config['tag_logging'] is False:
-                await ctx.user.send('The admin has not enabled tagging yet.')
+                await interaction.response.send_message('The admin has not enabled tagging yet.', ephemeral=True)
             try:
-                self.db.get_member(ctx.user)
+                self.db.get_member(interaction.user)
             except ValueError as e:
-                await ctx.user.send('You are not currently registered for HvZ, or something has gone very wrong.')
+                await interaction.response.send_message(
+                    'You are not currently registered for HvZ.', 
+                    ephemeral=True
+                )
                 log.debug(e)
             else:
                 for i, c in enumerate(self.awaiting_chatbots):  # Restart registration if one is already in progress
-                    if (c.member == ctx.user) and c.chat_type == 'tag_logging':
-                        await ctx.user.send('**Restarting tag logging process...**')
+                    if (c.member == interaction.user) and c.chat_type == 'tag_logging':
+                        await interaction.user.send('**Restarting tag logging process...**')
                         self.awaiting_chatbots.pop(i)
 
-                chatbot = ChatBot(ctx.user, 'tag_logging')
+                chatbot = ChatBot(interaction.user, 'tag_logging')
                 await chatbot.ask_question()
+                await interaction.response.send_message(
+                    'You\'ve been sent a Direct Message to start tag logging.', 
+                    ephemeral=True
+                )
                 self.awaiting_chatbots.append(chatbot)
-            finally:
-                await ctx.response.defer()  # Do this always to convince Discord that the button was successfull
 
 
         @self.listen()
@@ -371,11 +372,16 @@ class HVZBot(discord.Bot):
                         return 0
 
                     tagged_member_id = int(tagged_member_data['ID'])
-                    try:
-                        tagged_member = self.guild.get_member(tagged_member_id)
-                    except ValueError:
-                        await chatbot.member.send('The member you tagged isn\'t on the server anymore.')
-                        log.error('Someone tried to tag a member who isn\'t on the server anymore.')
+
+                    tagged_member = self.guild.get_member(tagged_member_id)
+                    if tagged_member is None:
+                        await chatbot.member.send(
+                            ('The player you tagged isn\'t on the Discord server anymore! '
+                            'Please ask them to rejoin the server, or contact an admin.')
+                        )
+                        log.error(
+                            f'{chatbot.target_member.name} tried to tag {tagged_member_data.Name} who isn\'t on the server anymore.'
+                        )
                         return 0
 
                     if self.roles['zombie'] in tagged_member.roles:
