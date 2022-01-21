@@ -7,9 +7,10 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from datetime import datetime
 from loguru import logger
+import logging
 log = logger
 
-#logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
+logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']

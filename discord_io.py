@@ -12,5 +12,5 @@ class DiscordStream(io.TextIOBase):
 
 
     async def write(self, s: str):
-        await self.channel.send(s)
+        await self.channel.send(f'```{s}```')
         return len(s)

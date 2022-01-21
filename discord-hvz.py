@@ -8,7 +8,9 @@ import utilities as util
 from admin_commands import AdminCommands
 from discord_io import DiscordStream
 
+import logging
 from loguru import logger
+import sys
 import coloredlogs
 import time
 import functools
@@ -40,6 +42,32 @@ token = getenv("TOKEN")
 
 
 log = logger
+logger.remove()
+logger.add(sys.stderr, level="INFO")
+
+discord_handler = logging.getLogger('discord')
+
+class InterceptHandler(logging.Handler):
+    def emit(self, record):
+        # Get corresponding Loguru level if it exists
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
+
+        # Find caller from where originated the logged message
+        frame, depth = logging.currentframe(), 2
+        while frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
+
+        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+
+
+discord_logger = logging.getLogger('discord')
+discord_logger.propagate = False
+discord_logger.setLevel(logging.INFO)
+discord_logger.addHandler(InterceptHandler())
 
 
 
@@ -190,9 +218,14 @@ class HVZBot(discord.Bot):
                 discord_channel_handler = logging.StreamHandler(stream=DiscordStream(self))
                 logging.root.addHandler(discord_channel_handler)
                 '''
-                logger.add(DiscordStream(self).write, level='INFO', enqueue=True)
+                logger.add(
+                    DiscordStream(self).write, 
+                    level='INFO', 
+                    enqueue=True,
+                    format='{level} | {name}:{function}:{line} - {message}'
+                )
 
-                log.critical(f'Discord-HvZ self launched correctly! Logged in as: {self.user.name} ------------------------------------------')
+                log.success(f'Discord-HvZ Bot launched correctly! Logged in as: {self.user.name} ------------------------------------------')
                 self.sheets_interface.export_to_sheet('members')
                 self.sheets_interface.export_to_sheet('tags')
 
