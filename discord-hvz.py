@@ -6,8 +6,9 @@ from chatbot import ChatBot
 from hvzdb import HvzDb
 import utilities as util
 from admin_commands import AdminCommands
+from discord_io import DiscordStream
 
-import logging
+from loguru import logger
 import coloredlogs
 import time
 import functools
@@ -37,11 +38,27 @@ def dump(obj):
 load_dotenv()  # Load the Discord token from the .env file
 token = getenv("TOKEN")
 
+
+log = logger
+
+
+
+
+
+
+
+
+
+
+
+
+'''
 log_format = '%(asctime)s %(name)s %(levelname)s %(message)s'
 coloredlogs.DEFAULT_LOG_FORMAT = log_format
 logging.basicConfig(filename='discord-hvz.log', encoding='utf-8', filemode='a', 
                     format=log_format, level=logging.DEBUG)
 coloredlogs.install(level='INFO')  # Stream handler for root logger 
+
 
 # Setup a logger for discord.py
 discord_logger = logging.getLogger('discord')
@@ -58,6 +75,7 @@ discord_logger.addHandler(file_handler)
 
 
 log = logging.getLogger(__name__)
+'''
 
 class HVZBot(discord.Bot):
 
@@ -168,7 +186,11 @@ class HVZBot(discord.Bot):
                             await self.channels[channel].send(content=content)
                 except KeyError as e:
                     raise KeyError(f'Could not find the channel {e}!')  # A bit redundant
-                
+                '''
+                discord_channel_handler = logging.StreamHandler(stream=DiscordStream(self))
+                logging.root.addHandler(discord_channel_handler)
+                '''
+                logger.add(DiscordStream(self).write, level='INFO', enqueue=True)
 
                 log.critical(f'Discord-HvZ self launched correctly! Logged in as: {self.user.name} ------------------------------------------')
                 self.sheets_interface.export_to_sheet('members')
@@ -448,4 +470,5 @@ class HVZBot(discord.Bot):
 
 bot = HVZBot()
 bot.add_cog(AdminCommands(bot))
+
 bot.run(token)

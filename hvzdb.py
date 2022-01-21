@@ -1,5 +1,4 @@
 import discord
-import logging
 import os.path
 
 from sqlalchemy import create_engine
@@ -13,7 +12,8 @@ from sqlalchemy import func, cast
 from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy import and_
 
-log = logging.getLogger(__name__)
+from loguru import logger
+log = logger
 
 
 class HvzDb():
