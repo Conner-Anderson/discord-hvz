@@ -1,5 +1,3 @@
-
-
 import functools
 import discord
 from discord.ext import commands
@@ -7,7 +5,9 @@ from discord.ext import commands
 import string
 import random
 from loguru import logger
+
 log = logger
+
 
 def make_tag_code(db):
     code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '0125IOUDQVSZ'))
@@ -23,12 +23,10 @@ def make_tag_code(db):
             print(tag_code)
             return tag_code
 
-
-
     raise ValueError('Could not find valid tag code.')
 
-def member_from_string(member_string, db, ctx=None):
 
+def member_from_string(member_string, db, ctx=None):
     options = ['ID', 'Discord_Name', 'Nickname', 'Name']
 
     if (ctx is not None) and (len(ctx.message.mentions) > 0):
@@ -41,10 +39,11 @@ def member_from_string(member_string, db, ctx=None):
             return member_row
         except ValueError:
             pass
-    raise ValueError(f'Could not find a member that matched \"{member_string}\". Can be member ID, Name, Discord_Name, or Nickname.')
+    raise ValueError \
+        (f'Could not find a member that matched \"{member_string}\". Can be member ID, Name, Discord_Name, or Nickname.')
+
 
 def generate_tag_tree(db):
-
     oz_table = db.get_rows('members', 'OZ', True)
 
     def loop(table, level):
@@ -72,7 +71,7 @@ def generate_tag_tree(db):
                     tagged_members.append(db.get_member(t.Tagged_ID))
 
                 output += loop(tagged_members, level + 1)
-                
+
         return output
 
     return loop(oz_table, 0)

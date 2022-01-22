@@ -13,14 +13,15 @@ from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy import and_
 
 from loguru import logger
+
 log = logger
 
 
-class HvzDb():
+class HvzDb:
     def __init__(self):
         self.metadata_obj = MetaData()
         self.engine = create_engine("sqlite+pysqlite:///hvzdb.db", future=True)
-        
+
         self.tables = {'members': None, 'tags': None}
         for n in self.tables:
 
@@ -63,9 +64,8 @@ class HvzDb():
                         Column('Report_Time', DateTime),
                         Column('Revoked_Tag', Boolean)
                     )
-        
-        self.metadata_obj.create_all(self.engine)
 
+        self.metadata_obj.create_all(self.engine)
 
         # self.tag_logging_table = Table('tag_logging', self.metadata_obj, autoload_with=self.engine)
 
@@ -76,9 +76,8 @@ class HvzDb():
                 result = conn.execute(selection)
                 t.keys = result.keys()
 
-
     def add_member(self, member_row):
-        '''
+        """
         Adds a member to the database
 
         Parameters:
@@ -87,7 +86,7 @@ class HvzDb():
 
         Returns:
                 result (result object?): This needs work.
-        '''
+        """
         result = self.__add_row(self.tables['members'], member_row)
         return result
 
@@ -111,9 +110,8 @@ class HvzDb():
             result = conn.execute(insert(table), row)
             return result
 
-
     def get_member(self, value, column=None):
-        '''
+        """
         Returns a Row object that represents a single member in the database
 
         Parameters:
@@ -121,7 +119,7 @@ class HvzDb():
 
         Returns:
                 row (Row): Row object. Access rows in these ways: row.some_row, row['some_row']
-        '''
+        """
         if column is not None:
             search_value = value
             search_column = column
@@ -157,9 +155,8 @@ class HvzDb():
             tag_row = self.__get_row(table, table.c[search_column], value)
         else:
             tag_row = self.__get_row(table, table.c[search_column], value,
-                exclusion_column=table.c['Revoked_Tag'], exclusion_value=True)
+                                     exclusion_column=table.c['Revoked_Tag'], exclusion_value=True)
         return tag_row
-
 
     def __get_row(self, table, search_column, search_value, exclusion_column=None, exclusion_value=None):
         '''
@@ -187,9 +184,8 @@ class HvzDb():
             raise ValueError(f'Could not find a row where \"{search_column}\" is \"{search_value}\"')
         return result_row
 
-
     def get_table(self, table):
-        '''
+        """
         Returns a list of all members in the database
 
         Parameters:
@@ -198,7 +194,7 @@ class HvzDb():
         Returns:
                 result (list[Row]): List of Rows. Rows are like tuples, but with dictionary
                                                 keys. Like this: row['Name'] or row.Name
-        '''
+        """
         selection = select(self.tables[table])
         with self.engine.begin() as conn:
             result = conn.execute(selection).all()
@@ -209,13 +205,13 @@ class HvzDb():
         # Returns the first column that matches. The column is a list.
         sql = f'SELECT {column} FROM {table}'
         cur = self.conn.cursor()
-        
+
         output = cur.execute(sql).fetchall()
-        
+
         return output
 
     def edit_member(self, member, column, value):
-        '''
+        """
         Edits an attribute of a member in the database
 
         Parameters:
@@ -225,7 +221,7 @@ class HvzDb():
 
         Returns:
                 result (bool): True if the edit was successful, False if it was not.
-        '''
+        """
         member_id = member
         if isinstance(member, discord.abc.User):
             member_id = member.id
@@ -239,7 +235,7 @@ class HvzDb():
         return result
 
     def edit_tag(self, tag_id, column, value):
-        '''
+        """
         Edits an attribute of a tag in the database
 
         Parameters:
@@ -249,7 +245,7 @@ class HvzDb():
 
         Returns:
                 result (bool): True if the edit was successful, False if it was not.
-        '''
+        """
 
         result = self.__edit_row(
             self.tables['tags'],
@@ -260,12 +256,10 @@ class HvzDb():
         )
         return result
 
-
-
     def __edit_row(self, table, search_column, search_value, target_column, target_value):
         updator = (
             update(table).where(search_column == search_value).
-            values({target_column: target_value})
+                values({target_column: target_value})
         )
 
         if target_column not in table.keys:
@@ -277,7 +271,6 @@ class HvzDb():
             return True
         else:
             raise ValueError(f'\"{search_value}\" not found in \"{search_column}\" column.')
-
 
     def delete_member(self, member):
         member_id = member
@@ -311,7 +304,7 @@ class HvzDb():
             return True
 
     def get_rows(self, table, search_column, search_value, exclusion_column=None, exclusion_value=None):
-        '''
+        """
         Returns the first Row object where the specified value matches.
         Meant to be used within the class.
 
@@ -324,10 +317,10 @@ class HvzDb():
 
         Returns:
                 row (Row): Row object. Access rows in these ways: row.some_row, row['some_row']
-        '''
+        """
         the_table = self.tables[table]
         selection = select(the_table).where(the_table.c[search_column] == search_value)
-        if (exclusion_column is not None):
+        if exclusion_column is not None:
             if exclusion_value is None:
                 raise ValueError('No exclusion value provided.')
             selection = selection.where(the_table.c[exclusion_column] != exclusion_value)

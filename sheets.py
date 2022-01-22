@@ -8,6 +8,7 @@ from google.oauth2.credentials import Credentials
 from datetime import datetime
 from loguru import logger
 import logging
+
 log = logger
 
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
@@ -19,7 +20,8 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 SPREADSHEET_ID = config['sheet_ids'][config['active_server']]
 SAMPLE_RANGE_NAME = 'Output!A2:B'
 
-class SheetsInterface():
+
+class SheetsInterface:
 
     def __init__(self, bot):
         self.setup(bot)
@@ -53,15 +55,12 @@ class SheetsInterface():
         # Call the Sheets API and save it for other functions globally
         self.spreadsheets = service.spreadsheets()
 
-
     def check_creds(self):
         if os.path.exists('token.json'):
             creds = Credentials.from_authorized_user_file('token.json', SCOPES)
             if creds.valid:
                 return
-        self.setup(self.bot)      
-
-
+        self.setup(self.bot)
 
     def export_to_sheet(self, table_name):
 
@@ -72,7 +71,7 @@ class SheetsInterface():
         sheet_settings = config['sheet_settings'][table_name]
 
         # Let's turn the list of Rows into a list of lists. Google wants that.
-        
+
         values = []
         for y, row in enumerate(table):
             values.append([])
@@ -91,9 +90,10 @@ class SheetsInterface():
         body = {'values': values}
 
         try:
-            result = self.spreadsheets.values().update(spreadsheetId=SPREADSHEET_ID, range=f'\'{sheet_name}\'!A1:L', valueInputOption='USER_ENTERED', body=body).execute()
+            result = self.spreadsheets.values().update(spreadsheetId=SPREADSHEET_ID, range=f'\'{sheet_name}\'!A1:L',
+                                                       valueInputOption='USER_ENTERED', body=body).execute()
         except Exception as e:
-            log.exception('There was an exception with the Google API request! Here it is: %s' % (e))
+            log.exception('There was an exception with the Google API request! Here it is: %s' % e)
         else:
             log.debug('{0} cells updated.'.format(result.get('updatedCells')))
 
@@ -102,14 +102,15 @@ class SheetsInterface():
     # Returns 0 if the reading fails
     def read_sheet(self, sheet_name, range):
         try:
-            result = self.spreadsheets.values().get(spreadsheetId=SPREADSHEET_ID, range='\'%s\'!%s' % (sheet_name, range)).execute()
+            result = self.spreadsheets.values().get(spreadsheetId=SPREADSHEET_ID,
+                                                    range='\'%s\'!%s' % (sheet_name, range)).execute()
         except Exception as e:
             s = str(e).split('Details: ')
-            log.error('Error when excecuting read_sheet() with arguments \"%s\" and \"%s\"  ----> %s' % (sheet_name, range, s[1]))
+            log.error('Error when excecuting read_sheet() with arguments \"%s\" and \"%s\"  ----> %s' % (
+            sheet_name, range, s[1]))
             return 0
         else:
             return result.get('values', 0)
-
 
     ''' Old method of updating nicknames. Might want it later
     def update_nicknames(table):

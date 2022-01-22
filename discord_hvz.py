@@ -11,10 +11,8 @@ from discord_io import DiscordStream
 import logging
 from loguru import logger
 import sys
-import coloredlogs
 import time
 import functools
-import traceback
 
 import discord
 from discord.ext import commands
@@ -30,7 +28,6 @@ from os import getenv
 from sqlalchemy.exc import NoSuchColumnError
 
 
-
 def dump(obj):
     '''Prints the passed object in a very detailed form for debugging'''
     for attr in dir(obj):
@@ -40,7 +37,6 @@ def dump(obj):
 load_dotenv()  # Load the Discord token from the .env file
 token = getenv("TOKEN")
 
-
 log = logger
 logger.remove()
 logger.add(sys.stderr, level="INFO")
@@ -48,6 +44,7 @@ logger.add(sys.stderr, level="INFO")
 logger.add('logs/discord-hvz_{time}.log', rotation='1 week', level='DEBUG', mode='a')
 
 discord_handler = logging.getLogger('discord')
+
 
 class InterceptHandler(logging.Handler):
     def emit(self, record):
@@ -70,12 +67,6 @@ discord_logger = logging.getLogger('discord')
 discord_logger.propagate = False
 discord_logger.setLevel(logging.WARNING)
 discord_logger.addHandler(InterceptHandler())
-
-
-
-
-
-
 
 '''
 log_format = '%(asctime)s %(name)s %(levelname)s %(message)s'
@@ -102,6 +93,7 @@ discord_logger.addHandler(file_handler)
 log = logging.getLogger(__name__)
 '''
 
+
 class HVZBot(discord.Bot):
 
     def check_event(self, func):
@@ -109,6 +101,7 @@ class HVZBot(discord.Bot):
         A decorator that aborts events/listeners if they are from the wrong guild
         If you add an event of a type not used before, make sure the ctx here works with it
         '''
+
         @functools.wraps(func)
         async def inner(ctx, *args, **kwargs):
             my_guild_id = self.guild.id
@@ -128,25 +121,32 @@ class HVZBot(discord.Bot):
             result = await func(ctx, *args, **kwargs)
 
             return result
+
         return inner
 
     def check_dm_allowed(self, func):
         '''A decorator for component callbacks. Catches the issue of users not allowing self DMs.'''
+
         @functools.wraps(func)
         async def wrapper(ctx):
             try:
                 return await func(ctx)
             except discord.Forbidden:
-                await ctx.response.send_message(content='Please check your settings for this server and turn on Allow Direct Messages.', ephemeral=True)
+                await ctx.response.send_message(content='Please check your settings for this server and turn on Allow '
+                                                        'Direct Messages.', ephemeral=True)
                 log.info('Chatbot ended because the user does not have DMs turned on for the server.')
                 return None
+
         return wrapper
 
     def __init__(self):
+        self.guild = None
+        self.roles = None
+        self.channels = None
         intents = discord.Intents.default()
         intents.members = True
         super().__init__(
-            description='Discord HvZ self!', 
+            description='Discord HvZ self!',
             intents=intents
         )
 
@@ -164,13 +164,12 @@ class HVZBot(discord.Bot):
                             break
                 except Exception as e:
                     raise Exception(f'Cannot find a valid server. Check config.yml. Error --> {e}')
-               
+
                 # Updates the cache with all members and channels and roles
                 await self.guild.fetch_members(limit=500).flatten()
                 await self.guild.fetch_channels()
                 await self.guild.fetch_roles()
 
-                self.roles = {}
                 needed_roles = ['admin', 'zombie', 'human', 'player']
                 for i, x in enumerate(needed_roles):
                     for r in self.guild.roles:
@@ -180,8 +179,7 @@ class HVZBot(discord.Bot):
                     else:
                         raise Exception(f'{x} role not found!')
 
-                self.channels = {}
-                needed_channels = ['tag-announcements', 'report-tags', 'landing', 'zombie-chat', 'bot-output'] 
+                needed_channels = ['tag-announcements', 'report-tags', 'landing', 'zombie-chat', 'bot-output']
                 for i, x in enumerate(needed_channels):
                     for c in self.guild.channels:
                         if c.name.lower() == config['channel_names'][x]:
@@ -189,11 +187,14 @@ class HVZBot(discord.Bot):
                             break
                     else:
                         raise Exception(f'{x} channel not found!')
-                
-                button_messages = {'landing': ['Use the button below and check your Direct Messages to register for HvZ!', 
-                                    HVZButton(style=discord.enums.ButtonStyle.red, label='Register for HvZ', custom_id='register', callback_func=register)],
-                                'report-tags': ['Use the button below and check your Direct Messages to log a tag.', 
-                                HVZButton(style=discord.enums.ButtonStyle.red, label='Report Tag', custom_id='tag_log', callback_func=tag_log)]}
+
+                button_messages = {
+                    'landing': ['Use the button below and check your Direct Messages to register for HvZ!',
+                                HVZButton(style=discord.enums.ButtonStyle.red, label='Register for HvZ',
+                                          custom_id='register', callback_func=register)],
+                    'report-tags': ['Use the button below and check your Direct Messages to log a tag.',
+                                    HVZButton(style=discord.enums.ButtonStyle.red, label='Report Tag',
+                                              custom_id='tag_log', callback_func=tag_log)]}
 
                 try:
                     for channel, buttons in button_messages.items():
@@ -213,13 +214,14 @@ class HVZBot(discord.Bot):
                     raise KeyError(f'Could not find the channel {e}!')  # A bit redundant
 
                 logger.add(
-                    DiscordStream(self).write, 
-                    level='INFO', 
+                    DiscordStream(self).write,
+                    level='INFO',
                     enqueue=True,
                     format='{level} | {name}:{function}:{line} - {message}'
                 )
 
-                log.success(f'Discord-HvZ Bot launched correctly! Logged in as: {self.user.name} ------------------------------------------')
+                log.success(
+                    f'Discord-HvZ Bot launched correctly! Logged in as: {self.user.name} ------------------------------------------')
                 self.sheets_interface.export_to_sheet('members')
                 self.sheets_interface.export_to_sheet('tags')
 
@@ -228,10 +230,8 @@ class HVZBot(discord.Bot):
                 await self.close()
                 time.sleep(1)
 
-
         class HVZButton(discord.ui.Button):
             def __init__(self, label, style, custom_id, callback_func):
-
                 self.callback_func = callback_func
                 super().__init__(
                     label=label,
@@ -242,7 +242,6 @@ class HVZBot(discord.Bot):
 
             async def callback(self, interaction: discord.Interaction):
                 await self.callback_func(interaction)
-
 
         @self.listen()
         async def on_application_command_error(ctx, error):
@@ -262,26 +261,27 @@ class HVZBot(discord.Bot):
                 if trace:
                     trace = error
 
-                #log_function(f'{error.__class__.__name__} exception in command {ctx.command}: {error}', exc_info=trace)
+                # log_function(f'{error.__class__.__name__} exception in command {ctx.command}: {error}', exc_info=trace)
 
-                getattr(log.opt(exception=trace), log_level)(f'{error.__class__.__name__} exception in command {ctx.command}: {error}')
-                
+                getattr(log.opt(exception=trace), log_level)(
+                    f'{error.__class__.__name__} exception in command {ctx.command}: {error}')
 
             await ctx.respond(f'The command at least partly failed: {error}')
-
 
         @self.listen()
         @self.check_event
         async def on_message(message):
 
             if (message.channel.type == discord.ChannelType.private):
-                for i, chatbot in enumerate(self.awaiting_chatbots):  # Check if the message could be part of an ongoing chat conversation
+                for i, chatbot in enumerate(
+                        self.awaiting_chatbots):  # Check if the message could be part of an ongoing chat conversation
                     if chatbot.member == message.author:
                         try:
                             result = await chatbot.take_response(message)
                         except Exception as e:
                             log.error(f'Exception in take_response() --> {e}')
-                            await message.author.send('There was an error when running the chatbot! Report this to an admin with details.')
+                            await message.author.send(
+                                'There was an error when running the chatbot! Report this to an admin with details.')
                             return
                         if result == 1:
                             resolved_chat = await resolve_chat(chatbot)
@@ -293,14 +293,13 @@ class HVZBot(discord.Bot):
                             self.awaiting_chatbots.pop(i)
                         break
 
-
         @self.check_event
         @self.check_dm_allowed
         async def register(interaction: discord.Interaction):
             try:
                 self.db.get_member(interaction.user)
                 await interaction.response.send_message(
-                    'You are already registered for HvZ! Contact an admin if you think this is wrong.', 
+                    'You are already registered for HvZ! Contact an admin if you think this is wrong.',
                     ephemeral=True
                 )
             except ValueError:
@@ -311,11 +310,10 @@ class HVZBot(discord.Bot):
                 chatbot = ChatBot(interaction.user, 'registration')
                 await chatbot.ask_question()
                 await interaction.response.send_message(
-                    'You\'ve been sent a Direct Message to start registration.', 
+                    'You\'ve been sent a Direct Message to start registration.',
                     ephemeral=True
                 )
                 self.awaiting_chatbots.append(chatbot)
-                
 
         @self.check_event
         @self.check_dm_allowed
@@ -327,7 +325,7 @@ class HVZBot(discord.Bot):
                 self.db.get_member(interaction.user)
             except ValueError as e:
                 await interaction.response.send_message(
-                    'You are not currently registered for HvZ.', 
+                    'You are not currently registered for HvZ.',
                     ephemeral=True
                 )
                 log.debug(e)
@@ -340,11 +338,10 @@ class HVZBot(discord.Bot):
                 chatbot = ChatBot(interaction.user, 'tag_logging')
                 await chatbot.ask_question()
                 await interaction.response.send_message(
-                    'You\'ve been sent a Direct Message to start tag logging.', 
+                    'You\'ve been sent a Direct Message to start tag logging.',
                     ephemeral=True
                 )
                 self.awaiting_chatbots.append(chatbot)
-
 
         @self.listen()
         @self.check_event
@@ -369,8 +366,8 @@ class HVZBot(discord.Bot):
                 self.sheets_interface.export_to_sheet('members')
                 self.sheets_interface.export_to_sheet('tags')
 
-
-        @self.command(guild_ids=[config['available_servers'][config['active_server']]])  # create a slash command for the supplied guilds
+        @self.command(guild_ids=[
+            config['available_servers'][config['active_server']]])  # create a slash command for the supplied guilds
         async def hello(ctx):
             """Say hello to the bot"""  # the command description can be supplied as the docstring
             await ctx.respond(f"Hello {ctx.author}!")
@@ -382,7 +379,6 @@ class HVZBot(discord.Bot):
         async def joined(ctx, member: discord.Member = None):
             user = member or ctx.author
             await ctx.respond(f'{user.name} joined at {discord.utils.format_dt(user.joined_at)}')
-
 
         async def resolve_chat(chatbot):  # Called when a Chatself returns 1, showing it is done
             responses = {}
@@ -397,11 +393,11 @@ class HVZBot(discord.Bot):
                 responses['Discord_Name'] = chatbot.target_member.name
                 responses['Registration_Time'] = datetime.today()
                 responses['OZ'] = False
-                
+
                 try:
                     responses['Tag_Code'] = util.make_tag_code(self.db)
 
-                    self.db.add_member(responses) 
+                    self.db.add_member(responses)
                     await chatbot.target_member.add_roles(self.roles['player'])
                     await chatbot.target_member.add_roles(self.roles['human'])
                     try:
@@ -413,7 +409,8 @@ class HVZBot(discord.Bot):
                 except Exception:
                     name = responses['Name']
                     log.exception(f'Exception when completing registration for {chatbot.target_member.name}, {name}')
-                    await chatbot.member.send('Something went very wrong with the registration, and it was not successful. Please message Conner Anderson about it.')
+                    await chatbot.member.send(
+                        'Something went very wrong with the registration, and it was not successful. Please message Conner Anderson about it.')
 
             elif chatbot.chat_type == 'tag_logging':
                 try:
@@ -429,7 +426,7 @@ class HVZBot(discord.Bot):
                     if tagged_member is None:
                         await chatbot.member.send(
                             ('The player you tagged isn\'t on the Discord server anymore! '
-                            'Please ask them to rejoin the server, or contact an admin.')
+                             'Please ask them to rejoin the server, or contact an admin.')
                         )
                         log.error(
                             f'{chatbot.target_member.name} tried to tag {tagged_member_data.Name} who isn\'t on the server anymore.'
@@ -437,11 +434,13 @@ class HVZBot(discord.Bot):
                         return 0
 
                     if self.roles['zombie'] in tagged_member.roles:
-                        await chatbot.member.send('<@%s> is already a zombie! What are you up to?' % (tagged_member_data.ID))
+                        await chatbot.member.send(
+                            '<@%s> is already a zombie! What are you up to?' % (tagged_member_data.ID))
                         return 0
 
                     tag_time = datetime.today()
-                    if not responses['Tag_Day'].casefold().find('yesterday') == -1:  # Converts tag_day to the previous day
+                    if not responses['Tag_Day'].casefold().find(
+                            'yesterday') == -1:  # Converts tag_day to the previous day
                         tag_time -= timedelta(days=1)
                     tag_datetime = parser.parse(responses['Tag_Time'] + ' and 0 seconds', default=tag_time)
                     responses['Tag_Time'] = tag_datetime
@@ -470,7 +469,7 @@ class HVZBot(discord.Bot):
 
                     await tagged_member.add_roles(self.roles['zombie'])
                     await tagged_member.remove_roles(self.roles['human'])
-                    
+
                     self.db.edit_member(tagged_member, 'Faction', 'zombie')
                     try:
                         self.sheets_interface.export_to_sheet('tags')
@@ -490,12 +489,12 @@ class HVZBot(discord.Bot):
 
                 except Exception:
                     log.exception(f'Tag log for {chatbot.member.name} failed.')
-                    await chatbot.member.send('The tag log failed! This is likely a bug. Please message Conner Anderson about it.')
+                    await chatbot.member.send(
+                        'The tag log failed! This is likely a bug. Please message Conner Anderson about it.')
 
     def get_member(self, user_id: int):
         member = self.guild.get_member(user_id)
         return member
-
 
 
 bot = HVZBot()

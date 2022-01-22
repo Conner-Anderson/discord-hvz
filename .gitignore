@@ -17,3 +17,4 @@ build
 *.exe
 *.spec
 testbed.py
+.idea

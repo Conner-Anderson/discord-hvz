@@ -8,6 +8,7 @@ yaml.preserve_quotes = True
 with open('config.yml') as fp:
     config = yaml.load(fp)
 
+
 def commit():
     with open('config.yml', mode='w') as fp:
         yaml.dump(config, fp)
