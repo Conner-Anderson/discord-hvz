@@ -181,7 +181,7 @@ class HVZBot(discord.Bot):
                         raise Exception(f'{x} role not found!')
 
                 self.channels = {}
-                needed_channels = ['tag-announcements', 'report-tags', 'landing', 'zombie-chat'] 
+                needed_channels = ['tag-announcements', 'report-tags', 'landing', 'zombie-chat', 'bot-output'] 
                 for i, x in enumerate(needed_channels):
                     for c in self.guild.channels:
                         if c.name.lower() == config['channel_names'][x]:
@@ -211,10 +211,7 @@ class HVZBot(discord.Bot):
                             await self.channels[channel].send(content=content)
                 except KeyError as e:
                     raise KeyError(f'Could not find the channel {e}!')  # A bit redundant
-                '''
-                discord_channel_handler = logging.StreamHandler(stream=DiscordStream(self))
-                logging.root.addHandler(discord_channel_handler)
-                '''
+
                 logger.add(
                     DiscordStream(self).write, 
                     level='INFO', 
