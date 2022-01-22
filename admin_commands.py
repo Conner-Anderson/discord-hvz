@@ -25,7 +25,7 @@ DISCORD_MESSAGE_MAX_LENGTH = 2000
 guild_id_list = [config['available_servers'][config['active_server']]]
 
 
-class AdminCommands(commands.Cog):
+class AdminCommandsCog(commands.Cog):
     def check_event(self, func):
         """
         A decorator that aborts events/listeners if they are from the wrong guild

@@ -67,4 +67,16 @@ channel_names:
   zombie-chat: zombie-chat
   bot-output: bot-output
 
+# Valid button colors: blurple, gray, green, red, url
+# Buttons must match the names of the functions they call
+buttons:
+  register:
+    message: "Use the button below and check your Direct Messages to register for HvZ!"
+    label: "Register for HvZ"
+    color: green
+  tag_log:
+    message: "Use the button below and check your Direct Messages to log a tag."
+    label: "Log Tag"
+    color: green
+
 

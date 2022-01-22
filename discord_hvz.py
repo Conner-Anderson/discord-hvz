@@ -1,11 +1,11 @@
 #!/bin/python3
-
+from buttons import HVZButtonCog
 from config import config
 import sheets
 from chatbot import ChatBot
 from hvzdb import HvzDb
 import utilities as util
-from admin_commands import AdminCommands
+from admin_commands import AdminCommandsCog
 from discord_io import DiscordStream
 
 import logging
@@ -123,13 +123,13 @@ class HVZBot(discord.Bot):
 
         return inner
 
-    def check_dm_allowed(self, func):
+    def check_dm_allowed(func):
         '''A decorator for component callbacks. Catches the issue of users not allowing self DMs.'''
 
         @functools.wraps(func)
-        async def wrapper(ctx):
+        async def wrapper(self, ctx):
             try:
-                return await func(ctx)
+                return await func(self, ctx)
             except discord.Forbidden:
                 await ctx.response.send_message(content='Please check your settings for this server and turn on Allow '
                                                         'Direct Messages.', ephemeral=True)
@@ -187,31 +187,6 @@ class HVZBot(discord.Bot):
                     else:
                         raise Exception(f'{x} channel not found!')
 
-                button_messages = {
-                    'landing': ['Use the button below and check your Direct Messages to register for HvZ!',
-                                HVZButton(style=discord.enums.ButtonStyle.red, label='Register for HvZ',
-                                          custom_id='register', callback_func=register)],
-                    'report-tags': ['Use the button below and check your Direct Messages to log a tag.',
-                                    HVZButton(style=discord.enums.ButtonStyle.red, label='Report Tag',
-                                              custom_id='tag_log', callback_func=tag_log)]}
-
-                try:
-                    for channel, buttons in button_messages.items():
-                        messages = await self.channels[channel].history(limit=100).flatten()
-                        content = buttons.pop(0)
-
-                        view = discord.ui.View(timeout=None)
-                        for button in buttons:
-                            view.add_item(button)
-                        for i, m in enumerate(messages):
-                            if self.user == m.author:
-                                await m.edit(content=content, view=view)
-                                break
-                        else:  # If there is no message to edit, make one.
-                            await self.channels[channel].send(content=content)
-                except KeyError as e:
-                    raise KeyError(f'Could not find the channel {e}!')  # A bit redundant
-
                 logger.add(
                     DiscordStream(self).write,
                     level='INFO',
@@ -228,19 +203,6 @@ class HVZBot(discord.Bot):
                 log.exception(f'self startup failed with this error --> {e}')
                 await self.close()
                 time.sleep(1)
-
-        class HVZButton(discord.ui.Button):
-            def __init__(self, label, style, custom_id, callback_func):
-                self.callback_func = callback_func
-                super().__init__(
-                    label=label,
-                    style=style,
-                    custom_id=custom_id,
-
-                )
-
-            async def callback(self, interaction: discord.Interaction):
-                await self.callback_func(interaction)
 
         @self.listen()
         async def on_application_command_error(ctx, error):
@@ -291,56 +253,6 @@ class HVZBot(discord.Bot):
                         elif result == -1:
                             self.awaiting_chatbots.pop(i)
                         break
-
-        @self.check_event
-        @self.check_dm_allowed
-        async def register(interaction: discord.Interaction):
-            try:
-                self.db.get_member(interaction.user)
-                await interaction.response.send_message(
-                    'You are already registered for HvZ! Contact an admin if you think this is wrong.',
-                    ephemeral=True
-                )
-            except ValueError:
-                for i, c in enumerate(self.awaiting_chatbots):  # Restart registration if one is already in progress
-                    if (c.member == interaction.user) and c.chat_type == 'registration':
-                        await interaction.user.send('**Restarting registration process...**')
-                        self.awaiting_chatbots.pop(i)
-                chatbot = ChatBot(interaction.user, 'registration')
-                await chatbot.ask_question()
-                await interaction.response.send_message(
-                    'You\'ve been sent a Direct Message to start registration.',
-                    ephemeral=True
-                )
-                self.awaiting_chatbots.append(chatbot)
-
-        @self.check_event
-        @self.check_dm_allowed
-        async def tag_log(interaction: discord.Interaction):
-
-            if config['tag_logging'] is False:
-                await interaction.response.send_message('The admin has not enabled tagging yet.', ephemeral=True)
-            try:
-                self.db.get_member(interaction.user)
-            except ValueError as e:
-                await interaction.response.send_message(
-                    'You are not currently registered for HvZ.',
-                    ephemeral=True
-                )
-                log.debug(e)
-            else:
-                for i, c in enumerate(self.awaiting_chatbots):  # Restart registration if one is already in progress
-                    if (c.member == interaction.user) and c.chat_type == 'tag_logging':
-                        await interaction.user.send('**Restarting tag logging process...**')
-                        self.awaiting_chatbots.pop(i)
-
-                chatbot = ChatBot(interaction.user, 'tag_logging')
-                await chatbot.ask_question()
-                await interaction.response.send_message(
-                    'You\'ve been sent a Direct Message to start tag logging.',
-                    ephemeral=True
-                )
-                self.awaiting_chatbots.append(chatbot)
 
         @self.listen()
         @self.check_event
@@ -486,8 +398,57 @@ class HVZBot(discord.Bot):
         member = self.guild.get_member(user_id)
         return member
 
+    @check_dm_allowed
+    async def register(self, interaction: discord.Interaction):
+        try:
+            self.db.get_member(interaction.user)
+            await interaction.response.send_message(
+                'You are already registered for HvZ! Contact an admin if you think this is wrong.',
+                ephemeral=True
+            )
+        except ValueError:
+            for i, c in enumerate(self.awaiting_chatbots):  # Restart registration if one is already in progress
+                if (c.member == interaction.user) and c.chat_type == 'registration':
+                    await interaction.user.send('**Restarting registration process...**')
+                    self.awaiting_chatbots.pop(i)
+            chatbot = ChatBot(interaction.user, 'registration')
+            await chatbot.ask_question()
+            await interaction.response.send_message(
+                'You\'ve been sent a Direct Message to start registration.',
+                ephemeral=True
+            )
+            self.awaiting_chatbots.append(chatbot)
+
+    @check_dm_allowed
+    async def tag_log(self, interaction: discord.Interaction):
+
+        if config['tag_logging'] is False:
+            await interaction.response.send_message('The admin has not enabled tagging yet.', ephemeral=True)
+        try:
+            self.db.get_member(interaction.user)
+        except ValueError as e:
+            await interaction.response.send_message(
+                'You are not currently registered for HvZ.',
+                ephemeral=True
+            )
+            log.debug(e)
+        else:
+            for i, c in enumerate(self.awaiting_chatbots):  # Restart registration if one is already in progress
+                if (c.member == interaction.user) and c.chat_type == 'tag_logging':
+                    await interaction.user.send('**Restarting tag logging process...**')
+                    self.awaiting_chatbots.pop(i)
+
+            chatbot = ChatBot(interaction.user, 'tag_logging')
+            await chatbot.ask_question()
+            await interaction.response.send_message(
+                'You\'ve been sent a Direct Message to start tag logging.',
+                ephemeral=True
+            )
+            self.awaiting_chatbots.append(chatbot)
+
 
 bot = HVZBot()
-bot.add_cog(AdminCommands(bot))
+bot.add_cog(AdminCommandsCog(bot))
+bot.add_cog(HVZButtonCog(bot))
 
 bot.run(token)
