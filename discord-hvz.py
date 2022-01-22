@@ -6,8 +6,11 @@ from chatbot import ChatBot
 from hvzdb import HvzDb
 import utilities as util
 from admin_commands import AdminCommands
+from discord_io import DiscordStream
 
 import logging
+from loguru import logger
+import sys
 import coloredlogs
 import time
 import functools
@@ -37,11 +40,50 @@ def dump(obj):
 load_dotenv()  # Load the Discord token from the .env file
 token = getenv("TOKEN")
 
+
+log = logger
+logger.remove()
+logger.add(sys.stderr, level="INFO")
+
+logger.add('logs/discord-hvz_{time}.log', rotation='1 week', level='DEBUG', mode='a')
+
+discord_handler = logging.getLogger('discord')
+
+class InterceptHandler(logging.Handler):
+    def emit(self, record):
+        # Get corresponding Loguru level if it exists
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
+
+        # Find caller from where originated the logged message
+        frame, depth = logging.currentframe(), 2
+        while frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
+
+        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+
+
+discord_logger = logging.getLogger('discord')
+discord_logger.propagate = False
+discord_logger.setLevel(logging.WARNING)
+discord_logger.addHandler(InterceptHandler())
+
+
+
+
+
+
+
+'''
 log_format = '%(asctime)s %(name)s %(levelname)s %(message)s'
 coloredlogs.DEFAULT_LOG_FORMAT = log_format
 logging.basicConfig(filename='discord-hvz.log', encoding='utf-8', filemode='a', 
                     format=log_format, level=logging.DEBUG)
 coloredlogs.install(level='INFO')  # Stream handler for root logger 
+
 
 # Setup a logger for discord.py
 discord_logger = logging.getLogger('discord')
@@ -58,6 +100,7 @@ discord_logger.addHandler(file_handler)
 
 
 log = logging.getLogger(__name__)
+'''
 
 class HVZBot(discord.Bot):
 
@@ -138,7 +181,7 @@ class HVZBot(discord.Bot):
                         raise Exception(f'{x} role not found!')
 
                 self.channels = {}
-                needed_channels = ['tag-announcements', 'report-tags', 'landing', 'zombie-chat'] 
+                needed_channels = ['tag-announcements', 'report-tags', 'landing', 'zombie-chat', 'bot-output'] 
                 for i, x in enumerate(needed_channels):
                     for c in self.guild.channels:
                         if c.name.lower() == config['channel_names'][x]:
@@ -168,9 +211,15 @@ class HVZBot(discord.Bot):
                             await self.channels[channel].send(content=content)
                 except KeyError as e:
                     raise KeyError(f'Could not find the channel {e}!')  # A bit redundant
-                
 
-                log.critical(f'Discord-HvZ self launched correctly! Logged in as: {self.user.name} ------------------------------------------')
+                logger.add(
+                    DiscordStream(self).write, 
+                    level='INFO', 
+                    enqueue=True,
+                    format='{level} | {name}:{function}:{line} - {message}'
+                )
+
+                log.success(f'Discord-HvZ Bot launched correctly! Logged in as: {self.user.name} ------------------------------------------')
                 self.sheets_interface.export_to_sheet('members')
                 self.sheets_interface.export_to_sheet('tags')
 
@@ -198,22 +247,25 @@ class HVZBot(discord.Bot):
         @self.listen()
         async def on_application_command_error(ctx, error):
             error = getattr(error, 'original', error)
-            log_function = None
+            log_level = None
             trace = False
 
             if isinstance(error, NoSuchColumnError):
-                log_function = log.warning
+                log_level = 'warning'
             elif isinstance(error, ValueError):
-                log_function = log.warning
+                log_level = 'warning'
             else:
-                log_function = log.error
+                log_level = 'error'
                 trace = True
 
-            if log_function is not None:
+            if log_level is not None:
                 if trace:
                     trace = error
 
-                log_function(f'{error.__class__.__name__} exception in command {ctx.command}: {error}', exc_info=trace)
+                #log_function(f'{error.__class__.__name__} exception in command {ctx.command}: {error}', exc_info=trace)
+
+                getattr(log.opt(exception=trace), log_level)(f'{error.__class__.__name__} exception in command {ctx.command}: {error}')
+                
 
             await ctx.respond(f'The command at least partly failed: {error}')
 
@@ -448,4 +500,5 @@ class HVZBot(discord.Bot):
 
 bot = HVZBot()
 bot.add_cog(AdminCommands(bot))
+
 bot.run(token)

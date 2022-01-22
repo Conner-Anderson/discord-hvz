@@ -16,3 +16,4 @@ sqalchemytest.py
 build
 *.exe
 *.spec
+testbed.py

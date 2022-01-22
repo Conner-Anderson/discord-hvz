@@ -1,8 +1,8 @@
-import logging
 import yaml
 import regex
 
-log = logging.getLogger(__name__)
+from loguru import logger
+log = logger
 
 class ChatBot:
 

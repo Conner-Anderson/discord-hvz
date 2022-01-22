@@ -3,13 +3,14 @@ from discord.ext import commands
 from discord.commands import SlashCommandGroup, CommandPermission
 from discord.commands import permissions
 from discord.commands import Option
-import logging
 import functools
 import time
 
 import utilities as util
 from chatbot import ChatBot
 from config import config
+from loguru import logger
+log = logger
 
 def dump(obj):
     '''Prints the passed object in a very detailed form for debugging'''
@@ -17,8 +18,6 @@ def dump(obj):
         print("obj.%s = %r" % (attr, getattr(obj, attr)))
 
 DISCORD_MESSAGE_MAX_LENGTH = 2000
-
-log = logging.getLogger(__name__)
 
 guild_id_list = [config['available_servers'][config['active_server']]]
 

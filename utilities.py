@@ -1,4 +1,4 @@
-import logging
+
 
 import functools
 import discord
@@ -6,8 +6,8 @@ from discord.ext import commands
 
 import string
 import random
-
-log = logging.getLogger(__name__)
+from loguru import logger
+log = logger
 
 def make_tag_code(db):
     code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '0125IOUDQVSZ'))

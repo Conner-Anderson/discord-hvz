@@ -5,10 +5,12 @@ from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-import logging
 from datetime import datetime
+from loguru import logger
+import logging
+log = logger
+
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
-log = logging.getLogger(__name__)
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
