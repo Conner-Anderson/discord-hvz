@@ -16,7 +16,6 @@ import functools
 
 import discord
 from discord.ext import commands
-from discord.commands.commands import slash_command
 
 from datetime import timedelta
 from datetime import datetime
@@ -141,8 +140,8 @@ class HVZBot(discord.Bot):
 
     def __init__(self):
         self.guild = None
-        self.roles = None
-        self.channels = None
+        self.roles = {}
+        self.channels = {}
         intents = discord.Intents.default()
         intents.members = True
         super().__init__(
@@ -365,15 +364,6 @@ class HVZBot(discord.Bot):
                 log.debug(f'{after.name} changed their nickname.')
                 self.sheets_interface.export_to_sheet('members')
                 self.sheets_interface.export_to_sheet('tags')
-
-        @self.command(guild_ids=[
-            config['available_servers'][config['active_server']]])  # create a slash command for the supplied guilds
-        async def hello(ctx):
-            """Say hello to the bot"""  # the command description can be supplied as the docstring
-            await ctx.respond(f"Hello {ctx.author}!")
-            # Please note that you MUST respond with ctx.respond(), ctx.defer(), or any other
-            # interaction response within 3 seconds in your slash command code, otherwise the
-            # interaction will fail.
 
         @self.command(guild_ids=[config['available_servers'][config['active_server']]])
         async def joined(ctx, member: discord.Member = None):
