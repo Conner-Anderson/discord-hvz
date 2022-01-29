@@ -62,14 +62,14 @@ class HVZButtonCog(commands.Cog):
             button_options.append(option)
 
         # make sure to set the guild ID here to whatever server you want the buttons in
-        @bot.command(guild_ids=guild_id_list, description="Post the button message")
+        @bot.command(guild_ids=guild_id_list)
         async def post(
                 ctx,
                 function_name: Option(str, 'Which button to post.', choices=button_options, name='function',
                                       required=True),
                 message: Option(str, 'Message to replace the default.', required=False, default=None)
         ):
-            """A slash command to post a new view with a button for each role"""
+            """Post a message with a button: registration or tag log. Can change message."""
 
             # timeout is None because we want this view to be persistent
             view = discord.ui.View(timeout=None)
@@ -79,7 +79,8 @@ class HVZButtonCog(commands.Cog):
             if message is None:
                 message = config['buttons'][function_name]['message']
 
-            await ctx.respond(message, view=view)
+            await ctx.channel.send(message, view=view)
+            await ctx.respond('Posted message with button.', ephemeral=True)
 
     @commands.Cog.listener()
     async def on_ready(self):

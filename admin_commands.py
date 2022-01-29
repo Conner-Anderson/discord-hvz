@@ -80,7 +80,7 @@ class AdminCommandsCog(commands.Cog):
                 setting: Option(bool, 'OZ setting.', default=None, required=False)
         ):
             """
-            Gives a member access to zombie channels when human. Must be manually given the zombie role later.
+            Checks or sets OZ on member. OZs can access zombie channels when human, including the tag channel.
 
             member_string must be a @mentioned member in the channel, an ID, a Discord_Name,
             a Nickname, or a Name.
@@ -154,7 +154,7 @@ class AdminCommandsCog(commands.Cog):
                 value: Option(str, 'Value to change to. Does not check validity!')
         ):
             """
-            Edits one attribute of a member in the database.
+            Edits one attribute of a member in the database. Reference the Google Sheet.
 
             Any arguments with spaces must be "surrounded in quotes"
             member_string must be an @mentioned member in the channel, an ID, a Discord_Name,
@@ -180,7 +180,7 @@ class AdminCommandsCog(commands.Cog):
         @permissions.has_role('Admin')
         async def member_list(ctx):
             """
-            Lists all members.
+            Lists all members. The Google Sheet is probably better.
 
             """
             table_name = 'members'
@@ -268,7 +268,7 @@ class AdminCommandsCog(commands.Cog):
                 tag_id: Option(int, 'Tag ID from the Google Sheet')
         ):
             """
-            Removes the tag by its ID, reverting tagged member to human.
+            Removes the tag by its ID, changing tagged member to human.
 
             Takes a tag ID, which you can get from the Google sheet.
             Removes the tag from the database. Also changes the tagged member back to
@@ -306,9 +306,8 @@ class AdminCommandsCog(commands.Cog):
                 value: Option(str, 'Value to change to. Does not verify validity!')
         ):
             """
-            Edits one attribute of a tag
+            Edits one attribute of a tag.
 
-            Any arguments with spaces must be "surrounded in quotes"
             Takes a tag ID, which you can get from the Google sheet.
             Valid attributes are the column names in the database, which can be found in exported Google Sheets.
             Case-sensitive, exact matches only!
@@ -329,7 +328,7 @@ class AdminCommandsCog(commands.Cog):
                 tag_id: Option(int, 'Tag ID from Google sheet to revoke.')
         ):
             """
-            Sets Tag_Revoked for a tag to True. Changes roles.
+            Sets Tag_Revoked for a tag to True and leaves it in the database. Changes tagged member to human.
 
             Takes a tag ID, which you can get from the Google sheet.
             Sets the tag to Revoked, but leaves it in the database.
@@ -400,10 +399,10 @@ class AdminCommandsCog(commands.Cog):
                     'Config setting to change or view.',
                     choices=['registration', 'tag_logging', 'silent_oz']
                 ),
-                choice: Option(bool, 'What to change the setting to.')
+                choice: Option(bool, 'What to change the setting to.', required=False)
         ):
             """
-            Views or edits configuration settings. registration, tag_logging, silent_oz
+            Views or edits a few configuration settings.
 
             If only 'setting' is provided, prints the current setting.
             If 'choice' is True or False, the config setting is set.
@@ -432,7 +431,7 @@ class AdminCommandsCog(commands.Cog):
         @permissions.has_role('Player')
         async def code(ctx):
             """
-            Gives you your tag code in a private reply.
+            Gives you your tag code in a private reply. Keep it secret, keep it safe.
 
             """
             try:
@@ -449,7 +448,6 @@ class AdminCommandsCog(commands.Cog):
             """
             Sends a message with a family tree of the zombies in the game.
 
-            The command message is deleted too.
             """
             tree = util.generate_tag_tree(bot.db).splitlines(True)
             buffer = '**THE ZOMBIE FAMILY TREE\n**'
@@ -463,18 +461,21 @@ class AdminCommandsCog(commands.Cog):
                     if next_length > 3000:
                         await ctx.respond(buffer)
                         buffer = ''
-
-        @bot.command(guild_ids=guild_id_list, name='tagger')
+        '''
+        @tag_group.command(guild_ids=guild_id_list, name='tagger')
         @permissions.has_role('Admin')
-        async def tagger(ctx, tag_id: int):
+        async def tag_tagger(
+                ctx,
+                member: Option(discord.Member, 'Member to find the tagger of.')
+        ):
             """
-            Gets the user who made a tag
+            Identifies the zombie who tagged a given member.
 
             """
-            tag_row = bot.db.get_tag(tag_id)
-            tagger = bot.guild.get_member(int(tag_row.Tagger_ID))
+            tagged = bot.db.get_tag
+            tagger =
             ctx.respond(f'Tagger for tag {tag_id}: <@{tagger.id}>')
-
+        '''
         @bot.command(guild_ids=guild_id_list, description='Shuts down the bot.')
         @permissions.has_role('Admin')
         async def shutdown(ctx):
