@@ -42,7 +42,7 @@ registration:
     rejection_response: Just need a yes or no here.
 
 tag_logging:
-  beginning: Let's log a tag.
+  beginning: Let's log a tag. Type 'cancel' at any time to stop this conversation.
   ending: Tag logged! Make sure your newly-brainless friend feels welcome in the hoard.
   questions:
   - name: Tag_Code
