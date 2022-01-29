@@ -97,7 +97,7 @@ class AdminCommandsCog(commands.Cog):
                 return
 
             if setting is None:
-                await ctx.respond(f'{member_row.Name}\'s OZ status is {member_row.OZ}')
+                await ctx.respond(f'{member_row.Name}\'s OZ status is {member_row.OZ}. Give a True or False argument to change their setting.')
                 return
             bot.db.edit_member(member_row.ID, 'OZ', setting)
 

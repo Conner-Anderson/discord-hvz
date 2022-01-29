@@ -55,7 +55,7 @@ tag_logging:
     display_name: Tag Day
     query: Did the tag happen "today" or "yesterday"?
     valid_regex: "(?i)(today)|yesterday"
-    rejection_response: Respond with either "today" or "tomorrow"
+    rejection_response: Respond with either "today" or "yesterday"
   - name: Tag_Time
     display_name: Tag Time
     query: About what time did the tag happen? Use the format 3:04pm

@@ -277,11 +277,6 @@ class HVZBot(discord.Bot):
                 self.sheets_interface.export_to_sheet('members')
                 self.sheets_interface.export_to_sheet('tags')
 
-        @self.command(guild_ids=[config['available_servers'][config['active_server']]])
-        async def joined(ctx, member: discord.Member = None):
-            user = member or ctx.author
-            await ctx.respond(f'{user.name} joined at {discord.utils.format_dt(user.joined_at)}')
-
         async def resolve_chat(chatbot):  # Called when a Chatself returns 1, showing it is done
             responses = {}
             for question in chatbot.questions:
@@ -382,11 +377,18 @@ class HVZBot(discord.Bot):
                     msg = f'<@{tagged_member_id}> has turned zombie!'
                     if not config['silent_oz']:
                         msg += f'\nTagged by <@{chatbot.target_member.id}>'
-                        msg += tag_datetime.strftime(' at about %-I:%M %p')
+                        msg += tag_datetime.strftime(' at about %I:%M %p')
 
                     msg += f'\nThere are now {new_human_count} humans and {new_zombie_count} zombies.'
 
                     await self.channels['tag-announcements'].send(msg)
+
+                    # Try to make a useful console output, but don't worry if it fails.
+                    try:
+                        tag_id = self.db.get_rows('tags', 'Tag_Time', tag_datetime)[0].Tag_ID
+                        log.info(f'{chatbot.target_member.name} tagged {tagged_member.name}. Tag ID: {tag_id}')
+                    except Exception as e:
+                        log.warning(e)
                     return 1
 
                 except Exception:
