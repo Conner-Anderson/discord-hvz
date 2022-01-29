@@ -53,7 +53,6 @@ class HVZButtonCog(commands.Cog):
     button_options = []
     for option in config['buttons']:
         button_options.append(option)
-        print(f'Added {option}')
 
     def __init__(self, bot):
         self.bot = bot

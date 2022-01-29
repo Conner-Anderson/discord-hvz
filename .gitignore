@@ -18,3 +18,4 @@ build
 *.spec
 testbed.py
 .idea
+*.zip

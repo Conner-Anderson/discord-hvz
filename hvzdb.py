@@ -305,7 +305,7 @@ class HvzDb:
 
     def get_rows(self, table, search_column, search_value, exclusion_column=None, exclusion_value=None):
         """
-        Returns the first Row object where the specified value matches.
+        Returns a list of Row objects where the specified value matches.
         Meant to be used within the class.
 
         Parameters:
@@ -316,7 +316,7 @@ class HvzDb:
                 exclusion_value (any) Optional. Required if exclusion_column is provided.
 
         Returns:
-                row (Row): Row object. Access rows in these ways: row.some_row, row['some_row']
+                result_rows: List of Row objects. Access rows in these ways: row.some_row, row['some_row']
         """
         the_table = self.tables[table]
         selection = select(the_table).where(the_table.c[search_column] == search_value)
