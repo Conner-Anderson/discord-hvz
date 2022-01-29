@@ -382,7 +382,7 @@ class HVZBot(discord.Bot):
                     msg = f'<@{tagged_member_id}> has turned zombie!'
                     if not config['silent_oz']:
                         msg += f'\nTagged by <@{chatbot.target_member.id}>'
-                    # msg += tag_datetime.strftime('\n%A, at about %I:%M %p')
+                        msg += tag_datetime.strftime(' at about %-I:%M %p')
 
                     msg += f'\nThere are now {new_human_count} humans and {new_zombie_count} zombies.'
 
