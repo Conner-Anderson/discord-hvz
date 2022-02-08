@@ -2,6 +2,7 @@ import typing
 
 import discord
 from discord.commands import Option
+from discord.commands import permissions
 # from discord.commands import slash_command
 from discord.ext import commands
 
@@ -62,6 +63,7 @@ class HVZButtonCog(commands.Cog):
 
         # make sure to set the guild ID here to whatever server you want the buttons in
         @bot.command(guild_ids=guild_id_list)
+        @permissions.has_role('Admin')
         async def post(
                 ctx,
                 function_name: Option(str, 'Which button to post.', choices=button_options, name='function',
