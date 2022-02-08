@@ -1,94 +1,155 @@
 import yaml
 import regex
-
+import discord
+from discord.commands import slash_command
+from discord.ext import commands
 from loguru import logger
+from typing import List, Union, Dict
 log = logger
 
-class ChatBot:
+from config import config
 
-    def __init__(self, member, selection, target_member=None):
-        # Arguments: The member to ask the questions to,
-        # and a string matching the question set this chatbot will use.
-        self.member = member
+guild_id_list = [config['available_servers'][config['active_server']]]
+
+class Question:
+    name: str = None
+    display_name: str = None
+    query: str = None
+    valid_regex: str = None
+    rejection_response: str = None
+    response: str = None
+
+    required_attributes = ['name', 'display_name', 'query']
+
+    def __init__(self, question: dict):
+        for a in self.required_attributes:
+            x = question.get(a)
+            if x is None:
+                raise ValueError(f'Question missing required attribute "{a}". Check questions.yml')
+
+        for key, content in question:
+            if not isinstance(content, str):
+                raise ValueError(f'Attribute "{key}" of question does not evaluate to a string.')
+            if hasattr(self, key):
+                self.__setattr__(key, content)
+            else:
+                log.warning(f'"{key}" is not a valid question attribute. Ignoring it.')
+
+
+
+class ChatBotScript:
+    kind: str
+    questions: List[Question]
+    beginning: str
+    ending: str
+
+    def __init__(self, kind: str):
+        # Load questions from YAML file
+        file = open('questions.yml', mode='r')
+        raw_data = yaml.safe_load(file)
+        chat = raw_data[kind]
+        file.close()
+
+        self.beginning = chat['beginning']
+        self.ending = chat['ending']
+
+        for q in chat['questions']:
+            try:
+                self.questions.append(Question(q))
+            except ValueError as e:
+                e.args
+
+
+
+class ChatBot:
+    processing: bool = False
+    kind: str
+    def __init__(
+            self,
+            chatbot_kind: str,
+            chat_member: discord.Member,
+            target_member: discord.Member = None,
+            existing_chatbot_kind: str = None
+    ):
+        self.chat_member = chat_member
+        self.kind = chatbot_kind
         if target_member is None:
-            self.target_member = member
+            self.target_member = chat_member
         else:
             self.target_member = target_member
-
-        self.next_question = 0
-        self.questions = []
-        self.verifying = False
-        self.chat_type = selection
 
         # Load questions from YAML file
         file = open('questions.yml', mode='r')
         raw_data = yaml.safe_load(file)
-        chat = raw_data[self.chat_type]
-
-        self.beginning_text = chat['beginning']
-        self.ending_text = chat['ending']
-
-        for q in chat['questions']:
-            q['response'] = None  # Add an empty response field to each question
-            self.questions.append(q)
+        chat = raw_data[chatbot_kind]
         file.close()
-        log.info(f'{self.chat_type} ChatBot started with {self.member.name}')
 
-    async def ask_question(self):
+
+
+    async def ask_question(self, starting: bool = False, existing_chatbot_kind: str = None):
         msg = ''
-        if (not self.verifying) and (self.next_question == 0):
-            msg += self.beginning_text + '\n'
-        msg += self.questions[self.next_question]['query']
-        await self.member.send(msg)
+        if existing_chatbot_kind is not None:
+            msg += f'Cancelled the previous {existing_chatbot_kind} conversation.\n'
+        if starting:
+            msg += chat['beginning']
+        msg += chat['beginning']
+        await chat_member.send(msg)
 
-    async def take_response(self, message):
-        if message.content.casefold().replace(' ', '') == 'cancel':
-            await message.reply('Cancelled.')
-            log.info(f'{self.chat_type} ChatBot cancelled by {self.member.name}')
-            return -1
+    async def receive(self, message: discord.Message):
+        pass
 
-        # Check if we're in the verification phase and aren't re-answering a question
-        if (self.verifying is True) & (self.next_question >= len(self.questions)):
-            if message.content.casefold().find('yes') != -1:
-                return 1
-            else:  # User must be responding to the verification prompt
-                for i, q in enumerate(self.questions):  # Iterate through question names to see if the user has named one to edit
-                    pattern = q['name'] + '|' + q['display_name']
-                    if regex.search(pattern, message.content, flags=regex.I) is not None:
-                        self.next_question = i  # Set the selection of the question to edit
-                        await self.ask_question()
-                        return
-                await self.member.send('That response doesn\'t make any sense. Try again?')
+
+class ChatBotManager(commands.Cog):
+    active_chatbots: Dict[int, ChatBot]
+    def __int__(self, bot):
+        self.bot = bot
+        log.info('ChatBotManager Initialized')
+
+    async def start_chatbot(
+            self,
+            chatbot_kind: str,
+            chat_member: discord.Member,
+            target_member: discord.Member = None
+    ):
+        existing = self.active_chatbots.get(chat_member.id)
+        if existing is not None:
+            existing = existing.kind
+        self.active_chatbots[chat_member.id] = ChatBot(chatbot_kind, chat_member, target_member, existing_chatbot_kind=existing)
+
+    @slash_command(guild_ids=guild_id_list)
+    async def chatbots(self, ctx):
+       pass
+
+    @commands.Cog.listener
+    async def on_message(self, message: discord.Message):
+        if message.channel.type == discord.ChannelType.private:
+
+            chatbot = self.active_chatbots.get(message.author.id)
+
+            if chatbot is None or chatbot.processing is True:
                 return
-        # At this point, it is time to accept the response to a normal or re-asked question
-        q = self.questions[self.next_question]  # Set the current question
-        match = regex.fullmatch(r'{}'.format(q['valid_regex']), message.content)
-        if match is None:
-            await message.reply(q['rejection_response'] + '\nPlease answer again.')  # An error message for failing the regex test, configurable per-question
-            return
-
-        # Record the accepted answer and proceed to the next question.
-        q['response'] = str(message.content)
-        self.next_question += 1
-
-        # This if sequence is a bit confusing, and could use rework
-        if self.verifying:  # Set the next question to the end of the list and verify again
-            self.next_question = len(self.questions)
-            await self.verify()
-        elif (self.next_question >= len(self.questions)):
-            self.verifying = True
-            await self.verify()  # If there are no more questions, move on to verification
-        else:
-            await self.ask_question()  # Otherwise, ask the next question
-
-    async def verify(self):
-        message = ('**Type "yes" to submit.**'
-            '\nOr type the name of what you want to change, such as "%s".\n\n' % (self.questions[0]['display_name']))
-        for q in self.questions:  # Build a list of the questions and their responses
-            message += (q['display_name'] + ': ' + q['response'] + '\n')
-        await self.member.send(message)
+            try:
+                completed = await chatbot.recieve(message)
+            except Exception as e:
+                await chatbot.chat_member.send(f'The chatbot had a critical error. You will need to retry from the beginning.')
+                self.active_chatbots.pop(message.author.id)
+                raise e
 
 
-    async def end(self):
-        await self.member.send(self.ending_text)
-        log.info(f'{self.member.name}\'s {self.chat_type} chatbot has completed.')
+            if completed:
+                self.active_chatbots.pop(message.author.id)
+            else:
+                chatbot.processing = False
+
+
+
+
+
+
+
+
+
+
+
+
+

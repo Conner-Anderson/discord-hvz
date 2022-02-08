@@ -2,7 +2,7 @@
 from buttons import HVZButtonCog
 from config import config
 import sheets
-from chatbot import ChatBot
+from chatbot import ChatBotManager
 from hvzdb import HvzDb
 import utilities as util
 from admin_commands import AdminCommandsCog
@@ -452,5 +452,6 @@ class HVZBot(discord.Bot):
 bot = HVZBot()
 bot.add_cog(AdminCommandsCog(bot))
 bot.add_cog(HVZButtonCog(bot))
+bot.add_cog(ChatBotManager(bot))
 
 bot.run(token)

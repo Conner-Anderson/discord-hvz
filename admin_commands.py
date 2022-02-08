@@ -7,7 +7,7 @@ import functools
 import time
 
 import utilities as util
-from chatbot import ChatBot
+from chatbot import ChatBotManager
 from config import config
 from loguru import logger
 

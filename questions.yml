@@ -3,6 +3,8 @@
 # If you need to use special characters like $ # @ * etc., surround your message in " "
 #See those little |- symbols? Those tell the config file that there's a block of text coming up.
 
+# Each question's 'name' variable must match a database column, or the bot will give an error on startup
+
 registration:
   beginning: I'll register you for HvZ. Type 'cancel' at any time to stop this conversation.
   ending: You are registered for HvZ! Please read the rules. New channels are available to you.
@@ -42,6 +44,27 @@ registration:
     rejection_response: Just need a yes or no here.
 
 tag_logging:
+  beginning: Let's log a tag. Type 'cancel' at any time to stop this conversation.
+  ending: Tag logged! Make sure your newly-brainless friend feels welcome in the hoard.
+  questions:
+  - name: Tag_Code
+    display_name: Tag Code
+    query: What is the tag code of the human you tagged?
+    valid_regex: '[a-zA-Z\d]{6}'
+    rejection_response: 'The tag code is 6 characters of numbers and capital
+      letters. None of these: 0 O Q I 1 D V U 5 S 2 Z'
+  - name: Tag_Day
+    display_name: Tag Day
+    query: Did the tag happen "today" or "yesterday"?
+    valid_regex: "(?i)(today)|yesterday"
+    rejection_response: Respond with either "today" or "yesterday"
+  - name: Tag_Time
+    display_name: Tag Time
+    query: About what time did the tag happen? Use the format 3:04pm
+    valid_regex: '(?i)\d{1,2}:[0-5]?[0-9]\s?(am|pm)'
+    rejection_response: Please use a format like 12:26pm or 7:00 am
+
+tag_logging_2:
   beginning: Let's log a tag. Type 'cancel' at any time to stop this conversation.
   ending: Tag logged! Make sure your newly-brainless friend feels welcome in the hoard.
   questions:
