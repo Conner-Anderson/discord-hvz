@@ -409,17 +409,9 @@ class HVZBot(discord.Bot):
                 ephemeral=True
             )
         except ValueError:
-            for i, c in enumerate(self.awaiting_chatbots):  # Restart registration if one is already in progress
-                if (c.member == interaction.user) and c.chat_type == 'registration':
-                    await interaction.user.send('**Restarting registration process...**')
-                    self.awaiting_chatbots.pop(i)
-            chatbot = ChatBot(interaction.user, 'registration')
-            await chatbot.ask_question()
-            await interaction.response.send_message(
-                'You\'ve been sent a Direct Message to start registration.',
-                ephemeral=True
-            )
-            self.awaiting_chatbots.append(chatbot)
+            chatbot_manager= self.get_cog('ChatBotManager')
+            await chatbot_manager.start_chatbot('registration', interaction.user)
+
 
     @check_dm_allowed
     async def tag_log(self, interaction: discord.Interaction):
@@ -450,8 +442,9 @@ class HVZBot(discord.Bot):
 
 
 bot = HVZBot()
+bot.add_cog(ChatBotManager(bot))
 bot.add_cog(AdminCommandsCog(bot))
 bot.add_cog(HVZButtonCog(bot))
-bot.add_cog(ChatBotManager(bot))
+
 
 bot.run(token)
