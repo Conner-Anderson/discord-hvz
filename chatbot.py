@@ -8,38 +8,47 @@ from discord.ext import commands
 from loguru import logger
 from typing import List, Union, Dict
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from discord_hvz import Bot
-log = logger
 
 from config import config
 
+log = logger
+
 guild_id_list = [config['available_servers'][config['active_server']]]
 
+
 class Question:
-    name: str = None
-    display_name: str = None
-    query: str = None
-    valid_regex: str = None
-    rejection_response: str = None
-    response: str = None
+    name: str
+    display_name: str
+    query: str
+    valid_regex: Union[str, None]
+    rejection_response: Union[str, None]
 
     required_attributes = ['name', 'display_name', 'query']
-    coupled_attributes = [('valid_regex', 'rejection_response'),] # Attributes where if one appears, the other must also
+    optional_attributes = []
+    coupled_attributes = [
+        ('valid_regex', 'rejection_response'), ]  # Attributes where if one appears, the other must also
 
     def __init__(self, question: dict):
+        self.name = ''
+        self.display_name = ''
+        self.query = ''
+        self.valid_regex = None
+        self.rejection_response = None
+
         for a in self.required_attributes:
             x = question.get(a)
             if x is None:
                 raise ValueError(f'Question missing required attribute "{a}". Check scripts.yml')
 
         for pair in self.coupled_attributes:
-            for i in range(0,1):
+            for i in range(0, 1):
                 if question.get(i) is not None:
-                    other = int(not i) # Invert
+                    other = int(not i)  # Invert
                     if question.get(pair[other]) is None:
                         raise ValueError(f'Missing coupled attribute')
-
 
         for key, content in question.items():
             if not isinstance(content, str):
@@ -52,19 +61,19 @@ class Question:
         log.info(f'Loaded question called {self.name}')
 
 
-
 class ChatBotScript:
     """
     A prototype object meant to be created at bot launch for every script in the scripts.yml file,
     then deep-copied for each ChatBot launched.
     """
     kind: str
-    questions: List[Question] = []
+    questions: List[Question]
     beginning: str
     ending: str
 
     def __init__(self, kind: str, script: Dict):
         self.kind = kind
+        self.questions = []
         self.beginning = script['beginning']
         self.ending = script['ending']
 
@@ -72,31 +81,33 @@ class ChatBotScript:
             try:
                 self.questions.append(Question(q))
             except ValueError as e:
-                #e.args
+                # e.args
                 raise e
 
     def get_question(self, question_number: int):
         return self.questions[question_number]
 
 
-
 class ChatBot:
-    processing: bool = False
+    processing: bool
     kind: str
     script: ChatBotScript
     chat_member: discord.Member
     target_member: discord.Member
     last_asked_question: int
-    responses: Dict[str, str] = {}
+    responses: Dict[str, str]
+
     def __init__(
             self,
             chatbot_script: ChatBotScript,
             chat_member: discord.Member,
             target_member: discord.Member = None
     ):
+        self.processing = False
         self.chat_member = chat_member
         self.kind = chatbot_script.kind
         self.script = chatbot_script
+        self.responses = {}
         if target_member is None:
             self.target_member = chat_member
         else:
@@ -119,14 +130,26 @@ class ChatBot:
     async def receive(self, message: discord.Message):
         question = self.script.get_question(self.last_asked_question)
         response: str = message.clean_content
-        if hasattr(question, 'valid_regex'):
+        if question.valid_regex is not None:
             match = regex.fullmatch(r'{}'.format(question.valid_regex), message.content)
             if match is None:
-                await message.reply(question.rejection_response + '\nPlease answer again.')  # An error message for failing the regex test, configurable per-question
+                await message.reply(
+                    question.rejection_response + '\nPlease answer again.')  # An error message for failing the regex test, configurable per-question
                 return
 
         self.responses[question.name] = response
-        await self.ask_question(self.last_asked_question + 1)
+        if self.last_asked_question + 1 >= len(self.script.questions):
+            await self.review()
+        else:
+            await self.ask_question(self.last_asked_question + 1)
+
+    async def review(self):
+        msg = ('**Type "yes" to submit.**'
+                   '\nOr type the name of what you want to change, such as "%s".\n\n' % (
+                   self.script.get_question(1).display_name))
+        for q in self.script.questions:  # Build a list of the questions and their responses
+            msg += (q.display_name + ': ' + self.responses[q.name] + '\n')
+        await self.chat_member.send(msg)
 
 
 
@@ -139,13 +162,13 @@ class ChatBotManager(commands.Cog):
         print('Started ChatBotManager')
         self.bot = bot
 
-
         file = open('scripts.yml', mode='r')
         scripts_data = yaml.safe_load(file)
         file.close()
 
         for kind, script in scripts_data.items():
             self.loaded_scripts[kind] = (ChatBotScript(kind, script))
+        log.info(self.loaded_scripts['registration'].questions)
 
         log.info('ChatBotManager Initialized')
 
@@ -167,10 +190,9 @@ class ChatBotManager(commands.Cog):
         )
         await self.active_chatbots[chat_member.id].start(existing)
 
-
     @slash_command(guild_ids=guild_id_list)
     async def chatbots(self, ctx):
-       pass
+        pass
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -181,27 +203,16 @@ class ChatBotManager(commands.Cog):
             if chatbot is None or chatbot.processing is True:
                 return
             try:
+                chatbot.processing = True
                 completed = await chatbot.receive(message)
             except Exception as e:
-                await chatbot.chat_member.send(f'The chatbot had a critical error. You will need to retry from the beginning.')
+                await chatbot.chat_member.send(
+                    f'The chatbot had a critical error. You will need to retry from the beginning.')
                 self.active_chatbots.pop(message.author.id)
-                raise e
-
+                log.exception(e)
+                return
 
             if completed:
                 self.active_chatbots.pop(message.author.id)
             else:
                 chatbot.processing = False
-
-
-
-
-
-
-
-
-
-
-
-
-
