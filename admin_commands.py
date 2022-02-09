@@ -442,8 +442,8 @@ class AdminCommandsCog(commands.Cog):
                 await ctx.author.send('Sorry, something went wrong with that command. Derp.')
                 log.exception(e)
 
-        @tag_group.command(guild_ids=guild_id_list, name='tree')
-        @permissions.has_role('Admin')
+        @bot.command(guild_ids=guild_id_list, name='tree')
+        @permissions.has_any_role('Moderator', 'Admin')
         async def tag_tree(ctx):
             """
             Sends a message with a family tree of the zombies in the game.
