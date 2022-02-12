@@ -6,6 +6,7 @@
 # Each question's 'name' variable must match a database column, or the bot will give an error on startup
 
 registration:
+  table: Members
   beginning: I'll register you for HvZ. Type 'cancel' at any time to stop this conversation.
   ending: You are registered for HvZ! Please read the rules. New channels are available to you.
   questions:
@@ -44,6 +45,7 @@ registration:
     rejection_response: Just need a yes or no here.
 
 tag_logging:
+  table: Tags
   beginning: Let's log a tag. Type 'cancel' at any time to stop this conversation.
   ending: Tag logged! Make sure your newly-brainless friend feels welcome in the hoard.
   questions:
@@ -65,6 +67,7 @@ tag_logging:
     rejection_response: Please use a format like 12:26pm or 7:00 am
 
 tag_logging_2:
+  table: Tags
   beginning: Let's log a tag. Type 'cancel' at any time to stop this conversation.
   ending: Tag logged! Make sure your newly-brainless friend feels welcome in the hoard.
   questions:

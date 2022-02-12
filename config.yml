@@ -59,6 +59,41 @@ sheet_settings:
     - Report_Time
     - Revoked_Tag
 
+# The below lists define database tables. When the bot boots up, it will create any tables that don't exist.
+# It WILL NOT edit existing tables to match this config. To add or subtract columns, the table or database must be deleted
+# This config also defines the order the columns appear on the Google Sheet. Any unlisted columns will appear last
+# Column order on the Sheet IS changeable without remaking the database or tables
+# The following columns and tables are required and will appear in the database whether or not they are defined here.
+# members: ID, Name, Faction, Tag_Code, OZ
+# tags: Tag_ID, Tagger_ID, Tagger_Name
+database_tables:
+  members:
+    - ID: String
+    - Name: String
+    - Nickname: String
+    - Discord_Name: String
+    - CPO: String
+    - Faction: String
+    - Tag_Code: String
+    - OZ_Desire: String
+    - Email: String
+    - Want_Bandana: String
+    - Registration_Time: DateTime
+    - OZ: Boolean
+  tags:
+    - Tag_ID: Integer
+    - Tagger_ID: String
+    - Tagger_Name: String
+    - Tagger_Nickname: String
+    - Tagger_Discord_Name: String
+    - Tagged_ID: String
+    - Tagged_Name: String
+    - Tagged_Nickname: String
+    - Tagged_Discord_Name: String
+    - Tag_Time: DateTime
+    - Report_Time: DateTime
+    - Revoked_Tag: String
+
 # Assign the real channel names on the right to the variables on the left
 channel_names:
   tag-announcements: tag-announcements
