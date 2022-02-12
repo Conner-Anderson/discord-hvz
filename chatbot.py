@@ -57,6 +57,14 @@ class Question:
                 log.warning(f'"{key}" is not a valid question attribute. Ignoring it.')
         log.info(f'Loaded question called {self.name}')
 
+@dataclass
+class Responses:
+    kind: str
+    table: str
+    _questions: List[Question]
+
+    def __post_init__(self):
+        
 
 
 
@@ -89,15 +97,12 @@ class ChatBotScript:
     def length(self):
         return len(self._questions)
 
-    @property
-    def kind(self):
-        return
 
     @property
-    def response_dict(self) -> Dict[str, None]:
-        output = {}
-        for q in self._questions:
-            output[q.name] = None
+    def review_string(self) -> str:
+        output = ''
+        for q in self._questions:  # Build a list of the questions and their responses
+            output += (q.display_name + ': ' + self.responses[q.name] + '\n')
         return output
 
 
@@ -139,15 +144,16 @@ class ChatBot:
 
     async def receive(self, message: discord.Message):
         question = self.script.get_question(self.last_asked_question)
-        response: str = message.clean_content
+        response: str = str(message.clean_content)
         if question.valid_regex is not None:
-            match = regex.fullmatch(r'{}'.format(question.valid_regex), message.content)
+            match = regex.fullmatch(r'{}'.format(question.valid_regex), response)
             if match is None:
                 await message.reply(
                     question.rejection_response + '\nPlease answer again.')  # An error message for failing the regex test, configurable per-question
                 return
 
         self.responses[question.name] = response
+
         if self.last_asked_question + 1 >= self.script.length:
             await self.review()
         else:
