@@ -1,6 +1,6 @@
 #!/bin/python3
 from buttons import HVZButtonCog
-from config import config
+from config import config, ConfigError
 import sheets
 from chatbot import ChatBotManager
 from hvzdb import HvzDb
@@ -440,11 +440,14 @@ class HVZBot(discord.Bot):
             )
             self.awaiting_chatbots.append(chatbot)
 
+try:
+    bot = HVZBot()
+    bot.add_cog(ChatBotManager(bot))
+    bot.add_cog(AdminCommandsCog(bot))
+    bot.add_cog(HVZButtonCog(bot))
 
-bot = HVZBot()
-bot.add_cog(ChatBotManager(bot))
-bot.add_cog(AdminCommandsCog(bot))
-bot.add_cog(HVZButtonCog(bot))
-
-
-bot.run(token)
+    bot.run(token)
+except ConfigError as e:
+    logger.error(e)
+except Exception as e:
+    logger.exception(e)

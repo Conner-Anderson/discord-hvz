@@ -16,46 +16,59 @@ if TYPE_CHECKING:
     from hvzdb import HvzDb
     from datetime import datetime
 
-from config import config
+from config import config, ConfigError
 
 log = logger
 
 guild_id_list = [config['available_servers'][config['active_server']]]
 
-@dataclass
+
+def dump(obj):
+    """Prints the passed object in a very detailed form for debugging"""
+    for attr in dir(obj):
+        print("obj.%s = %r" % (attr, getattr(obj, attr)))
+
+
+@dataclass(frozen=True)
 class Question:
-    question_data: InitVar[Dict]
-    name: str = None
-    display_name: str = None
-    query: str = None
+    name: str
+    display_name: str
+    query: str
     valid_regex: Union[str, None] = None
     rejection_response: Union[str, None] = None
 
-    required_attributes = ['name', 'display_name', 'query']
     coupled_attributes = [
-        ('valid_regex', 'rejection_response'), ]  # Attributes where if one appears, the other must also
+        ('valid_regex', 'rejection_response'),
+    ]  # Attributes where if one appears, the other must also
 
-    def __post_init__(self, question_data: Dict):
-        for a in self.required_attributes:
-            x = question_data.get(a)
-            if x is None:
-                raise ValueError(f'Question missing required attribute "{a}". Check scripts.yml')
-
-        for pair in self.coupled_attributes:
-            for i in range(0, 1):
-                if question_data.get(i) is not None:
-                    other = int(not i)  # Invert
-                    if question_data.get(pair[other]) is None:
-                        raise ValueError(f'Missing coupled attribute')
-
-        for key, content in question_data.items():
-            if not isinstance(content, str):
-                raise ValueError(f'Attribute "{key}" of question does not evaluate to a string.')
-            if hasattr(self, key):
-                self.__setattr__(key, content)
+    @classmethod
+    def build(cls, question_data: Dict):
+        for pair in cls.coupled_attributes:  # Throw error if both of a pair of coupled attributes don't exist
+            for i in range(0, 2):
+                this_attr = pair[i]
+                if question_data.get(this_attr) is not None:
+                    other_attr = pair[int(not i)]  # Invert
+                    if question_data.get(other_attr) is None:
+                        raise ConfigError(
+                            f'If a question has attribute {this_attr}, it must also have {other_attr}. Check scripts.yml')
+        try:
+            return Question(**question_data)
+        except TypeError as e:
+            e_text = repr(e)
+            name = question_data.get('name')
+            if name is None:
+                name = ''
+            if 'missing' in e_text:
+                attribute = e_text[e_text.find('\''):-2] # Pulls the attribute from the error message
+                raise ConfigError(
+                    f'Question {name} is missing the required attribute {attribute}. Check scripts.yml') from e
+            elif 'unexpected' in e_text:
+                attribute = e_text[e_text.find('\''):-2]
+                raise ConfigError(
+                    f'Question {name} has the unknown attribute {attribute}. Check scripts.yml') from e
             else:
-                log.warning(f'"{key}" is not a valid question attribute. Ignoring it.')
-        log.info(f'Loaded question called {self.name}')
+                raise e
+
 
 @dataclass
 class Responses:
@@ -64,39 +77,44 @@ class Responses:
     _questions: List[Question]
 
     def __post_init__(self):
-        
+        pass
 
 
-
-@dataclass
+@dataclass(frozen=True)
 class ChatBotScript:
     """
-    A prototype object meant to be created at bot launch for every script in the scripts.yml file,
-    then deep-copied for each ChatBot launched.
+
     """
     kind: str
-    script: InitVar[Dict]
-    _questions: List[Question] = field(default_factory=list, init=False)
-    beginning: str = field(init=False)
-    ending: str = field(init=False)
-    table: str = field(init=False)
+    table: str
+    questions: List[Question]
+    beginning: str = ''
+    ending: str = ''
 
-    def __post_init__(self,script: Dict):
-        self.beginning = script['beginning']
-        self.ending = script['ending']
-        self.table = script['table']
-
-        for q in script['questions']:
-            try:
-                self._questions.append(Question(q))
-            except ValueError as e:
-                # e.args
+    @classmethod
+    def build(cls, kind: str, script: Dict) -> ChatBotScript:
+        questions = []
+        for q in script.pop('questions'):
+            questions.append(Question.build(q))
+        try:
+            return ChatBotScript(kind=kind, questions=questions, **script)
+        except TypeError as e:
+            e_text = repr(e)
+            if 'missing' in e_text:
+                attribute = e_text[e_text.find('\''):-2] # Pulls the attribute from the error message
+                raise ConfigError(
+                    f'Script \'{kind}\' is missing the required attribute {attribute}. Check scripts.yml') from e
+            elif 'unexpected' in e_text:
+                attribute = e_text[e_text.find('\''):-2]
+                raise ConfigError(
+                    f'Question \'{kind}\' has the unknown attribute {attribute}. Check scripts.yml') from e
+            else:
                 raise e
+
 
     @property
     def length(self):
         return len(self._questions)
-
 
     @property
     def review_string(self) -> str:
@@ -105,10 +123,8 @@ class ChatBotScript:
             output += (q.display_name + ': ' + self.responses[q.name] + '\n')
         return output
 
-
     def get_question(self, question_number: int):
         return self._questions[question_number]
-
 
 
 @dataclass
@@ -122,7 +138,7 @@ class ChatBot:
     last_asked_question: int = field(default=0, init=False)
     responses: dict[str, any] = field(default=None, init=False)
 
-    def __post_init__(self,):
+    def __post_init__(self, ):
         self.responses = self.script.response_dict
 
         if self.target_member is None:
@@ -186,8 +202,7 @@ class ChatBotManager(commands.Cog):
         file.close()
 
         for kind, script in scripts_data.items():
-            self.loaded_scripts[kind] = (ChatBotScript(kind, script))
-        log.info(self.loaded_scripts['registration'].questions)
+            self.loaded_scripts[kind] = (ChatBotScript.build(kind, script))
 
         log.info('ChatBotManager Initialized')
 
@@ -207,7 +222,6 @@ class ChatBotManager(commands.Cog):
             self.bot.db,
             chat_member,
             target_member
-
 
         )
         await self.active_chatbots[chat_member.id].start(existing)
