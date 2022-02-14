@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
 from config import config, ConfigError
+from buttons import HVZButton
 
 log = logger
 
@@ -42,13 +43,14 @@ class QuestionData:
     query: str
     valid_regex: Union[str, None] = None
     rejection_response: Union[str, None] = None
+    button_options: List[HVZButton] = None
 
     coupled_attributes = [
         ('valid_regex', 'rejection_response'),
     ]  # Attributes where if one appears, the other must also
 
     @classmethod
-    def build(cls, question_data: Dict) -> QuestionData:
+    def build(cls, question_data: Dict, chatbotmanager: ChatBotManager) -> QuestionData:
         for pair in cls.coupled_attributes:  # Throw error if both of a pair of coupled attributes don't exist
             for i in range(0, 2):
                 this_attr = pair[i]
@@ -56,6 +58,16 @@ class QuestionData:
                 if question_data.get(this_attr) is not None and question_data.get(other_attr) is None:
                     raise ConfigError(
                         f'If a question has attribute {this_attr}, it must also have {other_attr}. Check scripts.yml')
+
+        if question_data.get('button_options') is not None:
+            buttons = []
+            log.info(question_data['button_options'])
+            for label, color in question_data['button_options'].items():
+                buttons.append(HVZButton(chatbotmanager.receive_interaction, label, color))
+                #log.info(buttons[-1].custom_id)
+            question_data['button_options'] = buttons
+
+
         try:
             return QuestionData(**question_data)
         except TypeError as e:
@@ -87,12 +99,12 @@ class ScriptData:
     ending: str = ''
 
     @classmethod
-    def build(cls, kind: str, script: Dict) -> ScriptData:
+    def build(cls, kind: str, script: Dict, chatbotmanager: ChatBotManager) -> ScriptData:
         if script.get('questions') is None:
             raise ConfigError
         questions = []
         for q in script.pop('questions'):
-            questions.append(QuestionData.build(q))
+            questions.append(QuestionData.build(q, chatbotmanager))
 
         try:
             return ScriptData(kind=kind, questions=questions, **script)
@@ -121,11 +133,6 @@ class ScriptData:
 
 
 @dataclass()
-class Question:
-    pass
-
-
-@dataclass()
 class Script:
     data: ScriptData
     kind: str = field(init=False, default=None)
@@ -134,6 +141,7 @@ class Script:
     last_asked_question: int = field(init=False, default=0)
     next_question: int = field(init=False, default=0)
     reviewing: bool = field(init=False, default=False)
+
     # next_review_question: int = field(init=False, default=0)
 
     def __post_init__(self):
@@ -155,7 +163,16 @@ class Script:
             output += f"**{q.display_name}**: {response}\n"
         return output
 
-    def ask_next_question(self, existing_script: Script = None, first=False) -> str:
+    def ask_next_question(self, existing_script: Script = None, first: bool=False) -> (str, Union[discord.ui.View, None]):
+        """Fetches next question and returns it.
+        :return:
+        :param existing_script:
+        :param first: 
+        :return: 
+        
+        """
+        message = ''
+        view = None
         this_question = self.next_question
         if this_question >= self.length:
             log.info('Entered reviewing mode')
@@ -163,15 +180,21 @@ class Script:
             self.last_asked_question = self.length
             return self.review_string
 
-        output = ''
+
         if existing_script is not None:
-            output += f'Cancelled the previous {existing_script.kind} conversation.\n'
+            message += f'Cancelled the previous {existing_script.kind} conversation.\n'
         if first:
-            output += f'{self.data.beginning} \n\n'
-        output += self.questions[this_question].query
+            message += f'{self.data.beginning} \n\n'
+        question = self.questions[this_question]
+        message += question.query
+
+        if question.button_options is not None:
+            view = discord.ui.View(timeout=None)
+            for button in question.button_options:
+                view.add_item(button)
 
         self.last_asked_question = this_question
-        return output
+        return message, view
 
     def receive_response(self, response: str) -> None:
         if self.reviewing and self.last_asked_question >= self.length:
@@ -213,28 +236,18 @@ class ChatBot:
             self.target_member = self.chat_member
 
     async def ask_question(self, existing_chatbot: ChatBot = None, first: bool = False):
-        msg = self.script.ask_next_question(existing_script=getattr(existing_chatbot, 'script', None), first=first)
-        await self.chat_member.send(msg)
+        msg, view = self.script.ask_next_question(existing_script=getattr(existing_chatbot, 'script', None), first=first)
+        await self.chat_member.send(msg, view=view)
 
-    async def receive(self, message: discord.Message):
+    async def receive(self, message: Union[discord.Message, str]):
+        if isinstance(message, discord.Message):
+            message = str(message.clean_content)
         try:
-            self.script.receive_response(str(message.clean_content))
+            self.script.receive_response(message)
         except ResponseError as e:
             await self.chat_member.send(str(e))
 
         await self.ask_question()
-
-    async def review(self):
-        self.reviewing = True
-        msg = ('**Type "yes" to submit.**'
-               '\nOr type the name of what you want to change, such as "%s".\n\n' % (
-                   self.script.get_question(1).display_name))
-        for q in self.script.questions:  # Build a list of the questions and their responses
-            msg += (q.display_name + ': ' + self.responses[q.name] + '\n')
-        await self.chat_member.send(msg)
-
-    async def end(self):
-        self.database.add_member()
 
 
 class ChatBotManager(commands.Cog):
@@ -251,7 +264,7 @@ class ChatBotManager(commands.Cog):
         file.close()
 
         for kind, script in scripts_data.items():
-            self.loaded_scripts[kind] = (ScriptData.build(kind, script))
+            self.loaded_scripts[kind] = (ScriptData.build(kind, script, chatbotmanager=self))
 
         log.info('ChatBotManager Initialized')
 
@@ -298,3 +311,16 @@ class ChatBotManager(commands.Cog):
                 self.active_chatbots.pop(message.author.id)
             else:
                 chatbot.processing = False
+
+    async def receive_interaction(self, interaction: discord.Interaction):
+        log.info(interaction.channel.type)
+        log.info(interaction.data)
+        if interaction.channel.type == discord.ChannelType.private :
+            chatbot = self.active_chatbots.get(interaction.user.id)
+            if chatbot is None or chatbot.processing is True:
+                return
+            id = interaction.data['custom_id']
+            label = id[:id.find(':')]
+            completed = await chatbot.receive(label)
+
+            log.success('Interaction!')

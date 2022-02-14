@@ -1,4 +1,6 @@
 import typing
+import time
+import random
 
 import discord
 from discord.commands import Option
@@ -25,15 +27,24 @@ guild_id_list = [config['available_servers'][config['active_server']]]
 
 
 class HVZButton(discord.ui.Button):
-    def __init__(self, function: typing.Callable):
+    valid_colors = ['blurple', 'gray', 'grey', 'green', 'red', 'url']
+    def __init__(self, function: typing.Callable, label: str = None, color: str = None):
         """
         A button for one role. `custom_id` is needed for persistent views.
         """
         self.function = function
+        if label is None:
+            label=config['buttons'][function.__name__]['label']
+        if color is None:
+            color = config['buttons'][function.__name__]['color']
+        elif color not in self.valid_colors:
+            color = 'green'
+        id = f'{label}:{str(random.random())}'
+        log.info(f'{id} -> {function.__name__}')
         super().__init__(
-            label=config['buttons'][function.__name__]['label'],
-            style=getattr(discord.enums.ButtonStyle, config['buttons'][function.__name__]['color']),
-            custom_id=function.__name__,
+            label=label,
+            style=getattr(discord.enums.ButtonStyle, color),
+            custom_id=id
         )
 
     async def callback(self, interaction: discord.Interaction):
