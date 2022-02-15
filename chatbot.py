@@ -104,6 +104,7 @@ class ScriptData:
     table: str
     questions: List[QuestionData]
     review_selection_buttons: List[HVZButton]
+    special_buttons: Dict[str, HVZButton]
     beginning: str = ''
     ending: str = ''
 
@@ -113,6 +114,7 @@ class ScriptData:
             raise ConfigError
         questions = []
         review_selection_buttons = []
+        special_buttons = {}
         for q in script.pop('questions'):
             question = QuestionData.build(q, chatbotmanager)
             questions.append(question)
@@ -124,9 +126,26 @@ class ScriptData:
                 unique=True
             ))
 
+        special_buttons['submit'] = HVZButton(
+            chatbotmanager.receive_interaction,
+            custom_id='submit',
+            label='Submit',
+            color='green',
+            unique=True
+        )
+        special_buttons['modify'] = HVZButton(
+            chatbotmanager.receive_interaction,
+            custom_id='modify',
+            label='Edit Answers',
+            color='blurple',
+            unique=True
+        )
+        # Add the additional arguments to the script
+        script.update({'special_buttons':special_buttons, 'review_selection_buttons':review_selection_buttons})
+
 
         try:
-            return ScriptData(kind=kind, questions=questions, review_selection_buttons=review_selection_buttons, **script)
+            return ScriptData(kind=kind, questions=questions, **script)
         except TypeError as e:
             e_text = repr(e)
             if 'missing' in e_text:
@@ -160,6 +179,7 @@ class Script:
     last_asked_question: int = field(init=False, default=0)
     next_question: int = field(init=False, default=0)
     reviewing: bool = field(init=False, default=False)
+    modifying: bool = field(init=False, default=False)
 
     # next_review_question: int = field(init=False, default=0)
 
@@ -198,8 +218,14 @@ class Script:
             self.reviewing = True
             self.last_asked_question = self.length
             view = discord.ui.View(timeout=None)
-            for button in self.data.review_selection_buttons:
-                view.add_item(button)
+
+            if self.modifying:
+                for button in self.data.review_selection_buttons:
+                    view.add_item(button)
+                return 'Select answer to modify:', view
+
+            view.add_item(self.data.special_buttons['submit'])
+            view.add_item(self.data.special_buttons['modify'])
             return self.review_string, view
 
 
@@ -219,8 +245,16 @@ class Script:
         return message, view
 
     def receive_response(self, response: str) -> None:
-        if self.reviewing and self.last_asked_question >= self.length:
-            log.info('Processing review selection')
+        if self.last_asked_question >= self.length:
+            if not self.modifying:
+                choice = response.casefold()
+                if choice == 'submit':
+                    pass
+                    return
+                elif choice =='modify':
+                    self.modifying = True
+                    return
+
             selection = response.casefold()
             for i, q in self.questions.items():
                 if selection == (q.name.casefold() or q.display_name.casefold()):
@@ -238,8 +272,9 @@ class Script:
                 raise ResponseError(message)
 
         self.responses[self.next_question] = response
-        if self.reviewing:
+        if self.modifying:
             self.next_question = self.length
+            self.modifying = False
         else:
             self.next_question = self.last_asked_question + 1
 
@@ -277,7 +312,7 @@ class ChatBotManager(commands.Cog):
     active_chatbots: Dict[int, ChatBot] = {}
     loaded_scripts: Dict[str, ScriptData] = {}
 
-    def __init__(self, bot: Bot):
+    def __init__(self, bot: HVZBot):
         print('Started ChatBotManager')
         self.bot = bot
 
@@ -333,7 +368,7 @@ class ChatBotManager(commands.Cog):
                 return
             custom_id = interaction.data['custom_id']
             response_text = self.slice_custom_id(custom_id)
-            
+
             try:
                 await self.receive_response(id, response_text)
             finally:
