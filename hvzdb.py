@@ -105,7 +105,11 @@ class HvzDb:
         return result
 
     def __add_row(self, table, row):
+        # Old function acting as an alias
+        self.add_row(table, row)
 
+    def add_row(self, table, row):
+        table = self.tables[table]
         with self.engine.begin() as conn:
             result = conn.execute(insert(table), row)
             return result

@@ -2,7 +2,7 @@ from __future__ import annotations
 import cProfile
 from dataclasses import dataclass, field, InitVar
 import yaml
-import copy
+from datetime import datetime
 import regex
 import discord
 from discord.commands import slash_command
@@ -173,12 +173,12 @@ class ScriptData:
 @dataclass()
 class Script:
     data: ScriptData
+    db: HvzDb
     kind: str = field(init=False, default=None)
     questions: Dict[int, QuestionData] = field(init=False, default_factory=dict)
     responses: Dict[int, Union[str, None]] = field(init=False, default_factory=dict)
     last_asked_question: int = field(init=False, default=0)
     next_question: int = field(init=False, default=0)
-    reviewing: bool = field(init=False, default=False)
     modifying: bool = field(init=False, default=False)
 
     # next_review_question: int = field(init=False, default=0)
@@ -192,6 +192,13 @@ class Script:
     @property
     def length(self):
         return len(self.questions)
+
+    @property
+    def completed_responses(self):
+        output = {}
+        for i, r in self.responses.items():
+            output[self.questions[i].name] = r
+        return output
 
     @property
     def review_string(self) -> str:
@@ -215,7 +222,6 @@ class Script:
         this_question = self.next_question
         if this_question >= self.length:
             log.debug('Entered reviewing mode')
-            self.reviewing = True
             self.last_asked_question = self.length
             view = discord.ui.View(timeout=None)
 
@@ -244,13 +250,12 @@ class Script:
         self.last_asked_question = this_question
         return message, view
 
-    def receive_response(self, response: str) -> None:
+    def receive_response(self, response: str) -> Union[None, dict]:
         if self.last_asked_question >= self.length:
             if not self.modifying:
                 choice = response.casefold()
                 if choice == 'submit':
-                    pass
-                    return
+                    return self.completed_responses
                 elif choice =='modify':
                     self.modifying = True
                     return
@@ -278,13 +283,17 @@ class Script:
         else:
             self.next_question = self.last_asked_question + 1
 
+    def save(self):
+        responses = self.responses
+
+
 
 @dataclass
 class ChatBot:
     script: Script
     database: HvzDb
     chat_member: discord.Member
-    target_member: discord.Member = None
+    target_member: discord.Member = None,
     processing: bool = field(default=False, init=False)
     reviewing: bool = field(default=False, init=False)
 
@@ -296,15 +305,30 @@ class ChatBot:
         msg, view = self.script.ask_next_question(existing_script=getattr(existing_chatbot, 'script', None), first=first)
         await self.chat_member.send(msg, view=view)
 
-    async def receive(self, message: Union[discord.Message, str]):
+    async def receive(self, message: Union[discord.Message, str]) -> Union[None, bool]:
         if isinstance(message, discord.Message):
             message = str(message.clean_content)
         try:
-            self.script.receive_response(message)
+            responses = self.script.receive_response(message)
         except ResponseError as e:
             await self.chat_member.send(str(e))
+        else:
+            if responses:
+                await self.save(responses)
+                return True
 
         await self.ask_question()
+
+    async def save(self, responses):
+        additional_columns = {
+            'Faction': 'human',
+            'ID': str(self.target_member.id),
+            'Discord_Name': self.target_member.name,
+            'Registration_Time': datetime.today(),
+            'OZ': False
+        }
+        responses.update(additional_columns)
+        self.database.add_row(self.script.data.table, responses)
 
 
 class ChatBotManager(commands.Cog):
@@ -334,7 +358,7 @@ class ChatBotManager(commands.Cog):
         existing = self.active_chatbots.get(chat_member.id)
 
         self.active_chatbots[chat_member.id] = ChatBot(
-            Script(self.loaded_scripts[chatbot_kind]),
+            Script(self.loaded_scripts[chatbot_kind], self.bot.db),
             self.bot.db,
             chat_member,
             target_member
