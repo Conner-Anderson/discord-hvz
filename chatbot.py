@@ -12,7 +12,7 @@ from typing import List, Union, Dict
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from discord_hvz import Bot
+    from discord_hvz import HVZBot
     from hvzdb import HvzDb
     from datetime import datetime
 
@@ -273,7 +273,7 @@ class ChatBot:
 
 
 class ChatBotManager(commands.Cog):
-    bot: Bot
+    bot: HVZBot
     active_chatbots: Dict[int, ChatBot] = {}
     loaded_scripts: Dict[str, ScriptData] = {}
 
@@ -333,8 +333,31 @@ class ChatBotManager(commands.Cog):
                 return
             custom_id = interaction.data['custom_id']
             response_text = self.slice_custom_id(custom_id)
+            
+            try:
+                await self.receive_response(id, response_text)
+            finally:
 
-            await self.receive_response(id, response_text)
+                # The below locates the button and edits the original message's view to have only it. Disables that button.
+                old_button = None
+                for v in self.bot.persistent_views:
+                    for b in v.children:
+                        if isinstance(b, discord.ui.Button) and b.custom_id == custom_id:
+                            old_button = b
+                            log.info(f'Found custom_id: {custom_id}')
+                            break
+                if old_button is not None:
+                    new_view = discord.ui.View(timeout=None)
+                    new_view.add_item(HVZButton(
+                        self.receive_interaction,
+                        custom_id,
+                        label=old_button.label,
+                        style=old_button.style,
+                        disabled=True
+                ))
+
+                    await interaction.response.edit_message(view=new_view)
+                    new_view.stop()
 
 
 

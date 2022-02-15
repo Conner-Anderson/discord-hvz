@@ -35,7 +35,8 @@ class HVZButton(discord.ui.Button):
             label: str = None,
             color: str = None,
             unique: bool = False,
-            style: discord.ButtonStyle = None
+            style: discord.ButtonStyle = None,
+            disabled: bool = False
     ):
         """
         A button for one role. `custom_id` is needed for persistent views.
@@ -70,7 +71,8 @@ class HVZButton(discord.ui.Button):
         super().__init__(
             label=label,
             style=style,
-            custom_id=custom_id
+            custom_id=custom_id,
+            disabled=disabled
         )
 
     async def callback(self, interaction: discord.Interaction):
