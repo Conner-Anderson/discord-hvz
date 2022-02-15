@@ -63,7 +63,15 @@ class QuestionData:
             buttons = []
             log.info(question_data['button_options'])
             for label, color in question_data['button_options'].items():
-                buttons.append(HVZButton(chatbotmanager.receive_interaction, label, color))
+                buttons.append(
+                    HVZButton(
+                        chatbotmanager.receive_interaction,
+                        custom_id=label,
+                        label=label,
+                        color=color,
+                        unique=True
+                    )
+                )
                 #log.info(buttons[-1].custom_id)
             question_data['button_options'] = buttons
 
@@ -95,6 +103,7 @@ class ScriptData:
     kind: str
     table: str
     questions: List[QuestionData]
+    review_selection_buttons: List[HVZButton]
     beginning: str = ''
     ending: str = ''
 
@@ -103,11 +112,21 @@ class ScriptData:
         if script.get('questions') is None:
             raise ConfigError
         questions = []
+        review_selection_buttons = []
         for q in script.pop('questions'):
-            questions.append(QuestionData.build(q, chatbotmanager))
+            question = QuestionData.build(q, chatbotmanager)
+            questions.append(question)
+            review_selection_buttons.append(HVZButton(
+                chatbotmanager.receive_interaction,
+                custom_id=question.name,
+                label=question.display_name,
+                color='blurple',
+                unique=True
+            ))
+
 
         try:
-            return ScriptData(kind=kind, questions=questions, **script)
+            return ScriptData(kind=kind, questions=questions, review_selection_buttons=review_selection_buttons, **script)
         except TypeError as e:
             e_text = repr(e)
             if 'missing' in e_text:
@@ -175,10 +194,13 @@ class Script:
         view = None
         this_question = self.next_question
         if this_question >= self.length:
-            log.info('Entered reviewing mode')
+            log.debug('Entered reviewing mode')
             self.reviewing = True
             self.last_asked_question = self.length
-            return self.review_string
+            view = discord.ui.View(timeout=None)
+            for button in self.data.review_selection_buttons:
+                view.add_item(button)
+            return self.review_string, view
 
 
         if existing_script is not None:
@@ -291,36 +313,51 @@ class ChatBotManager(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
+        if message.author.bot: # Not required? Maybe.
+            return
         if message.channel.type == discord.ChannelType.private:
-
-            chatbot = self.active_chatbots.get(message.author.id)
-
-            if chatbot is None or chatbot.processing is True:
-                return
-            try:
-                chatbot.processing = True
-                completed = await chatbot.receive(message)
-            except Exception as e:
-                await chatbot.chat_member.send(
-                    f'The chatbot had a critical error. You will need to retry from the beginning.')
-                self.active_chatbots.pop(message.author.id)
-                log.exception(e)
-                return
-
-            if completed:
-                self.active_chatbots.pop(message.author.id)
-            else:
-                chatbot.processing = False
+            author_id = message.author.id
+            response_text = str(message.clean_content)
+            await self.receive_response(author_id, response_text)
 
     async def receive_interaction(self, interaction: discord.Interaction):
-        log.info(interaction.channel.type)
-        log.info(interaction.data)
-        if interaction.channel.type == discord.ChannelType.private :
-            chatbot = self.active_chatbots.get(interaction.user.id)
-            if chatbot is None or chatbot.processing is True:
+        """
+        A function to pass to a component (button, etc.) to be called on activation.
+        :param interaction:
+        :return:
+        """
+        if interaction.channel.type == discord.ChannelType.private:
+            id = interaction.user.id
+            if interaction.type != discord.InteractionType.component:
+                log.warning('receive_interaction got something other than a component')
                 return
-            id = interaction.data['custom_id']
-            label = id[:id.find(':')]
-            completed = await chatbot.receive(label)
+            custom_id = interaction.data['custom_id']
+            response_text = self.slice_custom_id(custom_id)
 
-            log.success('Interaction!')
+            await self.receive_response(id, response_text)
+
+
+
+    async def receive_response(self, author_id: int, response_text: str):
+        log.info(f'author_id: {author_id} response_text: {response_text}')
+        chatbot = self.active_chatbots.get(author_id)
+
+        if chatbot is None or chatbot.processing is True:
+            return
+        try:
+            chatbot.processing = True
+            completed = await chatbot.receive(response_text)
+        except Exception as e:
+            await chatbot.chat_member.send(
+                f'The chatbot had a critical error. You will need to retry from the beginning.')
+            self.active_chatbots.pop(author_id)
+            log.exception(e)
+            return
+
+        if completed:
+            self.active_chatbots.pop(author_id)
+        else:
+            chatbot.processing = False
+
+    def slice_custom_id(self, text: str):
+        return text[:text.find(':')]

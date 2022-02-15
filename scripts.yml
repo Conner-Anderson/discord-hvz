@@ -35,6 +35,9 @@ registration:
       Answer "yes" or "no".
     valid_regex: '(?i)\s*(yes|no)\s*'
     rejection_response: Just need a yes or no here.
+    button_options:
+      'Yes': Green
+      'No': Red
   - name: Want_Bandana
     display_name: Want Bandana
     query: |-

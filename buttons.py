@@ -28,23 +28,49 @@ guild_id_list = [config['available_servers'][config['active_server']]]
 
 class HVZButton(discord.ui.Button):
     valid_colors = ['blurple', 'gray', 'grey', 'green', 'red', 'url']
-    def __init__(self, function: typing.Callable, label: str = None, color: str = None):
+    def __init__(
+            self,
+            function: typing.Callable,
+            custom_id: str = None,
+            label: str = None,
+            color: str = None,
+            unique: bool = False,
+            style: discord.ButtonStyle = None
+    ):
         """
         A button for one role. `custom_id` is needed for persistent views.
+        :param style: If supplied, this overrides color
+        :param custom_id:
+        :param function:
+        :param label:
+        :param color:
+        :param unique: If True, the Button's custom_id has a colon and random number added to it. Ex.: "label:0.15398452"
         """
         self.function = function
-        if label is None:
+        custom_id = str(custom_id)
+        if custom_id is None:
+            custom_id = function.__name__
+        else:
+            custom_id = str(custom_id)
+        if label is not None:
+            label = str(label)
+        else:
             label=config['buttons'][function.__name__]['label']
-        if color is None:
-            color = config['buttons'][function.__name__]['color']
-        elif color not in self.valid_colors:
-            color = 'green'
-        id = f'{label}:{str(random.random())}'
-        log.info(f'{id} -> {function.__name__}')
+        if style is None:
+            if color is None:
+                color = config['buttons'][function.__name__]['color']
+
+            if color.casefold() not in self.valid_colors:
+                color = 'green'
+            style = getattr(discord.enums.ButtonStyle, color.casefold())
+
+        if unique:
+            custom_id += f':{str(random.random())}'
+        log.info(f'{label} {color} {custom_id}')
         super().__init__(
             label=label,
-            style=getattr(discord.enums.ButtonStyle, color),
-            custom_id=id
+            style=style,
+            custom_id=custom_id
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -84,7 +110,7 @@ class HVZButtonCog(commands.Cog):
             # timeout is None because we want this view to be persistent
             view = discord.ui.View(timeout=None)
             function = getattr(self.bot, function_name)
-            view.add_item(HVZButton(function))
+            view.add_item(HVZButton(function, custom_id=function_name))
 
             if message is None:
                 message = config['buttons'][function_name]['message']
@@ -107,7 +133,7 @@ class HVZButtonCog(commands.Cog):
         for function_name in config['buttons']:
             # get the function to call from bot based on the name in config
             function = getattr(self.bot, function_name)
-            view.add_item(HVZButton(function))
+            view.add_item(HVZButton(function, custom_id=function_name))
 
         # add the view to the bot so it will watch for button interactions
         self.bot.add_view(view)
