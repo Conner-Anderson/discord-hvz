@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from discord_hvz import HVZBot
     from hvzdb import HvzDb
-    from datetime import datetime
+from datetime import datetime
 
 from config import config, ConfigError
 from buttons import HVZButton
@@ -320,6 +320,7 @@ class ChatBot:
         await self.ask_question()
 
     async def save(self, responses):
+        # TODO: Rework the database system to support this
         additional_columns = {
             'Faction': 'human',
             'ID': str(self.target_member.id),

@@ -1,145 +1,80 @@
-from __future__ import annotations
 import discord
 import os.path
-from dataclasses import dataclass, field, InitVar
-from typing import List, Union, Dict, TYPE_CHECKING, Any, ClassVar
-import copy
 
-from sqlalchemy.engine.mock import MockConnection
-
-if TYPE_CHECKING:
-    from discord_hvz import HVZBot
-from datetime import datetime
-
-import sqlalchemy
-from sqlalchemy import create_engine, MetaData
+from sqlalchemy import create_engine
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from sqlalchemy import MetaData
-from sqlalchemy import Table, Column, Integer, String, DateTime, Boolean, ForeignKey
+from sqlalchemy import Table, Column, Integer, String, DateTime, Boolean
+from sqlalchemy import ForeignKey
 from sqlalchemy import insert, select, delete, update
-from sqlalchemy import func, cast, and_
+from sqlalchemy import func, cast
 from sqlalchemy.exc import NoSuchTableError
-
-from config import config, ConfigError
+from sqlalchemy import and_
 
 from loguru import logger
 
 log = logger
 
-@dataclass
+
 class HvzDb:
-    engine: sqlalchemy.engine.Engine = field(init=False)
-    metadata_obj: MetaData = field(init=False)
-    tables: Dict[str, Table] = field(init=False, default_factory=dict)
-
-    required_columns: ClassVar[Dict[str, Dict[str, str]]] = {
-        'members': {
-            'ID': 'String',
-            'Name': 'String',
-            'Faction': 'String',
-            'Tag_Code': 'String',
-            'OZ': 'Boolean'
-        },
-        'tags': {
-            'Tag_ID': 'Integer',
-            'Tagger_ID': 'String',
-            'Tagger_Name': 'String'
-        }
-    }
-
-    valid_column_types: ClassVar[Dict[str, type]] = {
-        'string': String,
-        'integer': Integer,
-        'boolean': Boolean,
-        'datetime': DateTime
-    }
-
-    
-    def __post_init__(self):
-        database_config: Dict = copy.deepcopy(config['database_tables'])
+    def __init__(self):
+        self.metadata_obj = MetaData()
         self.engine = create_engine("sqlite+pysqlite:///hvzdb.db", future=True)
 
-        for table_name, column_dict in database_config.items():
+        self.tables = {'members': None, 'tags': None}
+        for n in self.tables:
+
             try:
-                self.tables[table_name] = Table(table_name, self.metadata_obj, autoload_with=self.engine)
-                continue
-            except NoSuchTableError: pass
-            logger.critical(f'Found a table called "{table_name}" in the config, but not in the database. Creating the table.')
-
-
-            column_args = []
-            # Add any required columns that are missing
-            if table_name in self.required_columns:
-                required_columns_table = self.required_columns[table_name]
-                for column_name, type_string in required_columns_table:
-                    if column_name in database_config[table_name]: continue
-                    database_config[table_name][column_name] = type_string
-                    logger.critical(f'The required column "{column_name} was not found in the config for the table"{table_name}". Creating it.')
-
-            # Create Columns from the config
-            for column_name, type_string in column_dict.items():
-                column_args.append(self._create_column_object(column_name, type_string))
-
-            self.tables[table_name] = Table(table_name, self.metadata_obj, *column_args)
-
-            """ Old code, might want to refer to it later
-            if n == 'members':
-                log.critical('There is no members table, so I\'m making it.')
-                self.tables[table_name] = Table(
-                    'members',
-                    self.metadata_obj,
-                    Column('ID', String, primary_key=True, nullable=False),
-                    Column('Name', String),
-                    Column('Nickname', String),
-                    Column('Discord_Name', String),
-                    Column('CPO', String),
-                    Column('Faction', String),
-                    Column('Tag_Code', String),
-                    Column('OZ_Desire', String),
-                    Column('Email', String),
-                    Column('Want_Bandana', String),
-                    Column('Registration_Time', DateTime),
-                    Column('OZ', Boolean)
-                )
-            elif n == 'tags':
-                log.critical('There is no tags table, so I\'m making it.')
-                self.tables[n] = Table(
-                    'tags',
-                    self.metadata_obj,
-                    Column('Tag_ID', Integer, primary_key=True, nullable=False, autoincrement=True),
-                    Column('Tagger_ID', String),
-                    Column('Tagger_Name', String),
-                    Column('Tagger_Nickname', String),
-                    Column('Tagger_Discord_Name', String),
-                    Column('Tagged_ID', String),
-                    Column('Tagged_Name', String),
-                    Column('Tagged_Nickname', String),
-                    Column('Tagged_Discord_Name', String),
-                    Column('Tag_Time', DateTime),
-                    Column('Report_Time', DateTime),
-                    Column('Revoked_Tag', Boolean)
-                )
-            """
+                self.tables[n] = Table(n, self.metadata_obj, autoload_with=self.engine)
+            except NoSuchTableError:
+                if n == 'members':
+                    log.critical('There is no members table, so I\'m making it.')
+                    self.tables[n] = Table(
+                        'members',
+                        self.metadata_obj,
+                        Column('ID', String, primary_key=True, nullable=False),
+                        Column('Name', String),
+                        Column('Nickname', String),
+                        Column('Discord_Name', String),
+                        Column('CPO', String),
+                        Column('Faction', String),
+                        Column('Tag_Code', String),
+                        Column('OZ_Desire', String),
+                        Column('Email', String),
+                        Column('Want_Bandana', String),
+                        Column('Registration_Time', DateTime),
+                        Column('OZ', Boolean)
+                    )
+                elif n == 'tags':
+                    log.critical('There is no tags table, so I\'m making it.')
+                    self.tables[n] = Table(
+                        'tags',
+                        self.metadata_obj,
+                        Column('Tag_ID', Integer, primary_key=True, nullable=False, autoincrement=True),
+                        Column('Tagger_ID', String),
+                        Column('Tagger_Name', String),
+                        Column('Tagger_Nickname', String),
+                        Column('Tagger_Discord_Name', String),
+                        Column('Tagged_ID', String),
+                        Column('Tagged_Name', String),
+                        Column('Tagged_Nickname', String),
+                        Column('Tagged_Discord_Name', String),
+                        Column('Tag_Time', DateTime),
+                        Column('Report_Time', DateTime),
+                        Column('Revoked_Tag', Boolean)
+                    )
 
         self.metadata_obj.create_all(self.engine)
 
+        # self.tag_logging_table = Table('tag_logging', self.metadata_obj, autoload_with=self.engine)
 
-        # Give each table a table_names tuple which is all column names
+        # Give each table a keys tuple which is all column names
         for n, t in self.tables.items():
             selection = select(t)
             with self.engine.begin() as conn:
                 result = conn.execute(selection)
-                t.table_names = result.keys()
-
-    def _create_column_object(self, column_name: str, column_type: str) -> Column:
-        try:
-            column_type = self.valid_column_types[column_type.casefold()]
-        except KeyError:
-            column_type = String
-
-        return Column(column_name, column_type)
-
+                t.keys = result.keys()
 
     def add_member(self, member_row):
         """
@@ -215,7 +150,7 @@ class HvzDb:
         table = self.tables['tags']
         if column is not None:
             search_column = column
-            if search_column not in table.column_names:
+            if search_column not in table.keys:
                 raise ValueError(f'{search_column} not a column in {table}')
         else:
             search_column = 'Tag_ID'
@@ -331,7 +266,7 @@ class HvzDb:
                 values({target_column: target_value})
         )
 
-        if target_column not in table.column_names:
+        if target_column not in table.keys:
             raise ValueError(f'{search_column} not a column in {table}')
 
         with self.engine.begin() as conn:
@@ -364,7 +299,7 @@ class HvzDb:
 
     def __delete_row(self, table, search_column, search_value):
 
-        if search_column not in table.column_names:
+        if search_column not in table.keys:
             raise ValueError(f'{search_column} not a column in {table}')
 
         deletor = delete(table).where(search_column == search_value)
