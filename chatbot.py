@@ -194,7 +194,7 @@ class Script:
         return len(self.questions)
 
     @property
-    def completed_responses(self):
+    def completed_responses(self) -> Dict[str, str]:
         output = {}
         for i, r in self.responses.items():
             output[self.questions[i].name] = r
@@ -329,7 +329,7 @@ class ChatBot:
             'OZ': False
         }
         responses.update(additional_columns)
-        self.database.add_row(self.script.data.table, responses)
+        self.database.add_row(self.script.data.table, {'thing':'stuff'})
 
 
 class ChatBotManager(commands.Cog):

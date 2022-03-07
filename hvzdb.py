@@ -30,7 +30,7 @@ log = logger
 @dataclass
 class HvzDb:
     engine: sqlalchemy.engine.Engine = field(init=False)
-    metadata_obj: MetaData = field(init=False)
+    metadata_obj: MetaData = field(init=False, default_factory=MetaData)
     tables: Dict[str, Table] = field(init=False, default_factory=dict)
 
     required_columns: ClassVar[Dict[str, Dict[str, str]]] = {
@@ -57,7 +57,7 @@ class HvzDb:
 
     
     def __post_init__(self):
-        database_config: Dict = copy.deepcopy(config['database_tables'])
+        database_config: Dict[str, Dict[str, str]] = copy.deepcopy(config['database_tables'])
         self.engine = create_engine("sqlite+pysqlite:///hvzdb.db", future=True)
 
         for table_name, column_dict in database_config.items():
@@ -65,72 +65,37 @@ class HvzDb:
                 self.tables[table_name] = Table(table_name, self.metadata_obj, autoload_with=self.engine)
                 continue
             except NoSuchTableError: pass
-            logger.critical(f'Found a table called "{table_name}" in the config, but not in the database. Creating the table.')
+            logger.warning(f'Found a table called "{table_name}" in the config, but not in the database. Creating the table.')
 
 
             column_args = []
             # Add any required columns that are missing
-            if table_name in self.required_columns:
-                required_columns_table = self.required_columns[table_name]
-                for column_name, type_string in required_columns_table:
-                    if column_name in database_config[table_name]: continue
-                    database_config[table_name][column_name] = type_string
-                    logger.critical(f'The required column "{column_name} was not found in the config for the table"{table_name}". Creating it.')
+
 
             # Create Columns from the config
             for column_name, type_string in column_dict.items():
                 column_args.append(self._create_column_object(column_name, type_string))
 
-            self.tables[table_name] = Table(table_name, self.metadata_obj, *column_args)
+            if table_name in self.required_columns:
+                required_columns_table = self.required_columns[table_name]
+                for column_name, type_string in required_columns_table.items():
+                    if column_name in column_dict:
+                        continue
+                    column_args.append(self._create_column_object(column_name, type_string))
+                    logger.critical(f'The required column "{column_name} was not found in the config for the table"{table_name}". Creating it.')
 
-            """ Old code, might want to refer to it later
-            if n == 'members':
-                log.critical('There is no members table, so I\'m making it.')
-                self.tables[table_name] = Table(
-                    'members',
-                    self.metadata_obj,
-                    Column('ID', String, primary_key=True, nullable=False),
-                    Column('Name', String),
-                    Column('Nickname', String),
-                    Column('Discord_Name', String),
-                    Column('CPO', String),
-                    Column('Faction', String),
-                    Column('Tag_Code', String),
-                    Column('OZ_Desire', String),
-                    Column('Email', String),
-                    Column('Want_Bandana', String),
-                    Column('Registration_Time', DateTime),
-                    Column('OZ', Boolean)
-                )
-            elif n == 'tags':
-                log.critical('There is no tags table, so I\'m making it.')
-                self.tables[n] = Table(
-                    'tags',
-                    self.metadata_obj,
-                    Column('Tag_ID', Integer, primary_key=True, nullable=False, autoincrement=True),
-                    Column('Tagger_ID', String),
-                    Column('Tagger_Name', String),
-                    Column('Tagger_Nickname', String),
-                    Column('Tagger_Discord_Name', String),
-                    Column('Tagged_ID', String),
-                    Column('Tagged_Name', String),
-                    Column('Tagged_Nickname', String),
-                    Column('Tagged_Discord_Name', String),
-                    Column('Tag_Time', DateTime),
-                    Column('Report_Time', DateTime),
-                    Column('Revoked_Tag', Boolean)
-                )
-            """
+            self.tables[table_name] = Table(table_name.casefold(), self.metadata_obj, *column_args)
 
         self.metadata_obj.create_all(self.engine)
 
 
         # Give each table a table_names tuple which is all column names
-        for n, t in self.tables.items():
-            selection = select(t)
+        for name, table in self.tables.items():
+            selection = select(table)
             with self.engine.begin() as conn:
                 result = conn.execute(selection)
-                t.table_names = result.keys()
+                table.column_names = result.keys()
+                logger.info(result.keys())
 
     def _create_column_object(self, column_name: str, column_type: str) -> Column:
         try:
@@ -171,10 +136,10 @@ class HvzDb:
 
     def __add_row(self, table, row):
         # Old function acting as an alias
-        self.add_row(table, row)
+        return self.add_row(table, row)
 
-    def add_row(self, table, row):
-        table = self.tables[table]
+    def add_row(self, table_selection:str, row: Dict):
+        table = self.tables[table_selection.casefold()]
         with self.engine.begin() as conn:
             result = conn.execute(insert(table), row)
             return result
