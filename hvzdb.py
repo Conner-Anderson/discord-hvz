@@ -14,12 +14,11 @@ from datetime import datetime
 import sqlalchemy
 from sqlalchemy import create_engine, MetaData
 from sqlalchemy import text
-from sqlalchemy.orm import Session
 from sqlalchemy import MetaData
 from sqlalchemy import Table, Column, Integer, String, DateTime, Boolean, ForeignKey
 from sqlalchemy import insert, select, delete, update
 from sqlalchemy import func, cast, and_
-from sqlalchemy.exc import NoSuchTableError
+from sqlalchemy.exc import NoSuchTableError, CompileError
 
 from config import config, ConfigError
 
@@ -82,7 +81,7 @@ class HvzDb:
                     if column_name in column_dict:
                         continue
                     column_args.append(self._create_column_object(column_name, type_string))
-                    logger.critical(f'The required column "{column_name} was not found in the config for the table"{table_name}". Creating it.')
+                    logger.warning(f'The required column "{column_name}" was not found in the config for the table "{table_name}". Creating it.')
 
             self.tables[table_name] = Table(table_name.casefold(), self.metadata_obj, *column_args)
 
@@ -95,54 +94,37 @@ class HvzDb:
             with self.engine.begin() as conn:
                 result = conn.execute(selection)
                 table.column_names = result.keys()
-                logger.info(result.keys())
 
     def _create_column_object(self, column_name: str, column_type: str) -> Column:
+        """
+        Returns a Column object after forcing the name to lowercase and validating the type
+        :param column_name:
+        :param column_type: A string matching a valid column type
+        :return: Column object
+        """
         try:
             column_type = self.valid_column_types[column_type.casefold()]
         except KeyError:
             column_type = String
 
-        return Column(column_name, column_type)
-
-
-    def add_member(self, member_row):
-        """
-        Adds a member to the database
-
-        Parameters:
-                member_row (dict): A dict with pairs of column_name:value. Example:
-                                    {'Name': 'George Soros', 'CPO': 9001, ...}
-
-        Returns:
-                result (result object?): This needs work.
-        """
-        result = self.__add_row(self.tables['members'], member_row)
-        return result
-
-    def add_tag(self, tag_row):
-        '''
-        Adds a tag to the database
-
-        Parameters:
-                tag_row (dict): A dict with pairs of column_name:value. Example:
-                                    {'Tag_ID': 'George Soros', 'CPO': 9001, ...}
-
-        Returns:
-                result (result object?): This needs work.
-        '''
-        result = self.__add_row(self.tables['tags'], tag_row)
-        return result
+        return Column(column_name.casefold(), column_type)
 
     def __add_row(self, table, row):
         # Old function acting as an alias
         return self.add_row(table, row)
 
-    def add_row(self, table_selection:str, row: Dict):
+    def add_row(self, table_selection:str, input_row: Dict):
         table = self.tables[table_selection.casefold()]
+
+        row = {}
+        # Convert all column names to lowercase
+        for k, i in input_row.items():
+            row[k.casefold()] = i
+
         with self.engine.begin() as conn:
-            result = conn.execute(insert(table), row)
+            result = conn.execute(table.insert().values(row))
             return result
+
 
     def get_member(self, value, column=None):
         """

@@ -67,7 +67,7 @@ class HVZButton(discord.ui.Button):
 
         if unique:
             custom_id += f':{str(random.random())}'
-        log.info(f'{label} {color} {custom_id}')
+        #log.info(f'{label} {color} {custom_id}')
         super().__init__(
             label=label,
             style=style,

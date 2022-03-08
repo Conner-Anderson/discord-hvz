@@ -209,6 +209,10 @@ class Script:
             output += f"**{q.display_name}**: {response}\n"
         return output
 
+    @property
+    def ending(self) -> str:
+        return self.data.ending
+
     def ask_next_question(self, existing_script: Script = None, first: bool=False) -> (str, Union[discord.ui.View, None]):
         """Fetches next question and returns it.
         :return:
@@ -305,7 +309,7 @@ class ChatBot:
         msg, view = self.script.ask_next_question(existing_script=getattr(existing_chatbot, 'script', None), first=first)
         await self.chat_member.send(msg, view=view)
 
-    async def receive(self, message: Union[discord.Message, str]) -> Union[None, bool]:
+    async def receive(self, message: Union[discord.Message, str]) -> bool:
         if isinstance(message, discord.Message):
             message = str(message.clean_content)
         try:
@@ -314,12 +318,14 @@ class ChatBot:
             await self.chat_member.send(str(e))
         else:
             if responses:
-                await self.save(responses)
+                self.save(responses)
+                await self.chat_member.send(self.script.ending)
                 return True
 
         await self.ask_question()
+        return False
 
-    async def save(self, responses):
+    def save(self, responses):
         # TODO: Rework the database system to support this
         additional_columns = {
             'Faction': 'human',
@@ -329,7 +335,7 @@ class ChatBot:
             'OZ': False
         }
         responses.update(additional_columns)
-        self.database.add_row(self.script.data.table, {'thing':'stuff'})
+        self.database.add_row(self.script.data.table, responses)
 
 
 class ChatBotManager(commands.Cog):
@@ -338,7 +344,6 @@ class ChatBotManager(commands.Cog):
     loaded_scripts: Dict[str, ScriptData] = {}
 
     def __init__(self, bot: HVZBot):
-        print('Started ChatBotManager')
         self.bot = bot
 
         file = open('scripts.yml', mode='r')
