@@ -19,6 +19,8 @@ from datetime import datetime
 from config import config, ConfigError
 from buttons import HVZButton
 
+import chatbotprocessors
+
 log = logger
 
 guild_id_list = [config['available_servers'][config['active_server']]]
@@ -41,9 +43,10 @@ class QuestionData:
     name: str
     display_name: str
     query: str
-    valid_regex: Union[str, None] = None
-    rejection_response: Union[str, None] = None
+    valid_regex: str = None
+    rejection_response: str = None
     button_options: List[HVZButton] = None
+    processor: callable = None
 
     coupled_attributes = [
         ('valid_regex', 'rejection_response'),
@@ -59,7 +62,7 @@ class QuestionData:
                     raise ConfigError(
                         f'If a question has attribute {this_attr}, it must also have {other_attr}. Check scripts.yml')
 
-        if question_data.get('button_options') is not None:
+        if question_data.get('button_options'):
             buttons = []
             log.info(question_data['button_options'])
             for label, color in question_data['button_options'].items():
@@ -75,6 +78,12 @@ class QuestionData:
                 #log.info(buttons[-1].custom_id)
             question_data['button_options'] = buttons
 
+        processor = question_data.get('processor')
+        if processor:
+            try:
+                question_data['processor'] = chatbotprocessors.processors[processor]
+            except KeyError:
+                raise ConfigError(f'Processor "{processor}" does not match any function.')
 
         try:
             return QuestionData(**question_data)
@@ -173,7 +182,7 @@ class ScriptData:
 @dataclass()
 class Script:
     data: ScriptData
-    db: HvzDb
+    bot: HVZBot
     kind: str = field(init=False, default=None)
     questions: Dict[int, QuestionData] = field(init=False, default_factory=dict)
     responses: Dict[int, Union[str, None]] = field(init=False, default_factory=dict)
@@ -274,11 +283,17 @@ class Script:
                 raise ResponseError(message)
 
         question = self.questions[self.last_asked_question]
-        if question.valid_regex is not None:
+        if question.valid_regex:
             match = regex.fullmatch(r'{}'.format(question.valid_regex), response)
             if match is None:
                 message = f'{question.rejection_response} Please try again.'
                 raise ResponseError(message)
+
+        if question.processor:
+            try:
+                response = question.processor(input_text=response, bot=self.bot)
+            except ValueError as e:
+                raise ResponseError(e)
 
         self.responses[self.next_question] = response
         if self.modifying:
@@ -364,7 +379,7 @@ class ChatBotManager(commands.Cog):
         existing = self.active_chatbots.get(chat_member.id)
 
         self.active_chatbots[chat_member.id] = ChatBot(
-            Script(self.loaded_scripts[chatbot_kind], self.bot.db),
+            Script(self.loaded_scripts[chatbot_kind], self.bot),
             self.bot.db,
             chat_member,
             target_member

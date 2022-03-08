@@ -126,7 +126,7 @@ class HvzDb:
             return result
 
 
-    def get_member(self, value, column=None):
+    def get_member(self, value, column: str = None):
         """
         Returns a Row object that represents a single member in the database
 
@@ -138,9 +138,9 @@ class HvzDb:
         """
         if column is not None:
             search_value = value
-            search_column = column
+            search_column = column.casefold()
         else:
-            search_column = 'ID'
+            search_column = 'id'
             if isinstance(value, discord.abc.User):
                 search_value = value.id
             else:

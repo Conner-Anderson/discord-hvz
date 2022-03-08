@@ -63,6 +63,7 @@ class SheetsInterface:
         self.setup(self.bot)
 
     def export_to_sheet(self, table_name):
+        return
 
         self.check_creds()
 

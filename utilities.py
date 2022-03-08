@@ -20,7 +20,6 @@ def make_tag_code(db):
         try:
             db.get_member(tag_code, column='Tag_Code')
         except ValueError:
-            print(tag_code)
             return tag_code
 
     raise ValueError('Could not find valid tag code.')
