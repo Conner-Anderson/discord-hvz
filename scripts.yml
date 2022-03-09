@@ -9,6 +9,7 @@ registration:
   table: Members
   beginning: I'll register you for HvZ. Type 'cancel' at any time to stop this conversation.
   ending: You are registered for HvZ! Please read the rules. New channels are available to you.
+  processor: registration
   questions:
   - name: Name
     display_name: Name

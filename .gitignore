@@ -19,4 +19,4 @@ build
 testbed.py
 .idea
 *.zip
-chatbotprocessors/custom_processors.py
+chatbotprocessors/custom_question_processors.py

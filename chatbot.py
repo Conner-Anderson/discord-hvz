@@ -8,7 +8,7 @@ import discord
 from discord.commands import slash_command
 from discord.ext import commands
 from loguru import logger
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Any
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -75,13 +75,13 @@ class QuestionData:
                         unique=True
                     )
                 )
-                #log.info(buttons[-1].custom_id)
+                # log.info(buttons[-1].custom_id)
             question_data['button_options'] = buttons
 
         processor = question_data.get('processor')
         if processor:
             try:
-                question_data['processor'] = chatbotprocessors.processors[processor]
+                question_data['processor'] = chatbotprocessors.question_processors[processor]
             except KeyError:
                 raise ConfigError(f'Processor "{processor}" does not match any function.')
 
@@ -116,6 +116,7 @@ class ScriptData:
     special_buttons: Dict[str, HVZButton]
     beginning: str = ''
     ending: str = ''
+    processor: callable = None
 
     @classmethod
     def build(cls, kind: str, script: Dict, chatbotmanager: ChatBotManager) -> ScriptData:
@@ -150,8 +151,14 @@ class ScriptData:
             unique=True
         )
         # Add the additional arguments to the script
-        script.update({'special_buttons':special_buttons, 'review_selection_buttons':review_selection_buttons})
+        script.update({'special_buttons': special_buttons, 'review_selection_buttons': review_selection_buttons})
 
+        processor = script.get('processor')
+        if processor:
+            try:
+                script['processor'] = chatbotprocessors.script_processors[processor]
+            except KeyError:
+                raise ConfigError(f'Processor "{processor}" does not match any function.')
 
         try:
             return ScriptData(kind=kind, questions=questions, **script)
@@ -222,7 +229,8 @@ class Script:
     def ending(self) -> str:
         return self.data.ending
 
-    def ask_next_question(self, existing_script: Script = None, first: bool=False) -> (str, Union[discord.ui.View, None]):
+    def ask_next_question(self, existing_script: Script = None, first: bool = False) -> (
+    str, Union[discord.ui.View, None]):
         """Fetches next question and returns it.
         :return:
         :param existing_script:
@@ -247,7 +255,6 @@ class Script:
             view.add_item(self.data.special_buttons['modify'])
             return self.review_string, view
 
-
         if existing_script is not None:
             message += f'Cancelled the previous {existing_script.kind} conversation.\n'
         if first:
@@ -263,13 +270,13 @@ class Script:
         self.last_asked_question = this_question
         return message, view
 
-    def receive_response(self, response: str) -> Union[None, dict]:
+    def receive_response(self, response: str, target_member: discord.Member) -> Union[None, dict]:
         if self.last_asked_question >= self.length:
             if not self.modifying:
                 choice = response.casefold()
                 if choice == 'submit':
                     return self.completed_responses
-                elif choice =='modify':
+                elif choice == 'modify':
                     self.modifying = True
                     return
 
@@ -302,15 +309,11 @@ class Script:
         else:
             self.next_question = self.last_asked_question + 1
 
-    def save(self):
-        responses = self.responses
-
-
 
 @dataclass
 class ChatBot:
     script: Script
-    database: HvzDb
+    bot: HVZBot
     chat_member: discord.Member
     target_member: discord.Member = None,
     processing: bool = field(default=False, init=False)
@@ -321,36 +324,39 @@ class ChatBot:
             self.target_member = self.chat_member
 
     async def ask_question(self, existing_chatbot: ChatBot = None, first: bool = False):
-        msg, view = self.script.ask_next_question(existing_script=getattr(existing_chatbot, 'script', None), first=first)
+        msg, view = self.script.ask_next_question(existing_script=getattr(existing_chatbot, 'script', None),
+                                                  first=first)
         await self.chat_member.send(msg, view=view)
 
     async def receive(self, message: Union[discord.Message, str]) -> bool:
         if isinstance(message, discord.Message):
             message = str(message.clean_content)
         try:
-            responses = self.script.receive_response(message)
+            responses = self.script.receive_response(message, target_member=self.target_member)
         except ResponseError as e:
             await self.chat_member.send(str(e))
         else:
             if responses:
-                self.save(responses)
-                await self.chat_member.send(self.script.ending)
+                try:
+                    await self.save(responses)
+                except ValueError as e:
+                    await self.target_member.send(str(e))
+                else:
+                    await self.chat_member.send(self.script.ending)
                 return True
 
         await self.ask_question()
         return False
 
-    def save(self, responses):
-        # TODO: Rework the database system to support this
-        additional_columns = {
-            'Faction': 'human',
-            'ID': str(self.target_member.id),
-            'Discord_Name': self.target_member.name,
-            'Registration_Time': datetime.today(),
-            'OZ': False
-        }
-        responses.update(additional_columns)
-        self.database.add_row(self.script.data.table, responses)
+    async def save(self, responses):
+
+        responses = await self.script.data.processor(
+            responses=responses,
+            bot=self.bot,
+            target_member=self.target_member
+        )
+
+        self.bot.db.add_row(self.script.data.table, responses)
 
 
 class ChatBotManager(commands.Cog):
@@ -380,7 +386,7 @@ class ChatBotManager(commands.Cog):
 
         self.active_chatbots[chat_member.id] = ChatBot(
             Script(self.loaded_scripts[chatbot_kind], self.bot),
-            self.bot.db,
+            self.bot,
             chat_member,
             target_member
 
@@ -393,7 +399,7 @@ class ChatBotManager(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        if message.author.bot: # Not required? Maybe.
+        if message.author.bot:  # Not required? Maybe.
             return
         if message.channel.type == discord.ChannelType.private:
             author_id = message.author.id
@@ -424,7 +430,6 @@ class ChatBotManager(commands.Cog):
                     for b in v.children:
                         if isinstance(b, discord.ui.Button) and b.custom_id == custom_id:
                             old_button = b
-                            log.info(f'Found custom_id: {custom_id}')
                             break
                 if old_button is not None:
                     new_view = discord.ui.View(timeout=None)
@@ -434,12 +439,10 @@ class ChatBotManager(commands.Cog):
                         label=old_button.label,
                         style=old_button.style,
                         disabled=True
-                ))
+                    ))
 
                     await interaction.response.edit_message(view=new_view)
                     new_view.stop()
-
-
 
     async def receive_response(self, author_id: int, response_text: str):
         log.info(f'author_id: {author_id} response_text: {response_text}')

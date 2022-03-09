@@ -243,7 +243,7 @@ class HvzDb:
             member_id = member.id
         result = self.__edit_row(
             self.tables['members'],
-            self.tables['members'].c.ID,
+            self.tables['members'].c.id,
             member_id,
             column,
             value
@@ -265,7 +265,7 @@ class HvzDb:
 
         result = self.__edit_row(
             self.tables['tags'],
-            self.tables['tags'].c.Tag_ID,
+            self.tables['tags'].c.tag_id,
             tag_id,
             column,
             value

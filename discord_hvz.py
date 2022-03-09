@@ -409,7 +409,7 @@ class HVZBot(discord.Bot):
                 ephemeral=True
             )
         except ValueError:
-            chatbot_manager= self.get_cog('ChatBotManager')
+            chatbot_manager = self.get_cog('ChatBotManager')
             await chatbot_manager.start_chatbot('registration', interaction.user)
 
 

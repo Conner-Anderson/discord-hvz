@@ -1,5 +1,4 @@
 from __future__ import annotations
-import numpy
 from typing import Dict, List
 from utilities import make_tag_code
 
@@ -14,7 +13,7 @@ Processors are only called if they are put in a "processor" field for a question
 Example: processor: generate_tag_code
 
 You can write your own processors! You can technically put them here, but it is preferred that you make a file for them
-called "custom_processors.py" in the same folder. That way your custom processors won't be overwritten when you update
+called "custom_question_processors.py" in the same folder. That way your custom processors won't be overwritten when you update
 Discord-HvZ.
 
 The below processors run critical parts of the bot and should not be edited without careful consideration.
@@ -49,9 +48,7 @@ def generate_tag_code(input_text: str, bot: HVZBot) -> str:
 
 def tag_code_to_member(input_text: str, bot: HVZBot):
     try:
-        tagged_member_data = bot.db.get_member(input_text.upper(), column='Tag_Code')
+        tagged_member_row = bot.db.get_member(input_text.upper(), column='Tag_Code')
     except ValueError:
         raise ValueError('This tag code didn\'t match a user')
 
-class TestThing:
-    pass

@@ -1,7 +1,11 @@
 from inspect import getmembers, isfunction
 
-from . import default_processors
+from . import default_question_processors
+from . import default_script_processors
 from loguru import logger
+
+script_processors = {}
+question_processors = {}
 
 def fetch_functions(module):
     output_functions = {}
@@ -11,14 +15,22 @@ def fetch_functions(module):
     return output_functions
 
 
-processors = {}
-processors.update(fetch_functions(default_processors))
+
+question_processors.update(fetch_functions(default_question_processors))
+script_processors.update(fetch_functions(default_script_processors))
 
 try:
-    import custom_processors
+    import custom_question_processors
 except ImportError:
-    print('custom_processors.py not found')
+    print('custom_question_processors.py not found')
 else:
-    processors.update(fetch_functions(custom_processors))
+    question_processors.update(fetch_functions(custom_question_processors))
 
-logger.info(processors)
+try:
+    import custom_script_processors
+except ImportError:
+    print('custom_script_processors.py not found')
+else:
+    script_processors.update(fetch_functions(custom_script_processors))
+
+
