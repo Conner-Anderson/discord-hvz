@@ -27,37 +27,10 @@ sheet_ids:
   letu: 1H8dlyi1xj3jCP7-TrMCPGcfuDQ-LAHq1BmyrFORpCA8
   dev: 1fLYdmc_sp-Rx25794zmPekp48I02lbctyqiLvaLDIwQ
 
-sheet_settings:
-  members:
-    sheet_name: Members
-    column_order:
-    - ID
-    - Name
-    - Nickname
-    - Discord_Name
-    - Faction
-    - CPO
-    - Tag_Code
-    - OZ_Desire
-    - Email
-    - Want_Bandana
-    - Registration_Time
-    - OZ
-  tags:
-    sheet_name: Tags
-    column_order:
-    - Tag_ID
-    - Tagger_ID
-    - Tagger_Name
-    - Tagger_Nickname
-    - Tagger_Discord_Name
-    - Tagged_ID
-    - Tagged_Name
-    - Tagged_Nickname
-    - Tagged_Discord_Name
-    - Tag_Time
-    - Report_Time
-    - Revoked_Tag
+sheet_names:
+  members: Members
+  tags: Tags
+
 
 # The below lists define database tables. When the bot boots up, it will create any tables that don't exist.
 # It WILL NOT edit existing tables to match this config. To add or subtract columns, the table or database must be deleted

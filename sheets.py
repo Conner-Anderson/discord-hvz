@@ -9,6 +9,10 @@ from datetime import datetime
 from loguru import logger
 import logging
 
+from typing import Dict, List, Any, Union, TYPE_CHECKING
+if TYPE_CHECKING:
+    import sqlalchemy
+
 log = logger
 
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
@@ -63,27 +67,31 @@ class SheetsInterface:
         self.setup(self.bot)
 
     def export_to_sheet(self, table_name):
-        return
+        #return
 
         self.check_creds()
 
-        table = self.bot.db.get_table(table_name)
+        table: List[sqlalchemy.engine.Row] = self.bot.db.get_table(table_name)
 
-        sheet_settings = config['sheet_settings'][table_name]
+        column_order_raw: Dict[str, str] = config['database_tables'][table_name]
+        column_order = []
+        for key in column_order_raw:
+            column_order.append(key.casefold())
 
         # Let's turn the list of Rows into a list of lists. Google wants that.
 
         values = []
         for y, row in enumerate(table):
             values.append([])
-            for x, c in enumerate(sheet_settings['column_order']):
-                if isinstance(row[x], datetime):
-                    values[y].append(row[c].isoformat())
-                else:
-                    values[y].append(row[c])
+            for x, column in enumerate(column_order):
+                cell = row[column]
+                if isinstance(cell, datetime):
+                    cell = cell.isoformat()
 
-        values.insert(0, sheet_settings['column_order'])
-        sheet_name = sheet_settings['sheet_name']
+                values[y].append(cell)
+
+        values.insert(0, column_order)
+        sheet_name = config['sheet_names'][table_name]
 
         # Erases entire sheet below row 1!
         self.spreadsheets.values().clear(spreadsheetId=SPREADSHEET_ID, range=f'\'{sheet_name}\'!A1:L').execute()

@@ -206,7 +206,7 @@ class HvzDb:
             raise ValueError(f'Could not find a row where \"{search_column}\" is \"{search_value}\"')
         return result_row
 
-    def get_table(self, table):
+    def get_table(self, table) -> List[sqlalchemy.engine.Row]:
         """
         Returns a list of all members in the database
 
