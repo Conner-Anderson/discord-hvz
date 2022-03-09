@@ -50,6 +50,7 @@ class HvzDb:
     valid_column_types: ClassVar[Dict[str, type]] = {
         'string': String,
         'integer': Integer,
+        'incrementing_integer': Integer,
         'boolean': Boolean,
         'datetime': DateTime
     }
@@ -103,11 +104,16 @@ class HvzDb:
         :return: Column object
         """
         try:
-            column_type = self.valid_column_types[column_type.casefold()]
+            column_type_object = self.valid_column_types[column_type.casefold()]
         except KeyError:
-            column_type = String
+            column_type_object = String
+        kwargs = {}
 
-        return Column(column_name.casefold(), column_type)
+        if column_type == 'incrementing_integer':
+            kwargs = {'primary_key': True, 'nullable':False, 'autoincrement':True}
+
+
+        return Column(column_name.casefold(), column_type_object, **kwargs)
 
     def __add_row(self, table, row):
         # Old function acting as an alias

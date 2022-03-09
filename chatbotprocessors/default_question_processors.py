@@ -1,11 +1,14 @@
 from __future__ import annotations
 from typing import Dict, List
 from utilities import make_tag_code
+from datetime import datetime, timedelta
+from dateutil import parser
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from discord_hvz import HVZBot
     from hvzdb import HvzDb
+    import sqlalchemy
 
 """
 This files contains 'processors' which are functions called by a chatbot conversing with a user.
@@ -46,9 +49,30 @@ def name(input_text: str, bot: HVZBot):
 def generate_tag_code(input_text: str, bot: HVZBot) -> str:
     return make_tag_code(bot.db)
 
-def tag_code_to_member(input_text: str, bot: HVZBot):
+def tag_code_to_member(input_text: str, bot: HVZBot) -> str:
     try:
-        tagged_member_row = bot.db.get_member(input_text.upper(), column='Tag_Code')
+        tagged_member_row: sqlalchemy.engine.Row = bot.db.get_member(input_text.upper(), column='Tag_Code')
     except ValueError:
         raise ValueError('This tag code didn\'t match a user')
+
+    tagged_member = bot.get_member(tagged_member_row.id)
+    if tagged_member is None:
+        raise ValueError(f'"{tagged_member_row.name}" is no longer on the Discord server. Contact them, then an Admin.')
+    if bot.roles['zombie'] in tagged_member.roles:
+        raise ValueError('The person you\'re tagging is already a zombie!')
+
+    return tagged_member
+
+def tag_time(input_text: str, bot: HVZBot) -> datetime:
+    given_tag_time: str = input_text
+    tag_datetime = datetime.today()
+    if given_tag_time.casefold().find('yesterday') != -1:
+        tag_datetime -= timedelta(days=1)
+        given_tag_time = given_tag_time.replace('yesterday', '').replace('Yesterday', '')
+    tag_datetime = parser.parse(given_tag_time + ' and 0 seconds', default=tag_datetime)
+
+    if tag_datetime > datetime.today():
+        raise ValueError('The tag time you stated is in the future. Try again.')
+
+    return tag_datetime
 

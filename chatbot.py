@@ -1,8 +1,6 @@
 from __future__ import annotations
-import cProfile
 from dataclasses import dataclass, field, InitVar
 import yaml
-from datetime import datetime
 import regex
 import discord
 from discord.commands import slash_command
@@ -14,7 +12,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from discord_hvz import HVZBot
     from hvzdb import HvzDb
-from datetime import datetime
 
 from config import config, ConfigError
 from buttons import HVZButton

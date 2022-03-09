@@ -1,4 +1,5 @@
 #!/bin/python3
+from __future__ import  annotations
 from buttons import HVZButtonCog
 from config import config, ConfigError
 import sheets
@@ -13,6 +14,7 @@ from loguru import logger
 import sys
 import time
 import functools
+from typing import List, Dict, Union, Any
 
 import discord
 from discord.ext import commands
@@ -67,31 +69,6 @@ discord_logger.propagate = False
 discord_logger.setLevel(logging.WARNING)
 discord_logger.addHandler(InterceptHandler())
 
-'''
-log_format = '%(asctime)s %(name)s %(levelname)s %(message)s'
-coloredlogs.DEFAULT_LOG_FORMAT = log_format
-logging.basicConfig(filename='discord-hvz.log', encoding='utf-8', filemode='a', 
-                    format=log_format, level=logging.DEBUG)
-coloredlogs.install(level='INFO')  # Stream handler for root logger 
-
-
-# Setup a logger for discord.py
-discord_logger = logging.getLogger('discord')
-discord_logger.propagate = False
-discord_logger.setLevel(logging.INFO)
-coloredlogs.install(level='WARNING', logger=discord_logger)
-
-# Setup a file handler for discord.py
-file_handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='a')
-file_handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter(log_format)
-file_handler.setFormatter(formatter)
-discord_logger.addHandler(file_handler)
-
-
-log = logging.getLogger(__name__)
-'''
-
 
 class HVZBot(discord.Bot):
 
@@ -139,7 +116,7 @@ class HVZBot(discord.Bot):
         return wrapper
 
     def __init__(self):
-        self.guild = None
+        self.guild: Union[discord.Guild, None] = None
         self.roles = {}
         self.channels = {}
         intents = discord.Intents.default()
@@ -399,6 +376,20 @@ class HVZBot(discord.Bot):
     def get_member(self, user_id: int):
         member = self.guild.get_member(user_id)
         return member
+
+    async def announce_tag(self, tagged_member: discord.Member, tagger_member: discord.Member, tag_time: datetime):
+
+        new_human_count = len(self.roles['human'].members)
+        new_zombie_count = len(self.roles['zombie'].members)
+
+        msg = f'<@{tagged_member.id}> has turned zombie!'
+        if not config['silent_oz']:
+            msg += f'\nTagged by <@{tagger_member.id}>'
+            msg += tag_time.strftime(' at about %I:%M %p')
+
+        msg += f'\nThere are now {new_human_count} humans and {new_zombie_count} zombies.'
+
+        await self.channels['tag-announcements'].send(msg)
 
     @check_dm_allowed
     async def register(self, interaction: discord.Interaction):

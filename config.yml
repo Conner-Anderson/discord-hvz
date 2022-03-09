@@ -81,7 +81,7 @@ database_tables:
     Registration_Time: DateTime
     OZ: Boolean
   tags:
-    Tag_ID: Integer
+    Tag_ID: incrementing_integer
     Tagger_ID: String
     Tagger_Name: String
     Tagger_Nickname: String
