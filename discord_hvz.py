@@ -243,13 +243,13 @@ class HVZBot(discord.Bot):
                 zombie = self.roles['zombie'] in after.roles
                 human = self.roles['human'] in after.roles
                 if zombie and not human:
-                    self.db.edit_member(after, 'Faction', 'zombie')
+                    self.db.edit_member(after, 'faction', 'zombie')
                     self.sheets_interface.export_to_sheet('members')
                 elif human and not zombie:
-                    self.db.edit_member(after, 'Faction', 'human')
+                    self.db.edit_member(after, 'faction', 'human')
                     self.sheets_interface.export_to_sheet('members')
             if not before.nick == after.nick:
-                self.db.edit_member(after, 'Nickname', after.nick)
+                self.db.edit_member(after, 'nickname', after.nick)
                 log.debug(f'{after.name} changed their nickname.')
                 self.sheets_interface.export_to_sheet('members')
                 self.sheets_interface.export_to_sheet('tags')
@@ -374,6 +374,7 @@ class HVZBot(discord.Bot):
                         'The tag log failed! This is likely a bug. Please message Conner Anderson about it.')
 
     def get_member(self, user_id: int):
+        user_id = int(user_id)
         member = self.guild.get_member(user_id)
         return member
 
@@ -409,6 +410,7 @@ class HVZBot(discord.Bot):
 
         if config['tag_logging'] is False:
             await interaction.response.send_message('The admin has not enabled tagging yet.', ephemeral=True)
+            return
         try:
             self.db.get_member(interaction.user)
         except ValueError as e:
@@ -416,20 +418,10 @@ class HVZBot(discord.Bot):
                 'You are not currently registered for HvZ.',
                 ephemeral=True
             )
-            log.debug(e)
-        else:
-            for i, c in enumerate(self.awaiting_chatbots):  # Restart registration if one is already in progress
-                if (c.member == interaction.user) and c.chat_type == 'tag_logging':
-                    await interaction.user.send('**Restarting tag logging process...**')
-                    self.awaiting_chatbots.pop(i)
+            return
 
-            chatbot = ChatBot(interaction.user, 'tag_logging')
-            await chatbot.ask_question()
-            await interaction.response.send_message(
-                'You\'ve been sent a Direct Message to start tag logging.',
-                ephemeral=True
-            )
-            self.awaiting_chatbots.append(chatbot)
+        chatbot_manager = self.get_cog('ChatBotManager')
+        await chatbot_manager.start_chatbot('tag_logging', interaction.user)
 
 try:
     bot = HVZBot()

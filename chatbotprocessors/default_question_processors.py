@@ -4,6 +4,8 @@ from utilities import make_tag_code
 from datetime import datetime, timedelta
 from dateutil import parser
 
+from loguru import logger
+
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from discord_hvz import HVZBot
@@ -49,19 +51,20 @@ def name(input_text: str, bot: HVZBot):
 def generate_tag_code(input_text: str, bot: HVZBot) -> str:
     return make_tag_code(bot.db)
 
-def tag_code_to_member(input_text: str, bot: HVZBot) -> str:
+def tag_code_to_member_id(input_text: str, bot: HVZBot) -> str:
     try:
         tagged_member_row: sqlalchemy.engine.Row = bot.db.get_member(input_text.upper(), column='Tag_Code')
     except ValueError:
         raise ValueError('This tag code didn\'t match a user')
 
     tagged_member = bot.get_member(tagged_member_row.id)
+    logger.info(f'ID: {tagged_member_row.id} Row: {tagged_member_row}')
     if tagged_member is None:
         raise ValueError(f'"{tagged_member_row.name}" is no longer on the Discord server. Contact them, then an Admin.')
     if bot.roles['zombie'] in tagged_member.roles:
         raise ValueError('The person you\'re tagging is already a zombie!')
 
-    return tagged_member
+    return tagged_member.id
 
 def tag_time(input_text: str, bot: HVZBot) -> datetime:
     given_tag_time: str = input_text

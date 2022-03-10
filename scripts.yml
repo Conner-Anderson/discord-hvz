@@ -61,7 +61,7 @@ tag_logging:
     valid_regex: '[a-zA-Z\d]{6}'
     rejection_response: 'The tag code is 6 characters of numbers and capital
       letters. None of these: 0 O Q I 1 D V U 5 S 2 Z'
-    processor: tag_code_to_member
+    processor: tag_code_to_member_id
   - name: tag_time
     display_name: Tag Time
     query: About what time did the tag happen? Use the format 3:04pm. If it was yesterday, add "yesterday" to the end.
