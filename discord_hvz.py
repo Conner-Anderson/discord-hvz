@@ -173,8 +173,8 @@ class HVZBot(discord.Bot):
 
                 log.success(
                     f'Discord-HvZ Bot launched correctly! Logged in as: {self.user.name} ------------------------------------------')
-                self.sheets_interface.export_to_sheet('members')
-                self.sheets_interface.export_to_sheet('tags')
+                #self.sheets_interface.export_to_sheet('members')
+                #self.sheets_interface.export_to_sheet('tags')
 
             except Exception as e:
                 log.exception(f'self startup failed with this error --> {e}')

@@ -171,10 +171,10 @@ class AdminCommandsCog(commands.Cog):
                 return
 
             original_value = member_row[attribute]
-            bot.db.edit_member(member_row.ID, attribute, value)
+            bot.db.edit_member(member_row.id, attribute, value)
             await ctx.respond(
-                f'The value of {attribute} for <@{member_row.ID}> was changed from \"{original_value}\"" to \"{value}\"')
-            bot.sheets_interface.export_to_sheet('members')
+                f'The value of {attribute} for <@{member_row.id}> was changed from \"{original_value}\"" to \"{value}\"')
+            #bot.sheets_interface.export_to_sheet('members')
 
         @member_group.command(guild_ids=guild_id_list, name='list')
         @permissions.has_role('Admin')

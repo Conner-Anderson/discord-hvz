@@ -1,9 +1,10 @@
 from __future__ import annotations
-import discord
+import discord, sheets
 import os.path
 from dataclasses import dataclass, field, InitVar
 from typing import List, Union, Dict, TYPE_CHECKING, Any, ClassVar
 import copy
+import functools
 
 from sqlalchemy.engine.mock import MockConnection
 
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
 from datetime import datetime
 
 import sqlalchemy
-from sqlalchemy import create_engine, MetaData
+from sqlalchemy import create_engine, MetaData, event
 from sqlalchemy import text
 from sqlalchemy import MetaData
 from sqlalchemy import Table, Column, Integer, String, DateTime, Boolean, ForeignKey
@@ -26,11 +27,20 @@ from loguru import logger
 
 log = logger
 
+def dump(obj):
+    """Prints the passed object in a very detailed form for debugging"""
+    for attr in dir(obj):
+        try:
+            print("obj.%s = %r" % (attr, getattr(obj, attr)))
+        except Exception:
+            print('TYPE ERROR')
+
 @dataclass
 class HvzDb:
     engine: sqlalchemy.engine.Engine = field(init=False)
     metadata_obj: MetaData = field(init=False, default_factory=MetaData)
     tables: Dict[str, Table] = field(init=False, default_factory=dict)
+    sheet_interface: sheets.SheetsInterface = field(init=False, default=None)
 
     required_columns: ClassVar[Dict[str, Dict[str, str]]] = {
         'members': {
@@ -96,6 +106,19 @@ class HvzDb:
                 result = conn.execute(selection)
                 table.column_names = result.keys()
 
+        if config['google_sheet_export'] == True:
+            self.sheet_interface = sheets.SheetsInterface(self)
+
+    def _table_updated(self, table: Table) -> None:
+        """
+        To be called whenever a function changes a table. This lets the Google Sheet update.
+        :param table:
+        :return:
+        """
+        table_name: str = table.name
+        self.sheet_interface.update_table(table_name)
+
+
     def _create_column_object(self, column_name: str, column_type: str) -> Column:
         """
         Returns a Column object after forcing the name to lowercase and validating the type
@@ -130,6 +153,8 @@ class HvzDb:
         with self.engine.begin() as conn:
             result = conn.execute(table.insert().values(row))
             return result
+
+
 
 
     def get_member(self, value, column: str = None):
@@ -247,7 +272,7 @@ class HvzDb:
         member_id = member
         if isinstance(member, discord.abc.User):
             member_id = member.id
-        result = self.__edit_row(
+        result = self._edit_row(
             self.tables['members'],
             self.tables['members'].c.id,
             member_id,
@@ -269,7 +294,7 @@ class HvzDb:
                 result (bool): True if the edit was successful, False if it was not.
         """
 
-        result = self.__edit_row(
+        result = self._edit_row(
             self.tables['tags'],
             self.tables['tags'].c.tag_id,
             tag_id,
@@ -278,7 +303,7 @@ class HvzDb:
         )
         return result
 
-    def __edit_row(self, table, search_column, search_value, target_column, target_value):
+    def _edit_row(self, table: Table, search_column, search_value, target_column, target_value):
         updator = (
             update(table).where(search_column == search_value).
                 values({target_column: target_value})
@@ -290,6 +315,7 @@ class HvzDb:
         with self.engine.begin() as conn:
             result = conn.execute(updator)
         if result.rowcount > 0:
+            self._table_updated(table)
             return True
         else:
             raise ValueError(f'\"{search_value}\" not found in \"{search_column}\" column.')

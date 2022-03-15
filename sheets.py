@@ -1,5 +1,6 @@
-from __future__ import print_function
+from __future__ import print_function, annotations
 from config import config
+import utilities as util
 import os.path
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -8,10 +9,12 @@ from google.oauth2.credentials import Credentials
 from datetime import datetime
 from loguru import logger
 import logging
+import asyncio
 
 from typing import Dict, List, Any, Union, TYPE_CHECKING
 if TYPE_CHECKING:
     import sqlalchemy
+    from hvzdb import HvzDb
 
 log = logger
 
@@ -27,12 +30,13 @@ SAMPLE_RANGE_NAME = 'Output!A2:B'
 
 class SheetsInterface:
 
-    def __init__(self, bot):
-        self.setup(bot)
+    def __init__(self, db: HvzDb):
+        self.setup(db)
+        self.waiting_tables: Dict[str, asyncio.Task] = {}
 
-    def setup(self, bot):
+    def setup(self, db):
 
-        self.bot = bot
+        self.db = db
         """Shows basic usage of the Sheets API.
         Prints values from a sample spreadsheet.
         """
@@ -64,14 +68,30 @@ class SheetsInterface:
             creds = Credentials.from_authorized_user_file('token.json', SCOPES)
             if creds.valid:
                 return
-        self.setup(self.bot)
+        self.setup(self.db)
 
-    def export_to_sheet(self, table_name):
-        #return
+
+    def update_table(self, table_name: str):
+        for table, task in self.waiting_tables.items():
+            if task.done():
+                self.waiting_tables.pop(table)
+            elif table == table_name:
+                task.cancel()
+                self.waiting_tables.pop(table)
+                break
+
+        # Set timer to _export table to sheet
+        task = asyncio.create_task(util.do_after_wait(self._export, 4.0, table_name))
+        self.waiting_tables[table_name] = task
+
+
+
+    def _export(self, table_name: str):
+        # TODO: Add a "cache and commit" system for using a small number of Google API calls
 
         self.check_creds()
 
-        table: List[sqlalchemy.engine.Row] = self.bot.db.get_table(table_name)
+        table: List[sqlalchemy.engine.Row] = self.db.get_table(table_name)
 
         column_order_raw: Dict[str, str] = config['database_tables'][table_name]
         column_order = []

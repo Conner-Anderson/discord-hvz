@@ -1,5 +1,5 @@
 import functools
-import discord
+import asyncio
 from discord.ext import commands
 
 import string
@@ -74,3 +74,8 @@ def generate_tag_tree(db):
         return output
 
     return loop(oz_table, 0)
+
+
+async def do_after_wait(func: callable, delay: float, *args, **kwargs):
+    await asyncio.sleep(delay)
+    func(*args, **kwargs)
