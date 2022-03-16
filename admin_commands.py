@@ -397,7 +397,7 @@ class AdminCommandsCog(commands.Cog):
                 setting: Option(
                     str,
                     'Config setting to change or view.',
-                    choices=['registration', 'tag_logging', 'silent_oz']
+                    choices=['registration', 'tag_logging', 'silent_oz', 'google_sheet_export']
                 ),
                 choice: Option(bool, 'What to change the setting to.', required=False)
         ):

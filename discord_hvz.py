@@ -1,5 +1,5 @@
 #!/bin/python3
-from __future__ import  annotations
+from __future__ import annotations
 from buttons import HVZButtonCog
 from config import config, ConfigError
 import sheets
@@ -30,7 +30,7 @@ from sqlalchemy.exc import NoSuchColumnError
 
 
 def dump(obj):
-    '''Prints the passed object in a very detailed form for debugging'''
+    """Prints the passed object in a very detailed form for debugging"""
     for attr in dir(obj):
         print("obj.%s = %r" % (attr, getattr(obj, attr)))
 
@@ -73,10 +73,10 @@ discord_logger.addHandler(InterceptHandler())
 class HVZBot(discord.Bot):
 
     def check_event(self, func):
-        '''
+        """
         A decorator that aborts events/listeners if they are from the wrong guild
         If you add an event of a type not used before, make sure the ctx here works with it
-        '''
+        """
 
         @functools.wraps(func)
         async def inner(ctx, *args, **kwargs):
@@ -101,7 +101,7 @@ class HVZBot(discord.Bot):
         return inner
 
     def check_dm_allowed(func):
-        '''A decorator for component callbacks. Catches the issue of users not allowing self DMs.'''
+        """A decorator for component callbacks. Catches the issue of users not allowing self DMs."""
 
         @functools.wraps(func)
         async def wrapper(self, ctx):
@@ -173,8 +173,6 @@ class HVZBot(discord.Bot):
 
                 log.success(
                     f'Discord-HvZ Bot launched correctly! Logged in as: {self.user.name} ------------------------------------------')
-                #self.sheets_interface.export_to_sheet('members')
-                #self.sheets_interface.export_to_sheet('tags')
 
             except Exception as e:
                 log.exception(f'self startup failed with this error --> {e}')
@@ -208,31 +206,6 @@ class HVZBot(discord.Bot):
 
         @self.listen()
         @self.check_event
-        async def on_message(message):
-
-            if (message.channel.type == discord.ChannelType.private):
-                for i, chatbot in enumerate(
-                        self.awaiting_chatbots):  # Check if the message could be part of an ongoing chat conversation
-                    if chatbot.member == message.author:
-                        try:
-                            result = await chatbot.take_response(message)
-                        except Exception as e:
-                            log.error(f'Exception in take_response() --> {e}')
-                            await message.author.send(
-                                'There was an error when running the chatbot! Report this to an admin with details.')
-                            return
-                        if result == 1:
-                            resolved_chat = await resolve_chat(chatbot)
-                            if resolved_chat == 1:
-                                await chatbot.end()
-                            self.awaiting_chatbots.pop(i)
-
-                        elif result == -1:
-                            self.awaiting_chatbots.pop(i)
-                        break
-
-        @self.listen()
-        @self.check_event
         async def on_member_update(before, after):
             # When roles or nicknames change, update the database and sheet.
             try:
@@ -244,134 +217,11 @@ class HVZBot(discord.Bot):
                 human = self.roles['human'] in after.roles
                 if zombie and not human:
                     self.db.edit_member(after, 'faction', 'zombie')
-                    self.sheets_interface.export_to_sheet('members')
                 elif human and not zombie:
                     self.db.edit_member(after, 'faction', 'human')
-                    self.sheets_interface.export_to_sheet('members')
             if not before.nick == after.nick:
                 self.db.edit_member(after, 'nickname', after.nick)
                 log.debug(f'{after.name} changed their nickname.')
-                self.sheets_interface.export_to_sheet('members')
-                self.sheets_interface.export_to_sheet('tags')
-
-        async def resolve_chat(chatbot):  # Called when a Chatself returns 1, showing it is done
-            responses = {}
-            for question in chatbot.questions:
-                responses[question['name']] = question['response']
-
-            log.debug(f'Responses recieved in resolve_chat() --> {responses}')
-
-            if chatbot.chat_type == 'registration':
-                responses['Faction'] = 'human'
-                responses['ID'] = str(chatbot.target_member.id)
-                responses['Discord_Name'] = chatbot.target_member.name
-                responses['Registration_Time'] = datetime.today()
-                responses['OZ'] = False
-
-                try:
-                    responses['Tag_Code'] = util.make_tag_code(self.db)
-
-                    self.db.add_member(responses)
-                    await chatbot.target_member.add_roles(self.roles['player'])
-                    await chatbot.target_member.add_roles(self.roles['human'])
-                    try:
-                        self.sheets_interface.export_to_sheet('members')
-                    except Exception as e:  # The registration can still succeed even if something is wrong with the sheet
-                        log.exception(e)
-
-                    return 1
-                except Exception:
-                    name = responses['Name']
-                    log.exception(f'Exception when completing registration for {chatbot.target_member.name}, {name}')
-                    await chatbot.member.send(
-                        'Something went very wrong with the registration, and it was not successful. Please message Conner Anderson about it.')
-
-            elif chatbot.chat_type == 'tag_logging':
-                try:
-                    try:
-                        tagged_member_data = self.db.get_member(responses['Tag_Code'].upper(), column='Tag_Code')
-                    except ValueError:
-                        await chatbot.member.send('That tag code doesn\'t match anyone! Try again.')
-                        return 0
-
-                    tagged_member_id = int(tagged_member_data['ID'])
-
-                    tagged_member = self.guild.get_member(tagged_member_id)
-                    if tagged_member is None:
-                        await chatbot.member.send(
-                            ('The player you tagged isn\'t on the Discord server anymore! '
-                             'Please ask them to rejoin the server, or contact an admin.')
-                        )
-                        log.error(
-                            f'{chatbot.target_member.name} tried to tag {tagged_member_data.Name} who isn\'t on the server anymore.'
-                        )
-                        return 0
-
-                    if self.roles['zombie'] in tagged_member.roles:
-                        await chatbot.member.send(
-                            '<@%s> is already a zombie! What are you up to?' % (tagged_member_data.ID))
-                        return 0
-
-                    tag_time = datetime.today()
-                    if not responses['Tag_Day'].casefold().find(
-                            'yesterday') == -1:  # Converts tag_day to the previous day
-                        tag_time -= timedelta(days=1)
-                    tag_datetime = parser.parse(responses['Tag_Time'] + ' and 0 seconds', default=tag_time)
-                    responses['Tag_Time'] = tag_datetime
-                    responses['Report_Time'] = datetime.today()
-
-                    if tag_datetime > datetime.today():
-                        await chatbot.member.send('The tag time you stated is in the future. Try again.')
-                        return 0
-
-                    tagger_member_data = self.db.get_member(chatbot.target_member)
-
-                    responses['Tagged_ID'] = tagged_member_id
-                    responses['Tagged_Name'] = tagged_member_data.Name
-                    responses['Tagged_Discord_Name'] = tagged_member_data.Discord_Name
-                    responses['Tagged_Nickname'] = tagged_member.nick
-                    responses['Tagger_ID'] = chatbot.target_member.id
-                    responses['Tagger_Name'] = tagger_member_data.Name
-                    responses['Tagger_Discord_Name'] = tagger_member_data.Discord_Name
-                    responses['Tagger_Nickname'] = chatbot.target_member.nick
-                    responses['Revoked_Tag'] = False
-
-                    self.db.add_tag(responses)
-
-                    new_human_count = len(self.roles['human'].members) - 1
-                    new_zombie_count = len(self.roles['zombie'].members) + 1
-
-                    await tagged_member.add_roles(self.roles['zombie'])
-                    await tagged_member.remove_roles(self.roles['human'])
-
-                    self.db.edit_member(tagged_member, 'Faction', 'zombie')
-                    try:
-                        self.sheets_interface.export_to_sheet('tags')
-                        self.sheets_interface.export_to_sheet('members')
-                    except Exception as e:
-                        log.exception(e)
-
-                    msg = f'<@{tagged_member_id}> has turned zombie!'
-                    if not config['silent_oz']:
-                        msg += f'\nTagged by <@{chatbot.target_member.id}>'
-                        msg += tag_datetime.strftime(' at about %I:%M %p')
-
-                    msg += f'\nThere are now {new_human_count} humans and {new_zombie_count} zombies.'
-
-                    await self.channels['tag-announcements'].send(msg)
-
-                    # Try to make a useful console output, but don't worry if it fails.
-                    try:
-                        tag_id = self.db.get_rows('tags', 'Tag_Time', tag_datetime)[0].Tag_ID
-                        log.info(f'{chatbot.target_member.name} tagged {tagged_member.name}. Tag ID: {tag_id}')
-                    except Exception as e:
-                        log.warning(e)
-                    return 1
-
-                except Exception:
-                    log.exception(f'Tag log for {chatbot.member.name} failed.')
-                    await chatbot.member.send(
-                        'The tag log failed! This is likely a bug. Please message Conner Anderson about it.')
 
     def get_member(self, user_id: int):
         user_id = int(user_id)
@@ -404,7 +254,6 @@ class HVZBot(discord.Bot):
             chatbot_manager = self.get_cog('ChatBotManager')
             await chatbot_manager.start_chatbot('registration', interaction.user)
 
-
     @check_dm_allowed
     async def tag_log(self, interaction: discord.Interaction):
 
@@ -422,6 +271,7 @@ class HVZBot(discord.Bot):
 
         chatbot_manager = self.get_cog('ChatBotManager')
         await chatbot_manager.start_chatbot('tag_logging', interaction.user)
+
 
 try:
     bot = HVZBot()

@@ -109,14 +109,19 @@ class HvzDb:
         if config['google_sheet_export'] == True:
             self.sheet_interface = sheets.SheetsInterface(self)
 
-    def _table_updated(self, table: Table) -> None:
+    def _table_updated(self, table: Union[Table, str]) -> None:
         """
         To be called whenever a function changes a table. This lets the Google Sheet update.
         :param table:
         :return:
         """
-        table_name: str = table.name
-        self.sheet_interface.update_table(table_name)
+        try:
+            if isinstance(table, Table): table_name = table.name
+            else: table_name = table
+            self.sheet_interface.update_table(table_name)
+        except Exception as e:
+            # Allow sheet failure to silently pass for the user.
+            logger.error(f'The database failed to update to the Google Sheet with this error: {e}')
 
 
     def _create_column_object(self, column_name: str, column_type: str) -> Column:
@@ -152,6 +157,7 @@ class HvzDb:
 
         with self.engine.begin() as conn:
             result = conn.execute(table.insert().values(row))
+            self._table_updated(table)
             return result
 
 
@@ -349,7 +355,8 @@ class HvzDb:
         deletor = delete(table).where(search_column == search_value)
         with self.engine.begin() as conn:
             conn.execute(deletor)
-            return True
+        self._table_updated(table)
+        return True
 
     def get_rows(self, table, search_column, search_value, exclusion_column=None, exclusion_value=None):
         """

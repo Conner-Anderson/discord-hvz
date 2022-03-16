@@ -87,7 +87,7 @@ class SheetsInterface:
 
 
     def _export(self, table_name: str):
-        # TODO: Add a "cache and commit" system for using a small number of Google API calls
+        # TODO: It would be nice if this didn't have to deal directly with the database. Not a huge deal.
 
         self.check_creds()
 
