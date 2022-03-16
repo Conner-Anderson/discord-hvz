@@ -13,9 +13,8 @@ if TYPE_CHECKING:
 from datetime import datetime
 
 import sqlalchemy
-from sqlalchemy import create_engine, MetaData, event
-from sqlalchemy import text
-from sqlalchemy import MetaData
+from sqlalchemy.engine import Row
+from sqlalchemy import create_engine, MetaData, event, text
 from sqlalchemy import Table, Column, Integer, String, DateTime, Boolean, ForeignKey
 from sqlalchemy import insert, select, delete, update
 from sqlalchemy import func, cast, and_
@@ -163,7 +162,7 @@ class HvzDb:
 
 
 
-    def get_member(self, value, column: str = None):
+    def get_member(self, value, column: str = None) -> Row:
         """
         Returns a Row object that represents a single member in the database
 
@@ -237,7 +236,7 @@ class HvzDb:
             raise ValueError(f'Could not find a row where \"{search_column}\" is \"{search_value}\"')
         return result_row
 
-    def get_table(self, table) -> List[sqlalchemy.engine.Row]:
+    def get_table(self, table) -> List[Row]:
         """
         Returns a list of all members in the database
 

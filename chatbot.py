@@ -323,6 +323,9 @@ class ChatBot:
     async def ask_question(self, existing_chatbot: ChatBot = None, first: bool = False):
         msg, view = self.script.ask_next_question(existing_script=getattr(existing_chatbot, 'script', None),
                                                   first=first)
+        if first and self.target_member != self.chat_member:
+            await self.chat_member.send(f'The following is for <@{self.target_member.id}>.')
+
         await self.chat_member.send(msg, view=view)
 
     async def receive(self, message: Union[discord.Message, str]) -> bool:
@@ -337,7 +340,7 @@ class ChatBot:
                 try:
                     await self.save(responses)
                 except ValueError as e:
-                    await self.target_member.send(str(e))
+                    await self.chat_member.send(str(e))
                 else:
                     await self.chat_member.send(self.script.ending)
                 return True
@@ -378,7 +381,7 @@ class ChatBotManager(commands.Cog):
             chatbot_kind: str,
             chat_member: discord.Member,
             target_member: discord.Member = None
-    ):
+    ) -> None:
         existing = self.active_chatbots.get(chat_member.id)
 
         self.active_chatbots[chat_member.id] = ChatBot(

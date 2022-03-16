@@ -1,3 +1,4 @@
+from __future__ import annotations
 import discord
 from discord.ext import commands
 from discord.commands import SlashCommandGroup, CommandPermission
@@ -10,6 +11,12 @@ import utilities as util
 from chatbot import ChatBotManager
 from config import config
 from loguru import logger
+
+from typing import List, Union, Dict, TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from discord_hvz import HVZBot
+    from sqlalchemy.engine import Row
 
 log = logger
 
@@ -26,33 +33,8 @@ guild_id_list = [config['available_servers'][config['active_server']]]
 
 
 class AdminCommandsCog(commands.Cog):
-    def check_event(self, func):
-        """
-        A decorator that aborts events/listeners if they are from the wrong guild
-        If you add an event of a type not used before, make sure the ctx here works with it
-        """
 
-        @functools.wraps(func)
-        async def inner(ctx, *args, **kwargs):
-            my_guild_id = self.bot.guild.id
-            if isinstance(ctx, discord.Interaction):
-                guild_id = ctx.guild_id
-            elif isinstance(ctx, discord.Message):
-                if ctx.channel.type == discord.ChannelType.private:
-                    guild_id = my_guild_id  # Treat private messages as if they are part of this guild
-                else:
-                    guild_id = self.bot.guild.id
-            elif isinstance(ctx, discord.Member) | isinstance(ctx, commands.Context):
-                guild_id = ctx.guild.id
-            if guild_id != my_guild_id:
-                return
-            result = await func(ctx, *args, **kwargs)
-
-            return result
-
-        return inner
-
-    def __init__(self, bot):
+    def __init__(self, bot: HVZBot):
         self.bot = bot
 
         # The below gorup creation method is a patch until the devs implement a better way.
@@ -97,13 +79,14 @@ class AdminCommandsCog(commands.Cog):
                 return
 
             if setting is None:
-                await ctx.respond(f'{member_row.Name}\'s OZ status is {member_row.OZ}. Give a True or False argument to change their setting.')
+                await ctx.respond(
+                    f'{member_row.name}\'s OZ status is {member_row.oz}. Give a True or False argument to change their setting.')
                 return
-            bot.db.edit_member(member_row.ID, 'OZ', setting)
+            bot.db.edit_member(member_row.id, 'oz', setting)
 
-            await ctx.respond(f'Changed <@{member_row.ID}>\'s OZ status to {setting}')
+            await ctx.respond(f'Changed <@{member_row.id}>\'s OZ status to {setting}')
 
-            member = bot.guild.get_member(int(member_row.ID))
+            member = bot.guild.get_member(int(member_row.id))
             t_channel = bot.channels['report-tags']
             c_channel = bot.channels['zombie-chat']
             try:
@@ -116,7 +99,6 @@ class AdminCommandsCog(commands.Cog):
             except Exception as e:
                 await ctx.respond('Could not change permissions in the channels. Please give the bot permission to.')
                 log.warning(e)
-            bot.sheets_interface.export_to_sheet('members')
 
         @member_group.command(guild_ids=guild_id_list, name='delete')
         @permissions.has_role('Admin')
@@ -134,16 +116,16 @@ class AdminCommandsCog(commands.Cog):
             Deletion works even on players who have left the server.
             """
             member_row = bot.db.get_member(member)
-            bot.db.delete_member(member_row.ID)
+            member_id = member_row.id
+            bot.db.delete_member(member_id)
 
-            member = bot.guild.get_member(int(member_row.ID))
+            member = bot.guild.get_member(int(member_id))
             await member.remove_roles(bot.roles['human'])
             await member.remove_roles(bot.roles['zombie'])
             await member.remove_roles(bot.roles['player'])
 
             await ctx.respond(
-                f'<@{member_row.ID}> deleted from the game. Roles revoked, expunged from the database. Any tags will still exist.')
-            bot.sheets_interface.export_to_sheet('members')
+                f'<@{member_id}> deleted from the game. Roles revoked, expunged from the database. Any tags will still exist.')
 
         @member_group.command(guild_ids=guild_id_list, name='edit')
         @permissions.has_role('Admin')
@@ -174,7 +156,7 @@ class AdminCommandsCog(commands.Cog):
             bot.db.edit_member(member_row.id, attribute, value)
             await ctx.respond(
                 f'The value of {attribute} for <@{member_row.id}> was changed from \"{original_value}\"" to \"{value}\"')
-            #bot.sheets_interface.export_to_sheet('members')
+            # bot.sheets_interface.export_to_sheet('members')
 
         @member_group.command(guild_ids=guild_id_list, name='list')
         @permissions.has_role('Admin')
@@ -190,10 +172,10 @@ class AdminCommandsCog(commands.Cog):
                 char_length = 0
 
                 data = bot.db.get_table('members')
-
+                # TODO: Reconcile the fact that this function requires an email cell
                 if data:
                     for m in data:
-                        sub_string = '<@!' + m['ID'] + '>' + '\t' + m['Name'] + '\t' + m['Email'] + '\n'
+                        sub_string = f'<@!{m.id}>\t{m.name}\t{m.email}\n'
                         char_length += len(sub_string)
                         if char_length > DISCORD_MESSAGE_MAX_LENGTH:
                             await ctx.respond(f'{column_string}')
@@ -225,17 +207,17 @@ class AdminCommandsCog(commands.Cog):
             try:
                 bot.db.get_member(member)
                 await ctx.respond(f'<@{member.id}> is already registered.')
+                return
             except ValueError:
-                for i, c in enumerate(bot.awaiting_chatbots):  # Restart registration if one is already in progress
-                    if (c.member == ctx.author) and c.chat_type == 'registration':
-                        await ctx.author.send('**Restarting registration process...**')
-                        bot.awaiting_chatbots.pop(i)
+                pass
 
-                chatbot = ChatBot(ctx.author, 'registration', target_member=member)
-                await ctx.author.send(f'The following registration is for <@{member.id}>.')
-                await chatbot.ask_question()
-                bot.awaiting_chatbots.append(chatbot)
-                await ctx.respond('Registration chatbot started in direct message.', ephemeral=True)
+            chatbotmanager: Union[ChatBotManager, None] = bot.get_cog('ChatBotManager')
+            if not chatbotmanager:
+                await ctx.respond('ChatBotManager not loaded. Command failed.')
+                return
+
+            await chatbotmanager.start_chatbot('registration', ctx.author, target_member=member)
+            await ctx.respond('Registration chatbot started in a DM', ephemeral=True)
 
         @tag_group.command(guild_ids=guild_id_list, name='create')
         @permissions.has_role('Admin')
@@ -249,17 +231,13 @@ class AdminCommandsCog(commands.Cog):
             but the discord user actually making the tag will be the one specified.
             Does not check the faction membership of the tagger or if tag logging is on.
             """
+            chatbotmanager: Union[ChatBotManager, None] = bot.get_cog('ChatBotManager')
+            if not chatbotmanager:
+                await ctx.respond('ChatBotManager not loaded. Command failed.')
+                return
 
-            for i, c in enumerate(bot.awaiting_chatbots):  # Restart tag log if one is already in progress
-                if (c.member == ctx.author) and c.chat_type == 'tag_logging':
-                    await ctx.author.send('**Restarting tag logging process...**')
-                    bot.awaiting_chatbots.pop(i)
-
-            chatbot = ChatBot(ctx.author, 'tag_logging', target_member=member)
-            await ctx.author.send(f'The following registration is for <@{member.id}>.')
-            await chatbot.ask_question()
-            bot.awaiting_chatbots.append(chatbot)
-            await ctx.respond('Tag log chatbot started in a DM', ephemeral=True)
+            await chatbotmanager.start_chatbot('tag_logging', ctx.author, target_member=member)
+            await ctx.respond('Tag logging chatbot started in a DM', ephemeral=True)
 
         @tag_group.command(guild_ids=guild_id_list, name='delete')
         @permissions.has_role('Admin')
@@ -278,16 +256,16 @@ class AdminCommandsCog(commands.Cog):
             tag_row = bot.db.get_tag(tag_id)
             bot.db.delete_tag(tag_id)
             msg = ''
-
-            tagged_member = bot.guild.get_member(int(tag_row.Tagged_ID))
+            # TODO: This might use optional column values. At least need to think about it.
+            tagged_member = bot.guild.get_member(int(tag_row.tagged_id))
             if tagged_member is None:
-                msg += f'Roles not changed since <@{tag_row.Tagged_ID}> ({tag_row.Tagged_Name}) is no longer on the server.'
+                msg += f'Roles not changed since <@{tag_row.tagged_id}> ({tag_row.tagged_name}) is no longer on the server.'
             else:
                 try:
-                    existing_tag = bot.db.get_tag(tag_row.Tagged_ID, column='Tagged_ID', filter_revoked=True)
+                    existing_tag = bot.db.get_tag(tag_row.tagged_id, column='Tagged_ID', filter_revoked=True)
                     # Change to human if there are no previous tags on the tagged member
-                    msg += (f'Left <@{tagged_member.id}> as zombie because <@{existing_tag.Tagger_ID}> '
-                            f'({existing_tag.Tagger_Name}) still tagged them in tag {existing_tag.Tag_ID}')
+                    msg += (f'Left <@{tagged_member.id}> as zombie because <@{existing_tag.tagger_id}> '
+                            f'({existing_tag.tagger_name}) still tagged them in tag {existing_tag.tag_id}')
                 except ValueError:
                     await tagged_member.add_roles(bot.roles['human'])
                     await tagged_member.remove_roles(bot.roles['zombie'])
@@ -295,7 +273,6 @@ class AdminCommandsCog(commands.Cog):
 
             msg = f'Tag {tag_id} deleted. ' + msg
             await ctx.respond(msg)
-            bot.sheets_interface.export_to_sheet('tags')
 
         @tag_group.command(guild_ids=guild_id_list, name='edit')
         @permissions.has_role('Admin')
@@ -316,10 +293,9 @@ class AdminCommandsCog(commands.Cog):
             tag_row = bot.db.get_tag(tag_id)
 
             original_value = tag_row[attribute]
-            bot.db.edit_tag(tag_row.Tag_ID, attribute, value)
+            bot.db.edit_tag(tag_row.tag_id, attribute, value)
             await ctx.respond(
-                f'The value of {attribute} for tag {tag_row.Tag_ID} was changed from \"{original_value}\"" to \"{value}\"')
-            bot.sheets_interface.export_to_sheet('members')
+                f'The value of {attribute} for tag {tag_row.tag_id} was changed from \"{original_value}\"" to \"{value}\"')
 
         @tag_group.command(guild_ids=guild_id_list, name='revoke')
         @permissions.has_role('Admin')
@@ -337,19 +313,19 @@ class AdminCommandsCog(commands.Cog):
             """
             tag_row = bot.db.get_tag(tag_id)
 
-            bot.db.edit_tag(tag_id, 'Revoked_Tag', True)
+            bot.db.edit_tag(tag_id, 'revoked_tag', True)
 
             msg = ''
 
-            tagged_member = bot.guild.get_member(int(tag_row.Tagged_ID))
+            tagged_member = bot.guild.get_member(int(tag_row.tagged_id))
             if tagged_member is None:
-                msg += f'Roles not changed since <@{tag_row.Tagged_ID}> ({tag_row.Tagged_Name}) is no longer on the server.'
+                msg += f'Roles not changed since <@{tag_row.tagged_id}> ({tag_row.tagged_name}) is no longer on the server.'
             else:
                 try:
-                    existing_tag = bot.db.get_tag(tag_row.Tagged_ID, column='Tagged_ID', filter_revoked=True)
+                    existing_tag = bot.db.get_tag(tag_row.tagged_id, column='tagged_id', filter_revoked=True)
                     # Change to human if there are no previous tags on the tagged member
-                    msg += (f'Left <@{tagged_member.id}> as zombie because <@{existing_tag.Tagger_ID}> '
-                            f'({existing_tag.Tagger_Name}) still tagged them in tag {existing_tag.Tag_ID}')
+                    msg += (f'Left <@{tagged_member.id}> as zombie because <@{existing_tag.tagger_id}> '
+                            f'({existing_tag.tagger_name}) still tagged them in tag {existing_tag.tag_id}')
                 except ValueError:
                     await tagged_member.add_roles(bot.roles['human'])
                     await tagged_member.remove_roles(bot.roles['zombie'])
@@ -357,7 +333,6 @@ class AdminCommandsCog(commands.Cog):
 
             msg = f'Tag {tag_id} revoked. ' + msg
             await ctx.respond(msg)
-            bot.sheets_interface.export_to_sheet('tags')
 
         @tag_group.command(guild_ids=guild_id_list, name='restore')
         @permissions.has_role('Admin')
@@ -374,13 +349,13 @@ class AdminCommandsCog(commands.Cog):
             """
             tag_row = bot.db.get_tag(tag_id)
 
-            bot.db.edit_tag(tag_id, 'Revoked_Tag', False)
+            bot.db.edit_tag(tag_id, 'revoked_tag', False)
 
             msg = ''
 
-            tagged_member = bot.guild.get_member(int(tag_row.Tagged_ID))
+            tagged_member = bot.guild.get_member(int(tag_row.tagged_id))
             if tagged_member is None:
-                msg += f'Roles not changed since <@{tag_row.Tagged_ID}> ({tag_row.Tagged_Name}) is no longer on the server.'
+                msg += f'Roles not changed since <@{tag_row.tagged_id}> ({tag_row.tagged_name}) is no longer on the server.'
             else:
                 await tagged_member.add_roles(bot.roles['zombie'])
                 await tagged_member.remove_roles(bot.roles['human'])
@@ -388,7 +363,6 @@ class AdminCommandsCog(commands.Cog):
 
             msg = f'Tag {tag_id} restored. ' + msg
             await ctx.respond(msg)
-            bot.sheets_interface.export_to_sheet('tags')
 
         @bot.command(guild_ids=guild_id_list, name='config')
         @permissions.has_role('Admin')
@@ -435,7 +409,7 @@ class AdminCommandsCog(commands.Cog):
 
             """
             try:
-                tag_code = bot.db.get_member(ctx.author).Tag_Code
+                tag_code = bot.db.get_member(ctx.author).tag_code
                 await ctx.respond(f'Your tag code is: {tag_code}\nHave this ready to give to a zombie who tags you.',
                                   ephemeral=True)
             except Exception as e:
@@ -461,6 +435,7 @@ class AdminCommandsCog(commands.Cog):
                     if next_length > 3000:
                         await ctx.respond(buffer)
                         buffer = ''
+
         '''
         @tag_group.command(guild_ids=guild_id_list, name='tagger')
         @permissions.has_role('Admin')
@@ -476,6 +451,7 @@ class AdminCommandsCog(commands.Cog):
             tagger =
             ctx.respond(f'Tagger for tag {tag_id}: <@{tagger.id}>')
         '''
+
         @bot.command(guild_ids=guild_id_list, description='Shuts down the bot.')
         @permissions.has_role('Admin')
         async def shutdown(ctx):
@@ -483,13 +459,8 @@ class AdminCommandsCog(commands.Cog):
             Shuts down bot. If there are active chats, list them and don't shut down.
 
             """
-            if len(bot.awaiting_chatbots) == 0:
-                await ctx.respond('Shutting Down')
-                log.critical('Shutting Down\n. . .\n\n')
-                await bot.close()
-                time.sleep(1)
-            else:
-                msg = 'These chatbots are active:\n'
-                for c in bot.awaiting_chatbots:
-                    msg += f'<@{c.member.id}> has a chatbot of type {c.chat_type}\n'
-                await ctx.respond(msg)
+            # TODO: Restore graceful shutdown function when chatbots are active
+            await ctx.respond('Shutting Down')
+            log.critical('Shutting Down\n. . .\n\n')
+            await bot.close()
+            time.sleep(1)

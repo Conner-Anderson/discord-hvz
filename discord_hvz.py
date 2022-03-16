@@ -71,7 +71,7 @@ discord_logger.addHandler(InterceptHandler())
 
 
 class HVZBot(discord.Bot):
-
+    db: HvzDb
     def check_event(self, func):
         """
         A decorator that aborts events/listeners if they are from the wrong guild

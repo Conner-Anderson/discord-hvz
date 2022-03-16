@@ -18,7 +18,7 @@ def make_tag_code(db):
         for n in range(6):
             tag_code += code_set[random.randint(0, len(code_set) - 1)]
         try:
-            db.get_member(tag_code, column='Tag_Code')
+            db.get_member(tag_code, column='tag_code')
         except ValueError:
             return tag_code
 
@@ -26,7 +26,7 @@ def make_tag_code(db):
 
 
 def member_from_string(member_string, db, ctx=None):
-    options = ['ID', 'Discord_Name', 'Nickname', 'Name']
+    options = ['id', 'discord_name', 'nickname', 'name']
 
     if (ctx is not None) and (len(ctx.message.mentions) > 0):
         member_row = db.get_member(ctx.message.mentions[0])
@@ -51,11 +51,11 @@ def generate_tag_tree(db):
             output += '\n'
             for x in range(level):
                 output += '    '
-            output += f'- <@{r.ID}>'
+            output += f'- <@{r.id}>'
             if level == 0:
                 output += ' (OZ)'
             try:
-                tags = db.get_rows('tags', 'Tagger_ID', r.ID, exclusion_column='Revoked_Tag', exclusion_value=True)
+                tags = db.get_rows('tags', 'tagger_id', r.id, exclusion_column='revoked_tag', exclusion_value=True)
 
             except ValueError:
                 pass
@@ -67,7 +67,7 @@ def generate_tag_tree(db):
                 output += ':'
                 tagged_members = []
                 for t in tags:
-                    tagged_members.append(db.get_member(t.Tagged_ID))
+                    tagged_members.append(db.get_member(t.tagged_id))
 
                 output += loop(tagged_members, level + 1)
 
