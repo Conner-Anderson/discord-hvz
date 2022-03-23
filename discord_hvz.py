@@ -278,7 +278,7 @@ try:
     bot = HVZBot()
     bot.add_cog(ChatBotManager(bot))
     bot.add_cog(AdminCommandsCog(bot))
-    bot.add_cog(HVZButtonCog(bot))
+    #bot.add_cog(HVZButtonCog(bot))
 
     bot.run(token)
 except ConfigError as e:

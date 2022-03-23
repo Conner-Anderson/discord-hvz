@@ -3,7 +3,7 @@ from dataclasses import dataclass, field, InitVar
 import yaml
 import regex
 import discord
-from discord.commands import slash_command
+from discord.commands import slash_command, Option
 from discord.ext import commands
 from loguru import logger
 from typing import List, Union, Dict, Any
@@ -15,11 +15,13 @@ if TYPE_CHECKING:
 
 from config import config, ConfigError
 from buttons import HVZButton
+import chatbotbuttons
 
 import chatbotprocessors
 
 log = logger
 
+# Used for creating commands
 guild_id_list = [config['available_servers'][config['active_server']]]
 
 
@@ -377,6 +379,8 @@ class ChatBotManager(commands.Cog):
 
         for kind, script in scripts_data.items():
             self.loaded_scripts[kind] = (ScriptData.build(kind, script, chatbotmanager=self))
+
+        chatbotbuttons.setup_buttons(bot)
 
         log.info('ChatBotManager Initialized')
 
