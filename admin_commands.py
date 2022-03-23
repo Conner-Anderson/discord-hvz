@@ -1,4 +1,4 @@
-from __future__ import annotations
+#from __future__ import annotations
 import discord
 from discord.ext import commands
 from discord.commands import SlashCommandGroup, CommandPermission
@@ -34,7 +34,7 @@ guild_id_list = [config['available_servers'][config['active_server']]]
 
 class AdminCommandsCog(commands.Cog):
 
-    def __init__(self, bot: HVZBot):
+    def __init__(self, bot):
         self.bot = bot
 
         # The below gorup creation method is a patch until the devs implement a better way.

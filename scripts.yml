@@ -24,7 +24,7 @@ registration:
       What is your CPO? This is used for player band delivery.
       If you don\'t have one (such as commuters), please type "None"
     valid_regex: '(?i)\d*|none'
-    rejection_response: I'm looking for a single number here, or None.
+    rejection_response: I'm looking for a single number here, or \'None\'.
   - name: Email
     display_name: Email
     query: What is your @LETU.edu email?

@@ -61,7 +61,7 @@ class QuestionData:
 
         if question_data.get('button_options'):
             buttons = []
-            log.info(question_data['button_options'])
+            log.debug(question_data['button_options'])
             for label, color in question_data['button_options'].items():
                 buttons.append(
                     HVZButton(
@@ -195,6 +195,7 @@ class Script:
     modifying: bool = field(init=False, default=False)
 
     # next_review_question: int = field(init=False, default=0)
+    # TODO: Add concelation functionality
 
     def __post_init__(self):
         for i, q in enumerate(self.data.questions):
@@ -268,6 +269,7 @@ class Script:
         return message, view
 
     def receive_response(self, response: str, target_member: discord.Member) -> Union[None, dict]:
+        # A messy do-it-all function. Could use improvement.
         if self.last_asked_question >= self.length:
             if not self.modifying:
                 choice = response.casefold()
@@ -328,9 +330,11 @@ class ChatBot:
 
         await self.chat_member.send(msg, view=view)
 
-    async def receive(self, message: Union[discord.Message, str]) -> bool:
-        if isinstance(message, discord.Message):
-            message = str(message.clean_content)
+    async def receive(self, message: str) -> bool:
+        message = message.strip()
+        if message.casefold() == 'cancel':
+            await self.chat_member.send(f'Chat "{self.script.kind}" cancelled.')
+            return True
         try:
             responses = self.script.receive_response(message, target_member=self.target_member)
         except ResponseError as e:
@@ -445,7 +449,7 @@ class ChatBotManager(commands.Cog):
                     new_view.stop()
 
     async def receive_response(self, author_id: int, response_text: str):
-        log.info(f'author_id: {author_id} response_text: {response_text}')
+        log.debug(f'author_id: {author_id} response_text: {response_text}')
         chatbot = self.active_chatbots.get(author_id)
 
         if chatbot is None or chatbot.processing is True:

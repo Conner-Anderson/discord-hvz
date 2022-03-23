@@ -58,7 +58,7 @@ def tag_code_to_member_id(input_text: str, bot: HVZBot) -> str:
         raise ValueError('This tag code didn\'t match a user')
 
     tagged_member = bot.get_member(tagged_member_row.id)
-    logger.info(f'ID: {tagged_member_row.id} Row: {tagged_member_row}')
+    logger.debug(f'ID: {tagged_member_row.id} Row: {tagged_member_row}')
     if tagged_member is None:
         raise ValueError(f'"{tagged_member_row.name}" is no longer on the Discord server. Contact them, then an Admin.')
     if bot.roles['zombie'] in tagged_member.roles:

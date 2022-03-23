@@ -120,7 +120,7 @@ class HvzDb:
             self.sheet_interface.update_table(table_name)
         except Exception as e:
             # Allow sheet failure to silently pass for the user.
-            logger.error(f'The database failed to update to the Google Sheet with this error: {e}')
+            logger.exception(f'The database failed to update to the Google Sheet with this error: {e}')
 
 
     def _create_column_object(self, column_name: str, column_type: str) -> Column:
@@ -332,7 +332,7 @@ class HvzDb:
 
         self.__delete_row(
             self.tables['members'],
-            self.tables['members'].c.ID,
+            self.tables['members'].c.id,
             member_id
         )
         return
@@ -341,7 +341,7 @@ class HvzDb:
         table = self.tables['tags']
         self.__delete_row(
             table,
-            table.c.Tag_ID,
+            table.c.tag_id,
             tag_id
         )
         return
