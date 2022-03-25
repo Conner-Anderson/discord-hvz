@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     import discord
 
 
-async def registration(responses: Dict[str, Any], bot: HVZBot, target_member: discord.Member) -> None:
+async def registration_end(responses: Dict[str, Any], bot: HVZBot, target_member: discord.Member) -> None:
 
     responses['faction'] = 'human'
     responses['id'] = str(target_member.id)
@@ -56,3 +56,6 @@ async def tag_logging(responses: Dict[str, Any], bot: HVZBot, target_member: dis
         logger.warning(e)
 
     return responses
+
+def registration_start(*args, **kwargs):
+    pass

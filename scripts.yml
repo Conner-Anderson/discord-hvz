@@ -9,7 +9,10 @@ registration:
   table: members
   beginning: I'll register you for HvZ. Type 'cancel' at any time to stop this conversation.
   ending: You are registered for HvZ! Please read the rules. New channels are available to you.
-  processor: registration
+  starting_processor: registration_start
+  ending_processor: registration_end
+  postable_button_color: green
+  postable_button_label: Register
   questions:
   - name: Name
     display_name: Name
@@ -53,7 +56,7 @@ tag_logging:
   table: tags
   beginning: Let's log a tag. Type 'cancel' at any time to stop this conversation.
   ending: Tag logged! Make sure your newly-brainless friend feels welcome in the hoard.
-  processor: tag_logging
+  starting_processor: tag_logging
   questions:
   - name: tagged_id
     display_name: Tag Code

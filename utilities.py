@@ -1,4 +1,5 @@
 import functools
+from inspect import iscoroutinefunction
 import asyncio
 from discord.ext import commands
 
@@ -78,4 +79,7 @@ def generate_tag_tree(db):
 
 async def do_after_wait(func: callable, delay: float, *args, **kwargs):
     await asyncio.sleep(delay)
-    func(*args, **kwargs)
+    if iscoroutinefunction(func):
+        await func(*args, **kwargs)
+    else:
+        func(*args, **kwargs)

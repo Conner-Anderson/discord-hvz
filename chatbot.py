@@ -24,13 +24,6 @@ log = logger
 # Used for creating commands
 guild_id_list = [config['available_servers'][config['active_server']]]
 
-
-def dump(obj):
-    """Prints the passed object in a very detailed form for debugging"""
-    for attr in dir(obj):
-        print("obj.%s = %r" % (attr, getattr(obj, attr)))
-
-
 class ResponseError(ValueError):
     def __init__(self, message=None):
         if message is not None:
@@ -115,7 +108,9 @@ class ScriptData:
     special_buttons: Dict[str, HVZButton]
     beginning: str = ''
     ending: str = ''
-    processor: callable = None
+    starting_processor: callable = None
+    ending_processor: callable = None
+    _postable_button: HVZButton = None
 
     @classmethod
     def build(cls, kind: str, script: Dict, chatbotmanager: ChatBotManager) -> ScriptData:
@@ -152,15 +147,35 @@ class ScriptData:
         # Add the additional arguments to the script
         script.update({'special_buttons': special_buttons, 'review_selection_buttons': review_selection_buttons})
 
-        processor = script.get('processor')
-        if processor:
+        possible_processors = ['starting_processor', 'ending_processor']
+        for p in possible_processors:
+            name = script.get(p)
+            if not name:
+                continue
             try:
-                script['processor'] = chatbotprocessors.script_processors[processor]
+                script[p] = chatbotprocessors.script_processors[name]
             except KeyError:
-                raise ConfigError(f'Processor "{processor}" does not match any function.')
+                raise ConfigError(f'Processor "{name}" does not match any function.')
+
+
+        # Assemble a button that can be posted with the /post command.
+        button_color = script.pop('postable_button_color', None)
+        if not button_color:
+            button_color = 'green'
+        button_label = script.pop('postable_button_label', None)
+        if not button_label:
+            button_label = kind
+
+        postable_button = HVZButton(
+            function=chatbotmanager.start_chatbot_from_interaction,
+            custom_id=kind,
+            label=button_label,
+            color=button_color,
+            postable_bot=chatbotmanager.bot)
+        log.info(postable_button)
 
         try:
-            return ScriptData(kind=kind, questions=questions, **script)
+            return ScriptData(kind=kind, questions=questions, _postable_button=postable_button, **script)
         except TypeError as e:
             e_text = repr(e)
             if 'missing' in e_text:
@@ -170,7 +185,7 @@ class ScriptData:
             elif 'unexpected' in e_text:
                 attribute = e_text[e_text.find('\''):-2]
                 raise ConfigError(
-                    f'Question \'{kind}\' has the unknown attribute {attribute}. Check scripts.yml') from e
+                    f'Script \'{kind}\' has the unknown attribute {attribute}. Check scripts.yml') from e
             else:
                 raise e
 
@@ -329,6 +344,12 @@ class ChatBot:
                                                   first=first)
         if first and self.target_member != self.chat_member:
             await self.chat_member.send(f'The following is for <@{self.target_member.id}>.')
+        starting_processor = self.script.data.starting_processor
+        if first and starting_processor:
+            try:
+                starting_processor(self.target_member)
+            except ValueError as e:
+                await self.chat_member.send()
 
         await self.chat_member.send(msg, view=view)
 
@@ -356,7 +377,7 @@ class ChatBot:
 
     async def save(self, responses):
 
-        responses = await self.script.data.processor(
+        responses = await self.script.data.ending_processor(
             responses=responses,
             bot=self.bot,
             target_member=self.target_member
@@ -392,14 +413,19 @@ class ChatBotManager(commands.Cog):
     ) -> None:
         existing = self.active_chatbots.get(chat_member.id)
 
-        self.active_chatbots[chat_member.id] = ChatBot(
+        new_chatbot = ChatBot(
             Script(self.loaded_scripts[chatbot_kind], self.bot),
             self.bot,
             chat_member,
             target_member
 
         )
-        await self.active_chatbots[chat_member.id].ask_question(existing, first=True)
+        self.active_chatbots[chat_member.id] = new_chatbot
+        await new_chatbot.ask_question(existing, first=True)
+
+    async def start_chatbot_from_interaction(self, interaction: discord.Interaction):
+        await interaction.response.send_message('Check your direct messages.', ephemeral=True)
+        await self.start_chatbot(interaction.custom_id, interaction.user)
 
     @slash_command(guild_ids=guild_id_list)
     async def chatbots(self, ctx):

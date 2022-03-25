@@ -436,22 +436,6 @@ class AdminCommandsCog(commands.Cog):
                         await ctx.respond(buffer)
                         buffer = ''
 
-        '''
-        @tag_group.command(guild_ids=guild_id_list, name='tagger')
-        @permissions.has_role('Admin')
-        async def tag_tagger(
-                ctx,
-                member: Option(discord.Member, 'Member to find the tagger of.')
-        ):
-            """
-            Identifies the zombie who tagged a given member.
-
-            """
-            tagged = bot.db.get_tag
-            tagger =
-            ctx.respond(f'Tagger for tag {tag_id}: <@{tagger.id}>')
-        '''
-
         @bot.command(guild_ids=guild_id_list, description='Shuts down the bot.')
         @permissions.has_role('Admin')
         async def shutdown(ctx):
@@ -464,3 +448,13 @@ class AdminCommandsCog(commands.Cog):
             log.critical('Shutting Down\n. . .\n\n')
             await bot.close()
             time.sleep(1)
+
+        @bot.command(guild_ids=guild_id_list, description='Prints current commands')
+        @permissions.has_role('Admin')
+        async def read_commands(ctx):
+            """
+            Shuts down bot. If there are active chats, list them and don't shut down.
+
+            """
+            # TODO: Restore graceful shutdown function when chatbots are active
+            await ctx.respond(bot.commands)

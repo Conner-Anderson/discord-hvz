@@ -244,7 +244,7 @@ class HVZBot(discord.Bot):
         await self.channels['tag-announcements'].send(msg)
 
     @check_dm_allowed
-    async def register(self, interaction: discord.Interaction):
+    async def registration(self, interaction: discord.Interaction):
         try:
             self.db.get_member(interaction.user)
             await interaction.response.send_message(
@@ -256,7 +256,7 @@ class HVZBot(discord.Bot):
             await chatbot_manager.start_chatbot('registration', interaction.user)
 
     @check_dm_allowed
-    async def tag_log(self, interaction: discord.Interaction):
+    async def tag_logging(self, interaction: discord.Interaction):
 
         if config['tag_logging'] is False:
             await interaction.response.send_message('The admin has not enabled tagging yet.', ephemeral=True)
@@ -278,7 +278,7 @@ try:
     bot = HVZBot()
     bot.add_cog(ChatBotManager(bot))
     bot.add_cog(AdminCommandsCog(bot))
-    #bot.add_cog(HVZButtonCog(bot))
+    bot.add_cog(HVZButtonCog(bot))
 
     bot.run(token)
 except ConfigError as e:
