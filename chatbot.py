@@ -339,7 +339,7 @@ class ChatBot:
         if self.target_member is None:
             self.target_member = self.chat_member
 
-    async def ask_question(self, existing_chatbot: ChatBot = None, first: bool = False):
+    async def ask_question(self, existing_chatbot: ChatBot = None, first: bool = False) -> None:
         msg, view = self.script.ask_next_question(existing_script=getattr(existing_chatbot, 'script', None),
                                                   first=first)
         if first and self.target_member != self.chat_member:
@@ -420,12 +420,22 @@ class ChatBotManager(commands.Cog):
             target_member
 
         )
-        self.active_chatbots[chat_member.id] = new_chatbot
+
         await new_chatbot.ask_question(existing, first=True)
+        self.active_chatbots[chat_member.id] = new_chatbot
 
     async def start_chatbot_from_interaction(self, interaction: discord.Interaction):
-        await interaction.response.send_message('Check your direct messages.', ephemeral=True)
-        await self.start_chatbot(interaction.custom_id, interaction.user)
+        msg = ''
+        try:
+            await self.start_chatbot(interaction.custom_id, interaction.user)
+        except ValueError as e:
+            msg = e
+        except Exception as e:
+            msg = f'The chatbot failed unexpectedly. Here is the error you can give to an admin: "{e}"'
+        else:
+            msg = 'Check your private messages.'
+        finally:
+            await interaction.response.send_message(msg, ephemeral=True)
 
     @slash_command(guild_ids=guild_id_list)
     async def chatbots(self, ctx):

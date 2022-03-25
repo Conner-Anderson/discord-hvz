@@ -151,3 +151,4 @@ class HVZButtonCog(commands.Cog):
         )
         self.bot.add_application_command(command)
         await self.bot.sync_commands(guild_ids=guild_id_list, register_guild_commands=True)
+        # TODO: Re-implement persistence in buttons.
