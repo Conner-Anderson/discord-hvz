@@ -139,8 +139,12 @@ class HVZButtonCog(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         button_options = []
+        view = discord.ui.View(timeout=None) # A view to hold persistent buttons
         for button in self.postable_buttons:
             button_options.append(button.custom_id)
+            view.add_item(button)
+        self.bot.add_view(view) # Any buttons in this view are now persistent
+
         command = discord.SlashCommand(
             func=post,
             guild_ids=guild_id_list,
@@ -151,4 +155,4 @@ class HVZButtonCog(commands.Cog):
         )
         self.bot.add_application_command(command)
         await self.bot.sync_commands(guild_ids=guild_id_list, register_guild_commands=True)
-        # TODO: Re-implement persistence in buttons.
+

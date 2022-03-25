@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 
 from config import config, ConfigError
 from buttons import HVZButton
-import chatbotbuttons
 
 import chatbotprocessors
 
@@ -400,8 +399,6 @@ class ChatBotManager(commands.Cog):
 
         for kind, script in scripts_data.items():
             self.loaded_scripts[kind] = (ScriptData.build(kind, script, chatbotmanager=self))
-
-        chatbotbuttons.setup_buttons(bot)
 
         log.info('ChatBotManager Initialized')
 
