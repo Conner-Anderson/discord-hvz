@@ -1,11 +1,12 @@
 #!/bin/python3
 from __future__ import annotations
+
+import loguru
+
 from buttons import HVZButtonCog
 from config import config, ConfigError
-import sheets
 from chatbot import ChatBotManager
 from hvzdb import HvzDb
-import utilities as util
 from admin_commands import AdminCommandsCog
 from discord_io import DiscordStream
 
@@ -14,14 +15,13 @@ from loguru import logger
 import sys
 import time
 import functools
-from typing import List, Dict, Union, Any
+from typing import List, Dict, Union, Any, TYPE_CHECKING
 
 import discord
+from discord import Guild
 from discord.ext import commands
 
-from datetime import timedelta
 from datetime import datetime
-from dateutil import parser
 
 from dotenv import load_dotenv
 from os import getenv
@@ -70,8 +70,18 @@ discord_logger.setLevel(logging.WARNING)
 discord_logger.addHandler(InterceptHandler())
 
 
+class StartupError(Exception):
+    def __init__(self, message=None):
+        if message is not None:
+            super().__init__(message)
+
+
 class HVZBot(discord.Bot):
+    guild: Guild | None
     db: HvzDb
+    roles: Dict[str, discord.Role]
+    channels: Dict[str, discord.TextChannel]
+    discord_handler: loguru.Logger
 
     def check_event(self, func):
         """
@@ -106,11 +116,16 @@ class HVZBot(discord.Bot):
         self.roles = {}
         self.channels = {}
         self.db = HvzDb()
+
         intents = discord.Intents.all()
         super().__init__(
-            description='Discord HvZ self!',
+            description='Discord HvZ bot!',
             intents=intents
         )
+
+        @self.listen()
+        async def on_connect():
+            pass
 
         @self.listen()  # Always using listen() because it allows multiple events to respond to one thing
         async def on_ready():
@@ -129,35 +144,53 @@ class HVZBot(discord.Bot):
                 await self.guild.fetch_roles()
 
                 needed_roles = ['admin', 'zombie', 'human', 'player']
-                for i, x in enumerate(needed_roles):
-                    for r in self.guild.roles:
-                        if r.name.lower() == x:
-                            self.roles[x] = r
+                missing_roles = []
+                for needed_role in needed_roles:
+                    for found_role in self.guild.roles:
+                        if found_role.name.lower() == needed_role:
+                            self.roles[needed_role] = found_role
                             break
                     else:
-                        raise Exception(f'{x} role not found!')
+                        missing_roles.append(needed_role)
 
                 needed_channels = ['tag-announcements', 'report-tags', 'landing', 'zombie-chat', 'bot-output']
-                for i, x in enumerate(needed_channels):
-                    for c in self.guild.channels:
-                        if c.name.lower() == config['channel_names'][x]:
-                            self.channels[x] = c
+                missing_channels = []
+                for needed_channel in needed_channels:
+                    try:
+                        channel_name = config['channel_names'][needed_channel]
+                    except KeyError:
+                        channel_name = needed_channel
+                    for found_channel in self.guild.channels:
+                        if found_channel.name.lower() == channel_name:
+                            self.channels[needed_channel] = channel_name
                             break
                     else:
-                        raise Exception(f'{x} channel not found!')
+                        missing_channels.append(needed_channel)
 
-                logger.add(
+                msg = ''
+                if missing_roles:
+                    msg += f'These required roles are missing on the server: {missing_roles}\n'
+                if missing_channels:
+                    msg += f'These required channels are missing on the server: {missing_channels}\n'
+                if msg:
+                    raise StartupError(msg)
+
+                self.discord_handler = logger.add(
                     DiscordStream(self).write,
                     level='INFO',
                     enqueue=True,
                     format='{level} | {name}:{function}:{line} - {message}'
                 )
+                logger.remove(self.discord_handler)
 
                 log.success(
                     f'Discord-HvZ Bot launched correctly! Logged in as: {self.user.name} ------------------------------------------')
-
+            except StartupError as e:
+                logger.error(f'The bot failed to start because of this error: \n{e}')
+                await self.close()
+                time.sleep(1)
             except Exception as e:
-                log.exception(f'self startup failed with this error --> {e}')
+                log.exception(f'Bot startup failed with this error: \n{e}')
                 await self.close()
                 time.sleep(1)
 
@@ -234,5 +267,6 @@ try:
     bot.run(token)
 except ConfigError as e:
     logger.error(e)
+
 except Exception as e:
     logger.exception(e)
