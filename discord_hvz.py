@@ -73,7 +73,6 @@ discord_logger.addHandler(InterceptHandler())
 class HVZBot(discord.Bot):
     db: HvzDb
 
-
     def check_event(self, func):
         """
         A decorator that aborts events/listeners if they are from the wrong guild
@@ -102,34 +101,16 @@ class HVZBot(discord.Bot):
 
         return inner
 
-    def check_dm_allowed(func):
-        """A decorator for component callbacks. Catches the issue of users not allowing self DMs."""
-
-        @functools.wraps(func)
-        async def wrapper(self, ctx):
-            try:
-                return await func(self, ctx)
-            except discord.Forbidden:
-                await ctx.response.send_message(content='Please check your settings for this server and turn on Allow '
-                                                        'Direct Messages.', ephemeral=True)
-                log.info('Chatbot ended because the user does not have DMs turned on for the server.')
-                return None
-
-        return wrapper
-
     def __init__(self):
         self.guild: Union[discord.Guild, None] = None
         self.roles = {}
         self.channels = {}
+        self.db = HvzDb()
         intents = discord.Intents.all()
         super().__init__(
             description='Discord HvZ self!',
             intents=intents
         )
-
-        self.db = HvzDb()
-        self.awaiting_chatbots = []
-        self.sheets_interface = sheets.SheetsInterface(self)
 
         @self.listen()  # Always using listen() because it allows multiple events to respond to one thing
         async def on_ready():
@@ -242,36 +223,6 @@ class HVZBot(discord.Bot):
         msg += f'\nThere are now {new_human_count} humans and {new_zombie_count} zombies.'
 
         await self.channels['tag-announcements'].send(msg)
-
-    @check_dm_allowed
-    async def registration(self, interaction: discord.Interaction):
-        try:
-            self.db.get_member(interaction.user)
-            await interaction.response.send_message(
-                'You are already registered for HvZ! Contact an admin if you think this is wrong.',
-                ephemeral=True
-            )
-        except ValueError:
-            chatbot_manager = self.get_cog('ChatBotManager')
-            await chatbot_manager.start_chatbot('registration', interaction.user)
-
-    @check_dm_allowed
-    async def tag_logging(self, interaction: discord.Interaction):
-
-        if config['tag_logging'] is False:
-            await interaction.response.send_message('The admin has not enabled tagging yet.', ephemeral=True)
-            return
-        try:
-            self.db.get_member(interaction.user)
-        except ValueError as e:
-            await interaction.response.send_message(
-                'You are not currently registered for HvZ.',
-                ephemeral=True
-            )
-            return
-
-        chatbot_manager = self.get_cog('ChatBotManager')
-        await chatbot_manager.start_chatbot('tag_logging', interaction.user)
 
 
 try:
