@@ -23,6 +23,7 @@ log = logger
 # Used for creating commands
 guild_id_list = [config['available_servers'][config['active_server']]]
 
+
 class ResponseError(ValueError):
     def __init__(self, message=None):
         if message is not None:
@@ -156,7 +157,6 @@ class ScriptData:
             except KeyError:
                 raise ConfigError(f'Processor "{name}" does not match any function.')
 
-
         # Assemble a button that can be posted with the /post command.
         button_color = script.pop('postable_button_color', None)
         if not button_color:
@@ -210,9 +210,6 @@ class Script:
     next_question: int = field(init=False, default=0)
     modifying: bool = field(init=False, default=False)
 
-    # next_review_question: int = field(init=False, default=0)
-    # TODO: Add concelation functionality
-
     def __post_init__(self):
         for i, q in enumerate(self.data.questions):
             self.questions[i] = q
@@ -244,7 +241,7 @@ class Script:
         return self.data.ending
 
     def ask_next_question(self, existing_script: Script = None, first: bool = False) -> (
-    str, Union[discord.ui.View, None]):
+            str, Union[discord.ui.View, None]):
         """Fetches next question and returns it.
         :return:
         :param existing_script:
@@ -338,19 +335,18 @@ class ChatBot:
         if self.target_member is None:
             self.target_member = self.chat_member
 
-    async def ask_question(self, existing_chatbot: ChatBot = None, first: bool = False) -> None:
+    async def ask_question(self, existing_chatbot: ChatBot = None, first: bool = False) -> bool:
+        starting_processor = self.script.data.starting_processor
+        if first and starting_processor:
+            await starting_processor(self.target_member, self.bot)
+
         msg, view = self.script.ask_next_question(existing_script=getattr(existing_chatbot, 'script', None),
                                                   first=first)
         if first and self.target_member != self.chat_member:
             await self.chat_member.send(f'The following is for <@{self.target_member.id}>.')
-        starting_processor = self.script.data.starting_processor
-        if first and starting_processor:
-            try:
-                starting_processor(self.target_member)
-            except ValueError as e:
-                await self.chat_member.send()
 
         await self.chat_member.send(msg, view=view)
+        return False
 
     async def receive(self, message: str) -> bool:
         message = message.strip()
@@ -429,6 +425,7 @@ class ChatBotManager(commands.Cog):
             msg = e
         except Exception as e:
             msg = f'The chatbot failed unexpectedly. Here is the error you can give to an admin: "{e}"'
+            log.exception(e)
         else:
             msg = 'Check your private messages.'
         finally:

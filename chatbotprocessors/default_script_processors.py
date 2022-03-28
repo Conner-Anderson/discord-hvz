@@ -6,12 +6,13 @@ from loguru import logger
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
+    # This avoids circular imports while still allowing type checking for these items
     from discord_hvz import HVZBot
     from hvzdb import HvzDb
     import discord
 
 
-async def registration_end(responses: Dict[str, Any], bot: HVZBot, target_member: discord.Member) -> None:
+async def registration_end(responses: Dict[str, Any], bot: HVZBot, target_member: discord.Member) -> Dict[str, Any]:
 
     responses['faction'] = 'human'
     responses['id'] = str(target_member.id)
@@ -57,5 +58,11 @@ async def tag_logging(responses: Dict[str, Any], bot: HVZBot, target_member: dis
 
     return responses
 
-def registration_start(*args, **kwargs):
-    pass
+async def registration_start(member: discord.Member, bot: HVZBot) -> None:
+    try:
+        bot.db.get_member(member)
+    except ValueError:
+        # If the database can't find the user, then we can continue with registration
+        return
+    # If the member is found in the user database, then they are already registered.
+    raise ValueError('You are already registered for HvZ!')
