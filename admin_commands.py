@@ -31,6 +31,8 @@ DISCORD_MESSAGE_MAX_LENGTH = 2000
 
 guild_id_list = [config['available_servers'][config['active_server']]]
 
+CONFIG_CHOICES = ['registration', 'tag_logging', 'silent_oz', 'google_sheet_export']
+
 
 class AdminCommandsCog(commands.Cog):
 
@@ -371,7 +373,7 @@ class AdminCommandsCog(commands.Cog):
                 setting: Option(
                     str,
                     'Config setting to change or view.',
-                    choices=['registration', 'tag_logging', 'silent_oz', 'google_sheet_export']
+                    choices=CONFIG_CHOICES
                 ),
                 choice: Option(bool, 'What to change the setting to.', required=False)
         ):
@@ -385,9 +387,6 @@ class AdminCommandsCog(commands.Cog):
                 'tag_logging' Is the tag log button enabled? Default: True
                 'silent_oz' Are OZ names omitted from tag announcements? Default: False
             """
-            if setting.casefold() not in ('registration', 'tag_logging', 'silent_oz'):
-                await ctx.respond('Conner has not implemented full config access yet. Do !help config')
-                return
 
             try:
                 found_setting = config[setting]
@@ -396,10 +395,11 @@ class AdminCommandsCog(commands.Cog):
                 return
 
             if choice is None:
-                await ctx.respond(f'The config setting \"{setting}\" is set to \"{found_setting}\"')
-            else:
-                config[setting] = choice
-                await ctx.respond(f'Set \"{setting}\" to \"{found_setting}\"')
+                await ctx.respond(f'The config setting \"{setting}\" is currently set to \"{found_setting}\"')
+                return
+
+            config[setting] = choice
+            await ctx.respond(f'Set \"{setting}\" to \"{choice}\"')
 
         @bot.command(guild_ids=guild_id_list)
         @permissions.has_role('Player')

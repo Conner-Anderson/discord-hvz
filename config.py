@@ -5,8 +5,25 @@ yaml.preserve_quotes = True
 # file = open('config.yml', mode='r')
 # config = yaml.safe_load(file)
 
-with open('config.yml') as fp:
-    config = yaml.load(fp)
+
+class HVZConfig:
+    _config: dict
+    filename: str
+    def __init__(self, filename: str):
+        self.filename = filename
+        with open(filename) as fp:
+            self._config = yaml.load(fp)
+
+    def commit(self):
+        with open(self.filename, mode='w') as fp:
+            yaml.dump(self._config, fp)
+
+    def __getitem__(self, item):
+        return self._config[item]
+
+    def __setitem__(self, key, value):
+        self._config[key] = value
+        self.commit()
 
 class ConfigError(Exception):
     def __init__(self, message=None):
@@ -14,6 +31,5 @@ class ConfigError(Exception):
             super().__init__(message)
 
 
-def commit():
-    with open('config.yml', mode='w') as fp:
-        yaml.dump(config, fp)
+
+config = HVZConfig('config.yml')

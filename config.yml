@@ -13,7 +13,7 @@ available_servers:
 registration: true
 
 # Is tag logging enabled on the server? Useful for making sure the game doesn't start too early.
-tag_logging: true
+tag_logging: false
 
 # If true, the OZ's identity will not be included in tag announcements. 
 silent_oz: false
@@ -82,7 +82,8 @@ channel_names:
 # Buttons must match the names of the functions they call
 buttons:
   register:
-    message: "Use the button below and check your Direct Messages to register for HvZ!"
+    message: "Use the button below and check your Direct Messages to register for\
+      \ HvZ!"
     label: "Register for HvZ"
     color: green
   tag_log:
