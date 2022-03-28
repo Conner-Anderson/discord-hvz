@@ -415,6 +415,7 @@ class ChatBotManager(commands.Cog):
         )
 
         await new_chatbot.ask_question(existing, first=True)
+
         self.active_chatbots[chat_member.id] = new_chatbot
 
     async def start_chatbot_from_interaction(self, interaction: discord.Interaction):
@@ -423,6 +424,8 @@ class ChatBotManager(commands.Cog):
             await self.start_chatbot(interaction.custom_id, interaction.user)
         except ValueError as e:
             msg = e
+        except discord.Forbidden:
+            msg = 'Please check your settings for the server and turn on "Allow Direct Messages."'
         except Exception as e:
             msg = f'The chatbot failed unexpectedly. Here is the error you can give to an admin: "{e}"'
             log.exception(e)

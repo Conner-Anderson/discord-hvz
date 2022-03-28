@@ -56,7 +56,8 @@ tag_logging:
   table: tags
   beginning: Let's log a tag. Type 'cancel' at any time to stop this conversation.
   ending: Tag logged! Make sure your newly-brainless friend feels welcome in the hoard.
-  starting_processor: tag_logging
+  starting_processor: tag_logging_start
+  ending_processor: tag_logging_end
   questions:
   - name: tagged_id
     display_name: Tag Code

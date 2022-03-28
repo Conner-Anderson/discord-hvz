@@ -3,6 +3,7 @@ from typing import Dict, List, Any
 from datetime import datetime
 from utilities import make_tag_code
 from loguru import logger
+from config import config
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -26,7 +27,7 @@ async def registration_end(responses: Dict[str, Any], bot: HVZBot, target_member
 
     return responses
 
-async def tag_logging(responses: Dict[str, Any], bot: HVZBot, target_member: discord.Member) -> Dict[str, Any]:
+async def tag_logging_end(responses: Dict[str, Any], bot: HVZBot, target_member: discord.Member) -> Dict[str, Any]:
 
     tagged_member = bot.get_member(responses['tagged_id'])
     tagged_member_row = bot.db.get_member(tagged_member)
@@ -66,3 +67,11 @@ async def registration_start(member: discord.Member, bot: HVZBot) -> None:
         return
     # If the member is found in the user database, then they are already registered.
     raise ValueError('You are already registered for HvZ!')
+
+async def tag_logging_start(member: discord.Member, bot: HVZBot) -> None:
+    if config['tag_logging'] is False:
+        raise ValueError('The admin has not enabled tagging yet.')
+    try:
+        bot.db.get_member(member)
+    except ValueError as e:
+        raise ValueError('You are not currently registered for HvZ.')
