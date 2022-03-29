@@ -9,6 +9,7 @@ from chatbot import ChatBotManager
 from hvzdb import HvzDb
 from admin_commands import AdminCommandsCog
 from discord_io import DiscordStream
+from display import DisplayCog
 
 import logging
 from loguru import logger
@@ -263,6 +264,7 @@ try:
     bot.add_cog(ChatBotManager(bot))
     bot.add_cog(AdminCommandsCog(bot))
     bot.add_cog(HVZButtonCog(bot))
+    bot.add_cog(DisplayCog(bot))
 
     bot.run(token)
 except ConfigError as e:

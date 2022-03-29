@@ -1,17 +1,22 @@
-from __future__ import annotations
 import os
 import plotly.express as px
 from loguru import logger
 import pandas as pd
 import sqlalchemy
 import discord
+from discord.commands import slash_command, permissions, Option
+from config import config
 
 from typing import Dict, List, Any, Union, TYPE_CHECKING
-if TYPE_CHECKING:
-    import sqlalchemy
-    from hvzdb import HvzDb
 
-def create_game_plot(db: HvzDb, filename=None) -> discord.File:
+if TYPE_CHECKING:
+    from hvzdb import HvzDb
+    from discord_hvz import HVZBot
+
+guild_id_list = [config['available_servers'][config['active_server']]]
+
+
+def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
     if not filename:
         filename = db.filename
     engine = sqlalchemy.create_engine(f"sqlite+pysqlite:///{filename}")
@@ -35,12 +40,11 @@ def create_game_plot(db: HvzDb, filename=None) -> discord.File:
     tags_df['Human_Count'] = tags_df['Player_Count'] - tags_df['Zombie_Count']
     tags_df.sort_values(by='Tag_Time', inplace=True)
 
-
     fig = px.line(tags_df, x="Tag_Time", y=["Zombie_Count", "Human_Count"], title='Tags over time', markers=True)
     fig.update_xaxes(
-        dtick=3600000 * 12, # The big number is one hour
+        dtick=3600000 * 12,  # The big number is one hour
         tickformat="%a %I:%M %p")
-    #fig.show()
+    # fig.show()
 
     if not os.path.exists("plots"):
         os.mkdir("plots")
@@ -50,4 +54,24 @@ def create_game_plot(db: HvzDb, filename=None) -> discord.File:
     file = discord.File("plots/fig1.jpeg")
     return file
 
-create_game_plot('db', filename='hvzdb_live.db')
+
+# create_game_plot('db', filename='hvzdb_live.db')
+
+class DisplayCog(discord.Cog):
+    bot: 'HVZBot'
+
+    def __init__(self, bot):
+        self.bot = bot
+
+    @slash_command(guild_ids=guild_id_list)
+    @permissions.has_role('Admin')
+    async def display(
+            self,
+            ctx: discord.ApplicationContext,
+            message: Option(str, 'Optional message to include in the post.', default='')
+    ):
+        """
+        Description of the command
+        """
+        file = create_game_plot('db', filename='hvzdb_live.db')
+        await ctx.respond(message, file=file)
