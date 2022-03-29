@@ -40,6 +40,7 @@ class HvzDb:
     metadata_obj: MetaData = field(init=False, default_factory=MetaData)
     tables: Dict[str, Table] = field(init=False, default_factory=dict)
     sheet_interface: sheets.SheetsInterface = field(init=False, default=None)
+    filename: str = 'hvzdb.db'
 
     required_columns: ClassVar[Dict[str, Dict[str, str]]] = {
         'members': {
@@ -67,7 +68,7 @@ class HvzDb:
     
     def __post_init__(self):
         database_config: Dict[str, Dict[str, str]] = copy.deepcopy(config['database_tables'])
-        self.engine = create_engine("sqlite+pysqlite:///hvzdb.db", future=True)
+        self.engine = create_engine(f"sqlite+pysqlite:///{self.filename}", future=True)
 
         for table_name, column_dict in database_config.items():
             try:
