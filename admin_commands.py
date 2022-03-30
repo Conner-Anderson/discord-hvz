@@ -1,22 +1,20 @@
 #from __future__ import annotations
-import discord
-from discord.ext import commands
-from discord.commands import SlashCommandGroup, CommandPermission
-from discord.commands import permissions
-from discord.commands import Option
-import functools
 import time
+from typing import Union, TYPE_CHECKING
+
+import discord
+from discord.commands import Option
+from discord.commands import SlashCommandGroup
+from discord.commands import permissions
+from discord.ext import commands
+from loguru import logger
 
 import utilities as util
 from chatbot import ChatBotManager
 from config import config
-from loguru import logger
-
-from typing import List, Union, Dict, TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from discord_hvz import HVZBot
-    from sqlalchemy.engine import Row
+    pass
 
 log = logger
 
@@ -39,7 +37,7 @@ class AdminCommandsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-        # The below gorup creation method is a patch until the devs implement a better way.
+        # The below group creation method is a patch until the devs implement a better way.
 
         member_group = SlashCommandGroup(
             name='member',

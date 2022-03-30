@@ -1,18 +1,19 @@
 from __future__ import annotations
-from dataclasses import dataclass, field, InitVar
-#import yaml
-from ruamel.yaml import YAML
-import regex
+
+from dataclasses import dataclass, field
+from typing import List, Union, Dict
+from typing import TYPE_CHECKING
+
 import discord
-from discord.commands import slash_command, Option
+import regex
+from discord.commands import slash_command
 from discord.ext import commands
 from loguru import logger
-from typing import List, Union, Dict, Any
-from typing import TYPE_CHECKING
+# import yaml
+from ruamel.yaml import YAML
 
 if TYPE_CHECKING:
     from discord_hvz import HVZBot
-    from hvzdb import HvzDb
 
 from config import config, ConfigError
 from buttons import HVZButton
@@ -255,6 +256,7 @@ class Script:
         view = None
         this_question = self.next_question
         if this_question >= self.length:
+            # TODO: Reviewing mode should not show processor results to the user
             log.debug('Entered reviewing mode')
             self.last_asked_question = self.length
             view = discord.ui.View(timeout=None)

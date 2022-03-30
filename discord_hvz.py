@@ -1,32 +1,28 @@
 #!/bin/python3
 from __future__ import annotations
 
-import loguru
-
-from buttons import HVZButtonCog
-from config import config, ConfigError
-from chatbot import ChatBotManager
-from hvzdb import HvzDb
-from admin_commands import AdminCommandsCog
-from discord_io import DiscordStream
-
+import functools
 import logging
-from loguru import logger
 import sys
 import time
-import functools
-from typing import List, Dict, Union, Any, TYPE_CHECKING
+from datetime import datetime
+from os import getenv
+from typing import Dict, Union
 
 import discord
+import loguru
 from discord import Guild
 from discord.ext import commands
-
-from datetime import datetime
-
 from dotenv import load_dotenv
-from os import getenv
-
+from loguru import logger
 from sqlalchemy.exc import NoSuchColumnError
+
+from admin_commands import AdminCommandsCog
+from buttons import HVZButtonCog
+from chatbot import ChatBotManager
+from config import config, ConfigError
+from discord_io import DiscordStream
+from hvzdb import HvzDb
 
 
 def dump(obj):

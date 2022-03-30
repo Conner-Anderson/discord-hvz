@@ -1,26 +1,23 @@
 from __future__ import annotations
-import discord, sheets
-import os.path
-from dataclasses import dataclass, field, InitVar
-from typing import List, Union, Dict, TYPE_CHECKING, Any, ClassVar
-import copy
-import functools
 
-from sqlalchemy.engine.mock import MockConnection
+import copy
+from dataclasses import dataclass, field
+from typing import List, Union, Dict, TYPE_CHECKING, ClassVar
+
+import discord
+import sheets
 
 if TYPE_CHECKING:
-    from discord_hvz import HVZBot
-from datetime import datetime
+    pass
 
 import sqlalchemy
 from sqlalchemy.engine import Row
-from sqlalchemy import create_engine, MetaData, event, text
-from sqlalchemy import Table, Column, Integer, String, DateTime, Boolean, ForeignKey
-from sqlalchemy import insert, select, delete, update
-from sqlalchemy import func, cast, and_
-from sqlalchemy.exc import NoSuchTableError, CompileError
+from sqlalchemy import create_engine, MetaData
+from sqlalchemy import Table, Column, Integer, String, DateTime, Boolean
+from sqlalchemy import select, delete, update
+from sqlalchemy.exc import NoSuchTableError
 
-from config import config, ConfigError
+from config import config
 
 from loguru import logger
 
