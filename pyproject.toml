@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "discord-hvz"
+version = "0.2.0"
+description = "A run-yourself Discord bot to manage Humans vs. Zombies games."
+authors = ["ConnerHAnderson <conneranderson.dev@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "3.9.7"
+py-cord = "2.0.0b5"
+SQLAlchemy = "^1.4.32"
+loguru = "^0.6.0"
+"ruamel.yaml" = "^0.17.21"
+google-api-python-client = "^2.42.0"
+google-auth-httplib2 = "^0.1.0"
+google-auth-oauthlib = "^0.5.1"
+regex = "^2022.3.15"
+python-dateutil = "^2.8.2"
+python-dotenv = "^0.20.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

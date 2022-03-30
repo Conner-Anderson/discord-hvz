@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field, InitVar
-import yaml
+#import yaml
+from ruamel.yaml import YAML
 import regex
 import discord
 from discord.commands import slash_command, Option
@@ -19,6 +20,7 @@ from buttons import HVZButton
 import chatbotprocessors
 
 log = logger
+yaml=YAML(typ='safe')
 
 # Used for creating commands
 guild_id_list = [config['available_servers'][config['active_server']]]
@@ -390,7 +392,7 @@ class ChatBotManager(commands.Cog):
         self.bot = bot
 
         file = open('scripts.yml', mode='r')
-        scripts_data = yaml.safe_load(file)
+        scripts_data = yaml.load(file)
         file.close()
 
         for kind, script in scripts_data.items():
