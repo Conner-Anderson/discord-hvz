@@ -173,7 +173,6 @@ class ScriptData:
             label=button_label,
             color=button_color,
             postable_bot=chatbotmanager.bot)
-        log.info(postable_button)
 
         try:
             return ScriptData(kind=kind, questions=questions, _postable_button=postable_button, **script)
@@ -398,7 +397,7 @@ class ChatBotManager(commands.Cog):
         for kind, script in scripts_data.items():
             self.loaded_scripts[kind] = (ScriptData.build(kind, script, chatbotmanager=self))
 
-        log.info('ChatBotManager Initialized')
+        log.debug('ChatBotManager Initialized')
 
     async def start_chatbot(
             self,

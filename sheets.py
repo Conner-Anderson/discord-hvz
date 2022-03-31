@@ -72,6 +72,7 @@ class SheetsInterface:
 
 
     def update_table(self, table_name: str):
+        # TODO: Generalize this feature for use elsewhere, such as display
         tables_to_pop = []
         for table, task in self.waiting_tables.items():
             if task.done():
