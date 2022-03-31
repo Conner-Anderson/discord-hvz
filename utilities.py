@@ -1,10 +1,9 @@
-import functools
-from inspect import iscoroutinefunction
 import asyncio
-from discord.ext import commands
-
-import string
 import random
+import string
+from inspect import iscoroutinefunction
+from typing import List
+
 from loguru import logger
 
 log = logger
@@ -83,3 +82,13 @@ async def do_after_wait(func: callable, delay: float, *args, **kwargs):
         await func(*args, **kwargs)
     else:
         func(*args, **kwargs)
+
+def have_lists_changed(list1: List, list2: List, items: List) -> bool:
+    if list1 == list2:
+        return False
+    for item in items:
+        if item in list1 and item not in list2:
+            return True
+        elif item in list2 and item not in list1:
+            return True
+    return False
