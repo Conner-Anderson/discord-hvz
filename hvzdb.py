@@ -358,7 +358,16 @@ class HvzDb:
         self._table_updated(table)
         return True
 
-    def get_rows(self, table, search_column, search_value, exclusion_column=None, exclusion_value=None):
+    def get_rows(
+            self,
+            table: str,
+            search_column_name,
+            search_value=None,
+            lower_value=None,
+            upper_value=None,
+            exclusion_column_name=None,
+            exclusion_value=None
+    ):
         """
         Returns a list of Row objects where the specified value matches.
         Meant to be used within the class.
@@ -367,22 +376,38 @@ class HvzDb:
                 table (sqlalchemy.table): Table object
                 column (sqlalchemy.column): Column object to search for value
                 value (any): Value to search column for
-                exclusion_column (sqlalchemy.column) Optional. Reject rows where this column equals exclusion_value
+                exclusion_column_name (sqlalchemy.column) Optional. Reject rows where this column equals exclusion_value
                 exclusion_value (any) Optional. Required if exclusion_column is provided.
 
         Returns:
                 result_rows: List of Row objects. Access rows in these ways: row.some_row, row['some_row']
         """
         the_table = self.tables[table]
-        selection = select(the_table).where(the_table.c[search_column] == search_value)
-        if exclusion_column is not None:
-            if exclusion_value is None:
+        selection = select(the_table)
+        search_column = the_table.c[search_column_name]
+
+        if search_value:
+            selection = selection.where(search_column == search_value)
+        elif lower_value and upper_value:
+            selection = selection.where(search_column > lower_value).where(search_column < upper_value)
+        else:
+            raise ValueError('If search_value is not provided, both lower_value and upper_value must be.')
+
+        if exclusion_column_name:
+            exclusion_column = the_table.c[exclusion_column_name]
+            if not exclusion_value:
                 raise ValueError('No exclusion value provided.')
-            selection = selection.where(the_table.c[exclusion_column] != exclusion_value)
+            selection = selection.where(exclusion_column != exclusion_value)
+
         with self.engine.begin() as conn:
             result_rows = conn.execute(selection).all()
+
         if len(result_rows) == 0:
-            raise ValueError(f'Could not find rows where \"{search_column}\" is \"{search_value}\"')
+            if lower_value:
+                raise ValueError(f'Could not find rows where "{search_column_name}" is between "{lower_value}" and "{upper_value}"')
+            else:
+                raise ValueError(f'Could not find rows where \"{search_column_name}\" is \"{search_value}\"')
+
         return result_rows
 
 

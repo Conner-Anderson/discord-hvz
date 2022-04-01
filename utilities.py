@@ -55,7 +55,7 @@ def generate_tag_tree(db):
             if level == 0:
                 output += ' (OZ)'
             try:
-                tags = db.get_rows('tags', 'tagger_id', r.id, exclusion_column='revoked_tag', exclusion_value=True)
+                tags = db.get_rows('tags', 'tagger_id', r.id, exclusion_column_name='revoked_tag', exclusion_value=True)
 
             except ValueError:
                 pass

@@ -2,7 +2,7 @@ import os
 from dataclasses import dataclass, field, InitVar
 from typing import TYPE_CHECKING, Dict, List, ClassVar, Union
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import discord
 import pandas as pd
@@ -72,7 +72,6 @@ class DisplayCog(discord.Cog):
         self.panels = {}
         self.roles_to_watch = []
 
-
     def add_panel(self, panel: "HVZPanel"):
         if self.panels.get(panel.message_id):
             raise ValueError(f'Panel with id {panel.message_id} already exists.')
@@ -112,7 +111,6 @@ class DisplayCog(discord.Cog):
         self.bot.dispatch('role_change')
         return
 
-
     @discord.Cog.listener()
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
         panel = self.panels.get(payload.message_id)
@@ -125,6 +123,7 @@ class DisplayCog(discord.Cog):
     async def on_test_event(self):
         logger.success('Event triggered!')
 
+
 @dataclass
 class PanelElement(ABC):
 
@@ -132,43 +131,54 @@ class PanelElement(ABC):
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
         ...
 
+
 @dataclass
 class HumanElement(PanelElement):
     refresh_event: str = 'on_role_change'
+
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
         human_count = len(panel.bot.roles['human'].members)
         embed.add_field(name='Humans', value=str(human_count))
 
+
 @dataclass
 class ZombieElement(PanelElement):
     refresh_event: str = 'on_role_change'
+
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
         count = len(panel.bot.roles['zombie'].members)
         embed.add_field(name='Zombies', value=str(count))
 
+
 @dataclass
 class PlayerElement(PanelElement):
     refresh_event: str = 'on_role_change'
+
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
         count = len(panel.bot.roles['player'].members)
         embed.add_field(name='Players', value=str(count))
 
+
 @dataclass
 class PlayersTodayElement(PanelElement):
     refresh_event: str = 'on_role_change'
+
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
-        #TODO: Add database function to fetch number of players registered today
-        rows = panel.bot.db.get_rows(
-            table='members',
-            search_column='registration_time',
-            search_value=datetime.today()
-        )
-        count = len(rows)
+        try:
+            rows = panel.bot.db.get_rows(
+                table='members',
+                search_column_name='registration_time',
+                lower_value=datetime.now() - timedelta(days=1),
+                upper_value=datetime.now()
+            )
+            count = len(rows)
+        except ValueError:
+            count = 0
+
         extra = ''
         if not config['registration']:
             extra = ' (Registration Closed)'
         embed.add_field(name='New Players Today', value=str(count) + extra)
-        logger.info('Added Player today field')
 
 
 @dataclass
@@ -187,14 +197,12 @@ class HVZPanel:
         PlayersTodayElement
     ]
 
-
     def __post_init__(self, element_names):
         self.bot = self.cog.bot
         for name in element_names:
             for element in self.available_elements:
                 if name == element.__name__ or name == element:
                     self.elements.append(element())
-
 
     async def send(self):
         image = create_game_plot(self.bot.db, filename='hvzdb_live.db')
@@ -223,8 +231,8 @@ class HVZPanel:
         if attachment:
             embed.set_image(url=f'attachment://{attachment.filename}')
 
-
         return embed
+
 
 """
 Possible content:
