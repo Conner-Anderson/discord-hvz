@@ -2,7 +2,7 @@ import asyncio
 import random
 import string
 from inspect import iscoroutinefunction
-from typing import List
+from typing import List, Dict, Any, Union
 
 from loguru import logger
 
@@ -75,9 +75,51 @@ def generate_tag_tree(db):
 
     return loop(oz_table, 0)
 
+class PoolItem:
+
+    def __init__(self, function: callable, argument: Any):
+        self.function = function
+        self.argument = argument
+
+    def __eq__(self, other) -> bool:
+        try:
+            if self.function == other.function and self.argument == other.argument:
+                return True
+            else: return False
+        except:
+            return False
+
+    @property
+    def done(self) -> bool:
+        try:
+            if self.task.done():
+                return True
+            else:
+                return False
+        except:
+            return False
+
+    def start(self, wait_seconds: Union[int, float]) -> None:
+        self.task = asyncio.create_task(do_after_wait(self.function, wait_seconds, self.argument))
+
+pool_items: List[PoolItem] = []
+
+def pool_function(function: callable, argument: Any, wait_seconds: Union[float, int]):
+    item = PoolItem(function, argument)
+    try:
+        index = pool_items.index(item)
+        pool_items[index].task.cancel()
+        pool_items.pop(index)
+    except ValueError:
+        pass
+
+    pool_items.append(item)
+    item.start(wait_seconds)
+
 
 async def do_after_wait(func: callable, delay: float, *args, **kwargs):
     await asyncio.sleep(delay)
+    print(f'Doing function: {func.__name__}')
     if iscoroutinefunction(func):
         await func(*args, **kwargs)
     else:

@@ -233,6 +233,9 @@ class HVZPanel:
             self.bot.add_listener(self.refresh, name='on_role_change')
 
     async def refresh(self):
+        utilities.pool_function(self._refresh, None, 5.0)
+
+    async def _refresh(self):
         logger.info('Refreshing')
         # TODO: Might want to make a way to not refresh this image so often
         image = create_game_plot(self.bot.db, filename='hvzdb_live.db')

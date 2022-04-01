@@ -71,21 +71,17 @@ class SheetsInterface:
         self.setup(self.db)
 
 
+
+
     def update_table(self, table_name: str):
         # TODO: Generalize this feature for use elsewhere, such as display
-        tables_to_pop = []
-        for table, task in self.waiting_tables.items():
-            if task.done():
-                tables_to_pop.append(table)
-            elif table == table_name:
-                task.cancel()
-                tables_to_pop.append(table)
-                break
-        for t in tables_to_pop: self.waiting_tables.pop(t)
+        util.pool_function(
+            function=self._export,
+            argument=table_name,
+            wait_seconds=10.0
+        )
 
-        # Set timer to _export table to sheet
-        task = asyncio.create_task(util.do_after_wait(self._export, 4.0, table_name))
-        self.waiting_tables[table_name] = task
+
 
 
 
