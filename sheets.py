@@ -77,8 +77,8 @@ class SheetsInterface:
         # TODO: Generalize this feature for use elsewhere, such as display
         util.pool_function(
             function=self._export,
-            argument=table_name,
-            wait_seconds=10.0
+            wait_seconds=10.0,
+            table_name=table_name
         )
 
 

@@ -1,8 +1,8 @@
 import os
-from dataclasses import dataclass, field, InitVar
-from typing import TYPE_CHECKING, Dict, List, ClassVar, Union
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field, InitVar
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Dict, List, ClassVar, Union
 
 import discord
 import pandas as pd
@@ -233,7 +233,7 @@ class HVZPanel:
             self.bot.add_listener(self.refresh, name='on_role_change')
 
     async def refresh(self):
-        utilities.pool_function(self._refresh, None, 5.0)
+        utilities.pool_function(self._refresh, 6.0)
 
     async def _refresh(self):
         logger.info('Refreshing')
