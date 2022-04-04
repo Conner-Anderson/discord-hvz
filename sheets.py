@@ -12,6 +12,7 @@ import logging
 import asyncio
 
 from typing import Dict, List, Any, Union, TYPE_CHECKING
+
 if TYPE_CHECKING:
     import sqlalchemy
     from hvzdb import HvzDb
@@ -70,20 +71,12 @@ class SheetsInterface:
                 return
         self.setup(self.db)
 
-
-
-
     def update_table(self, table_name: str):
-        # TODO: Generalize this feature for use elsewhere, such as display
         util.pool_function(
             function=self._export,
             argument=table_name,
             wait_seconds=10.0
         )
-
-
-
-
 
     def _export(self, table_name: str):
         # TODO: It would be nice if this didn't have to deal directly with the database. Not a huge deal.
@@ -135,7 +128,7 @@ class SheetsInterface:
         except Exception as e:
             s = str(e).split('Details: ')
             log.error('Error when excecuting read_sheet() with arguments \"%s\" and \"%s\"  ----> %s' % (
-            sheet_name, range, s[1]))
+                sheet_name, range, s[1]))
             return 0
         else:
             return result.get('values', 0)

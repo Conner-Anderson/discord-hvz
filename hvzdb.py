@@ -42,6 +42,9 @@ class HvzDb:
     sheet_interface: sheets.SheetsInterface = field(init=False, default=None)
     filename: str = 'hvzdb.db'
 
+    # Table names that cannot be created in the config. Reserved for cogs / modules
+    reserved_table_names: ClassVar[List[str]] = ['persistent_panels']
+
     required_columns: ClassVar[Dict[str, Dict[str, str]]] = {
         'members': {
             'ID': 'String',
@@ -67,6 +70,7 @@ class HvzDb:
 
     
     def __post_init__(self):
+        # TODO: Need to make sure the required tables are always created. Might be config-depended now...
         database_config: Dict[str, Dict[str, str]] = copy.deepcopy(config['database_tables'])
         self.engine = create_engine(f"sqlite+pysqlite:///{self.filename}", future=True)
 
@@ -109,6 +113,30 @@ class HvzDb:
         if config['google_sheet_export'] == True:
             self.sheet_interface = sheets.SheetsInterface(self)
 
+    def prepare_table(self, table_name: str, columns: Dict[str, Union[str, type]]) -> None:
+        """
+        Creates a new table in the database if there is none, and loads the table from the database if it exists already.
+        """
+        try:
+            self.tables[table_name] = Table(table_name, self.metadata_obj, autoload_with=self.engine)
+        except NoSuchTableError:
+            logger.warning(
+                f'Creating table "{table_name}" since it was not found in the database.')
+
+            column_args = []
+            # Create Columns from the config
+            for column_name, column_type in columns.items():
+                column_args.append(self._create_column_object(column_name, column_type))
+
+            self.tables[table_name] = Table(table_name.casefold(), self.metadata_obj, *column_args)
+
+        self.metadata_obj.create_all(self.engine)
+
+    def delete_table(self, table_name: str):
+        self.tables[table_name].drop(bind=self.engine)
+        logger.warning(f'Deleted tabled named {table_name}')
+
+
     def _table_updated(self, table: Union[Table, str]) -> None:
         """
         To be called whenever a function changes a table. This lets the Google Sheet update.
@@ -124,22 +152,27 @@ class HvzDb:
             logger.exception(f'The database failed to update to the Google Sheet with this error: {e}')
 
 
-    def _create_column_object(self, column_name: str, column_type: str) -> Column:
+    def _create_column_object(self, column_name: str, column_type: Union[str, type]) -> Column:
         """
         Returns a Column object after forcing the name to lowercase and validating the type
         :param column_name:
         :param column_type: A string matching a valid column type
         :return: Column object
         """
-        try:
-            column_type_object = self.valid_column_types[column_type.casefold()]
-        except KeyError:
-            column_type_object = String
-        kwargs = {}
+        if not isinstance(column_type, str):
+            if column_type in self.valid_column_types.items():
+                column_type_object = column_type
+            else:
+                raise TypeError(f'column_type is an invalid type: {type(column_type)}')
+        else:
+            try:
+                column_type_object = self.valid_column_types[column_type.casefold()]
+            except KeyError:
+                column_type_object = String
 
+        kwargs = {}
         if column_type == 'incrementing_integer':
             kwargs = {'primary_key': True, 'nullable':False, 'autoincrement':True}
-
 
         return Column(column_name.casefold(), column_type_object, **kwargs)
 

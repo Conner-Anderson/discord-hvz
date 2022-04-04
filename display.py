@@ -67,15 +67,21 @@ class DisplayCog(discord.Cog):
     panels: Dict[int, "HVZPanel"]
     roles_to_watch: List[discord.Role]
 
-    def __init__(self, bot):
+    def __init__(self, bot: "HVZBot"):
         self.bot = bot
         self.panels = {}
         self.roles_to_watch = []
 
+        bot.db.prepare_table('persistent_panels', columns={
+            'channel_id':'integer',
+            'message_id':'integer',
+            'elements':'string'
+        })
+
     def add_panel(self, panel: "HVZPanel"):
-        if self.panels.get(panel.message_id):
-            raise ValueError(f'Panel with id {panel.message_id} already exists.')
-        self.panels[panel.message_id] = panel
+        if self.panels.get(panel.message.id):
+            raise ValueError(f'Panel with id {panel.message.id} already exists.')
+        self.panels[panel.message.id] = panel
 
     @slash_command(guild_ids=guild_id_list)
     @permissions.has_role('Admin')
@@ -207,7 +213,7 @@ class HVZPanel:
     live: bool = True
     elements: List[PanelElement] = field(init=False, default_factory=list)
     bot: "HVZBot" = field(init=False)
-    message_id: int = field(init=False)
+    message: discord.Message = field(init=False)
     available_elements: ClassVar[List] = [
         HumanElement,
         ZombieElement,
@@ -227,10 +233,11 @@ class HVZPanel:
         image = create_game_plot(self.bot.db, filename='hvzdb_live.db')
         embed = self.create_embed(attachment=image)
         message = await self.channel.send(embed=embed, file=image)
-        self.message_id = message.id
+        self.message = message
         if self.live:
             self.cog.add_panel(self)
             self.bot.add_listener(self.refresh, name='on_role_change')
+            self.save()
 
     async def refresh(self):
         utilities.pool_function(self._refresh, None, 5.0)
@@ -240,8 +247,7 @@ class HVZPanel:
         # TODO: Might want to make a way to not refresh this image so often
         image = create_game_plot(self.bot.db, filename='hvzdb_live.db')
         embed = self.create_embed(attachment=image)
-        message = await self.channel.fetch_message(self.message_id)
-        await message.edit(embed=embed)
+        await self.message.edit(embed=embed)
 
     def create_embed(self, attachment: discord.File = None) -> discord.Embed:
         bot = self.bot
@@ -260,6 +266,19 @@ class HVZPanel:
             embed.set_image(url=f'attachment://{attachment.filename}')
 
         return embed
+
+    def save(self):
+        row_data = {
+            'channel_id':self.channel.id,
+            'message_id':self.message.id
+        }
+        # Converts elements into a string of their class names separated by commas and no spaces
+        elements_string = ','.join([type(element).__name__ for element in self.elements])
+        row_data.update({'elements':elements_string})
+
+        self.bot.db.add_row('persistent_panels', row_data)
+        output = self.bot.db.get_table('persistent_panels')[0]
+        logger.info(output)
 
 
 """
