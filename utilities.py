@@ -2,7 +2,7 @@ import asyncio
 import random
 import string
 from inspect import iscoroutinefunction
-from typing import List, Dict, Any, Union
+from typing import List, Union
 
 from loguru import logger
 
@@ -77,13 +77,14 @@ def generate_tag_tree(db):
 
 class PoolItem:
 
-    def __init__(self, function: callable, argument: Any):
+    def __init__(self, function: callable, *args, **kwargs):
         self.function = function
-        self.argument = argument
+        self.args = args
+        self.kwargs = kwargs
 
     def __eq__(self, other) -> bool:
         try:
-            if self.function == other.function and self.argument == other.argument:
+            if self.function == other.function and self.args == other.args and self.kwargs == other.kwargs:
                 return True
             else: return False
         except:
@@ -100,12 +101,24 @@ class PoolItem:
             return False
 
     def start(self, wait_seconds: Union[int, float]) -> None:
-        self.task = asyncio.create_task(do_after_wait(self.function, wait_seconds, self.argument))
+        self.task = asyncio.create_task(do_after_wait(self.function, wait_seconds, *self.args, **self.kwargs))
 
 pool_items: List[PoolItem] = []
 
-def pool_function(function: callable, argument: Any, wait_seconds: Union[float, int]):
-    item = PoolItem(function, argument)
+def pool_function(function: callable, wait_seconds: Union[float, int], *args, **kwargs) -> None:
+    """
+    Prevents a single function from being called too often by letting successive instances of it 'pool'
+    up until the wait time has elapsed without the function being called again.
+    For a function to pool with other instances of itself all arguments must == previously called instances.
+    Be cautious when passing functions that are not members of classes.
+
+    :param function: The function to call after the time has elapsed.
+    :param wait_seconds: The time to wait to call the function.
+    :param args: Positional arguments to pass to the function
+    :param kwargs: Keyword arguments to pass to the function
+    :return: None
+    """
+    item = PoolItem(function, *args, **kwargs)
     try:
         index = pool_items.index(item)
         pool_items[index].task.cancel()
@@ -119,11 +132,14 @@ def pool_function(function: callable, argument: Any, wait_seconds: Union[float, 
 
 async def do_after_wait(func: callable, delay: float, *args, **kwargs):
     await asyncio.sleep(delay)
-    print(f'Doing function: {func.__name__}')
-    if iscoroutinefunction(func):
-        await func(*args, **kwargs)
-    else:
-        func(*args, **kwargs)
+
+    try:
+        if iscoroutinefunction(func):
+            await func(*args, **kwargs)
+        else:
+            func(*args, **kwargs)
+    except Exception as e:
+        logger.exception(e)
 
 def have_lists_changed(list1: List, list2: List, items: List) -> bool:
     if list1 == list2:

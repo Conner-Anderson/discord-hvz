@@ -74,8 +74,8 @@ class SheetsInterface:
     def update_table(self, table_name: str):
         util.pool_function(
             function=self._export,
-            argument=table_name,
-            wait_seconds=10.0
+            wait_seconds=10.0,
+            table_name=table_name
         )
 
     def _export(self, table_name: str):
