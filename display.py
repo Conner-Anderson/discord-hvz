@@ -1,3 +1,4 @@
+import logging
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, InitVar
@@ -102,9 +103,19 @@ class DisplayCog(discord.Cog):
             ctx: discord.ApplicationContext
     ):
         panel_elements = [HumanElement, ZombieElement, PlayerElement, PlayersTodayElement, TagsTodayElement]
-        panel = HVZPanel(self, ctx.channel, element_names=panel_elements)
-        await panel.send()
+        panel = HVZPanel(self)
+        await panel.send(ctx.channel, panel_elements)
         await ctx.respond('Embed posted', ephemeral=True)
+
+    @discord.Cog.listener()
+    async def on_ready(self):
+        # Load persistent panels from the database.
+        rows = self.bot.db.get_table('persistent_panels')
+        for row in rows:
+            loaded_panel = await HVZPanel(self).load(row)
+            if not loaded_panel:
+                continue
+            self.add_panel(loaded_panel)
 
     @discord.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
@@ -208,12 +219,11 @@ class TagsTodayElement(PanelElement):
 @dataclass
 class HVZPanel:
     cog: DisplayCog
-    channel: discord.TextChannel
-    element_names: InitVar[List[Union[str, PanelElement]]]
-    live: bool = True
+    live: bool = field(init=False, default=True)
+    channel: discord.TextChannel = field(init=False, default=None)
+    message: discord.Message = field(init=False, default=None)
     elements: List[PanelElement] = field(init=False, default_factory=list)
     bot: "HVZBot" = field(init=False)
-    message: discord.Message = field(init=False)
     available_elements: ClassVar[List] = [
         HumanElement,
         ZombieElement,
@@ -222,14 +232,14 @@ class HVZPanel:
         TagsTodayElement
     ]
 
-    def __post_init__(self, element_names):
+    def __post_init__(self):
         self.bot = self.cog.bot
-        for name in element_names:
-            for element in self.available_elements:
-                if name == element.__name__ or name == element:
-                    self.elements.append(element())
 
-    async def send(self):
+
+    async def send(self, channel: discord.TextChannel, element_names: List[Union[str, PanelElement]]):
+
+        self.load_elements(element_names)
+        self.channel = channel
         image = create_game_plot(self.bot.db, filename='hvzdb_live.db')
         embed = self.create_embed(attachment=image)
         message = await self.channel.send(embed=embed, file=image)
@@ -239,12 +249,17 @@ class HVZPanel:
             self.bot.add_listener(self.refresh, name='on_role_change')
             self.save()
 
+    def load_elements(self, element_names: List[Union[str, PanelElement]]) -> None:
+        for name in element_names:
+            for element in self.available_elements:
+                if name == element.__name__ or name == element:
+                    self.elements.append(element())
+
     async def refresh(self):
         utilities.pool_function(self._refresh, 6.0)
 
     async def _refresh(self):
         logger.info('Refreshing')
-        # TODO: Might want to make a way to not refresh this image so often
         image = create_game_plot(self.bot.db, filename='hvzdb_live.db')
         embed = self.create_embed(attachment=image)
         await self.message.edit(embed=embed)
@@ -277,8 +292,20 @@ class HVZPanel:
         row_data.update({'elements':elements_string})
 
         self.bot.db.add_row('persistent_panels', row_data)
-        output = self.bot.db.get_table('persistent_panels')[0]
-        logger.info(output)
+
+    async def load(self, row: sqlalchemy.engine.Row) -> Union["HVZPanel", None]:
+        self.channel = self.bot.guild.get_channel(row['channel_id'])
+        try:
+            self.message = await self.channel.fetch_message(row['message_id'])
+        except discord.NotFound:
+            logger.warning('Could not find panel message. Removing it from the database.')
+            self.bot.db.delete_row('persistent_panels', 'message_id', row['message_id'])
+            return None
+
+        self.load_elements(row['elements'].split(','))
+        self.bot.add_listener(self.refresh, name='on_role_change')
+        return self
+
 
 
 """

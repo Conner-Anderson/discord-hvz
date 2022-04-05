@@ -24,8 +24,6 @@ from config import config, ConfigError
 
 from loguru import logger
 
-log = logger
-
 def dump(obj):
     """Prints the passed object in a very detailed form for debugging"""
     for attr in dir(obj):
@@ -41,6 +39,7 @@ class HvzDb:
     tables: Dict[str, Table] = field(init=False, default_factory=dict)
     sheet_interface: sheets.SheetsInterface = field(init=False, default=None)
     filename: str = 'hvzdb.db'
+    database_config: Dict[str, Dict[str, str]] = field(init=False, default_factory=dict)
 
     # Table names that cannot be created in the config. Reserved for cogs / modules
     reserved_table_names: ClassVar[List[str]] = ['persistent_panels']
@@ -71,10 +70,10 @@ class HvzDb:
     
     def __post_init__(self):
         # TODO: Need to make sure the required tables are always created. Might be config-depended now...
-        database_config: Dict[str, Dict[str, str]] = copy.deepcopy(config['database_tables'])
+        self.database_config: Dict[str, Dict[str, str]] = copy.deepcopy(config['database_tables'])
         self.engine = create_engine(f"sqlite+pysqlite:///{self.filename}", future=True)
 
-        for table_name, column_dict in database_config.items():
+        for table_name, column_dict in self.database_config.items():
             try:
                 self.tables[table_name] = Table(table_name, self.metadata_obj, autoload_with=self.engine)
                 continue
@@ -102,7 +101,7 @@ class HvzDb:
 
         self.metadata_obj.create_all(self.engine)
 
-
+        # TODO: Find a way to not need this
         # Give each table a table_names tuple which is all column names
         for name, table in self.tables.items():
             selection = select(table)
@@ -131,6 +130,7 @@ class HvzDb:
             self.tables[table_name] = Table(table_name.casefold(), self.metadata_obj, *column_args)
 
         self.metadata_obj.create_all(self.engine)
+        self.tables[table_name].column_names = columns.keys()
 
     def delete_table(self, table_name: str):
         self.tables[table_name].drop(bind=self.engine)
@@ -146,7 +146,8 @@ class HvzDb:
         try:
             if isinstance(table, Table): table_name = table.name
             else: table_name = table
-            self.sheet_interface.update_table(table_name)
+            if table in self.database_config: # Only send to Sheets if the table is in config.yml
+                self.sheet_interface.update_table(table_name)
         except Exception as e:
             # Allow sheet failure to silently pass for the user.
             logger.exception(f'The database failed to update to the Google Sheet with this error: {e}')
@@ -364,7 +365,7 @@ class HvzDb:
         if isinstance(member, discord.abc.User):
             member_id = member.id
 
-        self.__delete_row(
+        self.delete_row(
             self.tables['members'],
             self.tables['members'].c.id,
             member_id
@@ -373,21 +374,28 @@ class HvzDb:
 
     def delete_tag(self, tag_id):
         table = self.tables['tags']
-        self.__delete_row(
+        self.delete_row(
             table,
             table.c.tag_id,
             tag_id
         )
         return
 
-    def __delete_row(self, table, search_column, search_value):
+    def delete_row(self, table: Union[Table, str], search_column, search_value):
+        if isinstance(table, str):
+            try:
+                table = self.tables[table]
+            except KeyError:
+                raise KeyError(f'{table} is not a table.') from None
 
         if search_column not in table.column_names:
             raise ValueError(f'{search_column} not a column in {table}')
 
-        deletor = delete(table).where(search_column == search_value)
+        deletor = delete(table).where(table.c[search_column] == search_value)
         with self.engine.begin() as conn:
-            conn.execute(deletor)
+            result = conn.execute(deletor)
+        if result.rowcount < 1:
+            raise ValueError(f'Could not find rows where \"{search_column}\" is \"{search_value}\"')
         self._table_updated(table)
         return True
 
