@@ -1,5 +1,6 @@
 import logging
-import os
+import os, sys
+from inspect import getmembers, isclass
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, InitVar
 from datetime import datetime, timedelta
@@ -63,6 +64,207 @@ def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
 
 # create_game_plot('db', filename='hvzdb_live.db')
 
+
+
+
+class PanelElement(ABC):
+    @property
+    @abstractmethod
+    def refresh_event(self) -> str:
+        ...
+
+    @abstractmethod
+    def add(self, embed: discord.Embed, panel: "HVZPanel") -> Union[discord.File, None]:
+        ...
+
+
+class HumanElement(PanelElement):
+    @property
+    def refresh_event(self):
+        return 'on_role_change'
+
+    def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
+        human_count = len(panel.bot.roles['human'].members)
+        embed.add_field(name='Humans', value=str(human_count))
+
+
+class ZombieElement(PanelElement):
+    @property
+    def refresh_event(self):
+        return 'on_role_change'
+
+    def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
+        count = len(panel.bot.roles['zombie'].members)
+        embed.add_field(name='Zombies', value=str(count))
+
+
+class PlayerElement(PanelElement):
+    @property
+    def refresh_event(self):
+        return 'on_role_change'
+
+    def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
+        count = len(panel.bot.roles['player'].members)
+        embed.add_field(name='Players', value=str(count))
+
+
+class PlayersTodayElement(PanelElement):
+    @property
+    def refresh_event(self):
+        return 'on_role_change'
+
+    def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
+        try:
+            rows = panel.bot.db.get_rows(
+                table='members',
+                search_column_name='registration_time',
+                lower_value=datetime.now() - timedelta(days=1),
+                upper_value=datetime.now()
+            )
+            count = len(rows)
+        except ValueError:
+            count = 0
+
+        extra = ''
+        if not config['registration']:
+            extra = ' (Registration Closed)'
+        embed.add_field(name='New Players Today', value=str(count) + extra)
+
+
+class TagsTodayElement(PanelElement):
+    @property
+    def refresh_event(self):
+        return 'on_role_change'
+
+    def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
+        try:
+            rows = panel.bot.db.get_rows(
+                table='tags',
+                search_column_name='tag_time',
+                lower_value=datetime.now() - timedelta(days=1),
+                upper_value=datetime.now()
+            )
+            count = len(rows)
+        except ValueError:
+            count = 0
+
+        embed.add_field(name='Tags Today', value=str(count))
+
+
+class GamePlotElement(PanelElement):
+    @property
+    def refresh_event(self):
+        return 'on_role_change'
+
+    def add(self, embed: discord.Embed, panel: "HVZPanel") -> Union[None, discord.File]:
+        file = create_game_plot(panel.bot.db, filename='hvzdb_live.db')
+        embed.set_image(url=f'attachment://{file.filename}')
+        return file
+
+
+# Create a list of PanelElement classes available in the module
+# Needs to be here for the sake of the slash_command decorator.
+this_module = sys.modules[__name__]
+AVAILABLE_PANEL_ELEMENTS = [cls[1] for cls in getmembers(this_module, isclass) if issubclass(cls[1], PanelElement)]
+AVAILABLE_PANEL_ELEMENTS_STR = [element.__name__ for element in AVAILABLE_PANEL_ELEMENTS]
+
+
+@dataclass
+class HVZPanel:
+    cog: "DisplayCog"
+    live: bool = field(init=False, default=True)
+    channel: discord.TextChannel = field(init=False, default=None)
+    message: discord.Message = field(init=False, default=None)
+    elements: List[PanelElement] = field(init=False, default_factory=list)
+    bot: "HVZBot" = field(init=False)
+    available_elements: ClassVar[List] = [
+        HumanElement,
+        ZombieElement,
+        PlayerElement,
+        PlayersTodayElement,
+        TagsTodayElement,
+        GamePlotElement
+    ]
+
+    def __post_init__(self):
+        self.bot = self.cog.bot
+
+    async def send(self, channel: discord.TextChannel, element_names: List[Union[str, PanelElement]], live = True):
+
+        self.load_elements(element_names)
+        self.channel = channel
+
+        embed, file = self.create_embed()
+        message = await self.channel.send(embed=embed, file=file)
+        self.message = message
+        if self.live:
+            self.cog.add_panel(self)
+            self.setup_listeners()
+            self.save()
+
+    def load_elements(self, element_names: List[Union[str, PanelElement]]) -> None:
+        for name in element_names:
+            for element in AVAILABLE_PANEL_ELEMENTS:
+                if name == element.__name__ or name == element:
+                    self.elements.append(element())
+
+    async def refresh(self):
+        utilities.pool_function(self._refresh, 6.0)
+
+    async def _refresh(self):
+        logger.info('Refreshing')
+        image = create_game_plot(self.bot.db, filename='hvzdb_live.db')
+        embed, file = self.create_embed()
+        await self.message.edit(embed=embed, file=file)
+
+    def create_embed(self) -> (discord.Embed, discord.File):
+        embed = discord.Embed(title='Game Status')
+        output_file = None
+
+        for element in self.elements:
+            file = element.add(embed=embed, panel=self)
+            if file: output_file = file
+
+        time_string = datetime.now().strftime('%B %d, %I:%M %p')
+        if self.live:
+            embed.set_footer(text=f'Live updating. Updated: {time_string}')
+        else:
+            embed.set_footer(text=f'Created: {time_string}')
+
+        return embed, output_file
+
+    def save(self):
+        row_data = {
+            'channel_id': self.channel.id,
+            'message_id': self.message.id
+        }
+        # Converts elements into a string of their class names separated by commas and no spaces
+        elements_string = ','.join([type(element).__name__ for element in self.elements])
+        row_data.update({'elements': elements_string})
+
+        self.bot.db.add_row('persistent_panels', row_data)
+
+    async def load(self, row: sqlalchemy.engine.Row) -> Union["HVZPanel", None]:
+        self.channel = self.bot.guild.get_channel(row['channel_id'])
+        try:
+            self.message = await self.channel.fetch_message(row['message_id'])
+        except discord.NotFound:
+            logger.warning('Could not find panel message. Removing it from the database.')
+            self.bot.db.delete_row('persistent_panels', 'message_id', row['message_id'])
+            return None
+
+        self.load_elements(row['elements'].split(','))
+        self.setup_listeners()
+        return self
+
+    def setup_listeners(self):
+        events = [element.refresh_event for element in self.elements]
+        for event in set(events):
+            self.bot.add_listener(self.refresh, name=event)
+
+
+
+
 class DisplayCog(discord.Cog):
     bot: 'HVZBot'
     panels: Dict[int, "HVZPanel"]
@@ -74,9 +276,9 @@ class DisplayCog(discord.Cog):
         self.roles_to_watch = []
 
         bot.db.prepare_table('persistent_panels', columns={
-            'channel_id':'integer',
-            'message_id':'integer',
-            'elements':'string'
+            'channel_id': 'integer',
+            'message_id': 'integer',
+            'elements': 'string'
         })
 
     def add_panel(self, panel: "HVZPanel"):
@@ -97,14 +299,22 @@ class DisplayCog(discord.Cog):
         file = create_game_plot('db', filename='hvzdb_live.db')
         await ctx.respond(message, file=file)
 
-    @slash_command(guild_ids=guild_id_list)
+    @slash_command(guild_ids=guild_id_list, description='Post a message with various live-updating game statistics.')
     async def post_embed(
             self,
-            ctx: discord.ApplicationContext
+            ctx: discord.ApplicationContext,
+            element1: Option(str, required=True, choices=AVAILABLE_PANEL_ELEMENTS_STR, description='Element to add.'),
+            element2: Option(str, required=False, choices=AVAILABLE_PANEL_ELEMENTS_STR, default=None, description='Element to add.'),
+            element3: Option(str, required=False, choices=AVAILABLE_PANEL_ELEMENTS_STR, default=None, description='Element to add.'),
+            element4: Option(str, required=False, choices=AVAILABLE_PANEL_ELEMENTS_STR, default=None, description='Element to add.'),
+            element5: Option(str, required=False, choices=AVAILABLE_PANEL_ELEMENTS_STR, default=None, description='Element to add.'),
+            element6: Option(str, required=False, choices=AVAILABLE_PANEL_ELEMENTS_STR, default=None, description='Element to add.'),
+            static: Option(bool, required=False, default=False, description='The data will never update if static.')
     ):
-        panel_elements = [HumanElement, ZombieElement, PlayerElement, PlayersTodayElement, TagsTodayElement]
+        selections = {element1, element2, element3, element4, element5, element6}
+
         panel = HVZPanel(self)
-        await panel.send(ctx.channel, panel_elements)
+        await panel.send(ctx.channel, selections, live=not static)
         await ctx.respond('Embed posted', ephemeral=True)
 
     @discord.Cog.listener()
@@ -135,177 +345,6 @@ class DisplayCog(discord.Cog):
             return
         self.panels.pop(payload.message_id)
         logger.info(f'Removed panel with id: {payload.message_id}')
-
-    @discord.Cog.listener()
-    async def on_test_event(self):
-        logger.success('Event triggered!')
-
-
-@dataclass
-class PanelElement(ABC):
-
-    @abstractmethod
-    def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
-        ...
-
-
-@dataclass
-class HumanElement(PanelElement):
-    refresh_event: str = 'on_role_change'
-
-    def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
-        human_count = len(panel.bot.roles['human'].members)
-        embed.add_field(name='Humans', value=str(human_count))
-
-
-@dataclass
-class ZombieElement(PanelElement):
-    refresh_event: str = 'on_role_change'
-
-    def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
-        count = len(panel.bot.roles['zombie'].members)
-        embed.add_field(name='Zombies', value=str(count))
-
-
-@dataclass
-class PlayerElement(PanelElement):
-    refresh_event: str = 'on_role_change'
-
-    def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
-        count = len(panel.bot.roles['player'].members)
-        embed.add_field(name='Players', value=str(count))
-
-
-@dataclass
-class PlayersTodayElement(PanelElement):
-    refresh_event: str = 'on_role_change'
-
-    def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
-        try:
-            rows = panel.bot.db.get_rows(
-                table='members',
-                search_column_name='registration_time',
-                lower_value=datetime.now() - timedelta(days=1),
-                upper_value=datetime.now()
-            )
-            count = len(rows)
-        except ValueError:
-            count = 0
-
-        extra = ''
-        if not config['registration']:
-            extra = ' (Registration Closed)'
-        embed.add_field(name='New Players Today', value=str(count) + extra)
-
-@dataclass
-class TagsTodayElement(PanelElement):
-    refresh_event: str = 'on_role_change'
-
-    def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
-        try:
-            rows = panel.bot.db.get_rows(
-                table='tags',
-                search_column_name='tag_time',
-                lower_value=datetime.now() - timedelta(days=1),
-                upper_value=datetime.now()
-            )
-            count = len(rows)
-        except ValueError:
-            count = 0
-
-        embed.add_field(name='Tags Today', value=str(count))
-
-
-@dataclass
-class HVZPanel:
-    cog: DisplayCog
-    live: bool = field(init=False, default=True)
-    channel: discord.TextChannel = field(init=False, default=None)
-    message: discord.Message = field(init=False, default=None)
-    elements: List[PanelElement] = field(init=False, default_factory=list)
-    bot: "HVZBot" = field(init=False)
-    available_elements: ClassVar[List] = [
-        HumanElement,
-        ZombieElement,
-        PlayerElement,
-        PlayersTodayElement,
-        TagsTodayElement
-    ]
-
-    def __post_init__(self):
-        self.bot = self.cog.bot
-
-
-    async def send(self, channel: discord.TextChannel, element_names: List[Union[str, PanelElement]]):
-
-        self.load_elements(element_names)
-        self.channel = channel
-        image = create_game_plot(self.bot.db, filename='hvzdb_live.db')
-        embed = self.create_embed(attachment=image)
-        message = await self.channel.send(embed=embed, file=image)
-        self.message = message
-        if self.live:
-            self.cog.add_panel(self)
-            self.bot.add_listener(self.refresh, name='on_role_change')
-            self.save()
-
-    def load_elements(self, element_names: List[Union[str, PanelElement]]) -> None:
-        for name in element_names:
-            for element in self.available_elements:
-                if name == element.__name__ or name == element:
-                    self.elements.append(element())
-
-    async def refresh(self):
-        utilities.pool_function(self._refresh, 6.0)
-
-    async def _refresh(self):
-        logger.info('Refreshing')
-        image = create_game_plot(self.bot.db, filename='hvzdb_live.db')
-        embed = self.create_embed(attachment=image)
-        await self.message.edit(embed=embed)
-
-    def create_embed(self, attachment: discord.File = None) -> discord.Embed:
-        bot = self.bot
-        embed = discord.Embed(title='Game Status')
-
-        for element in self.elements:
-            element.add(embed=embed, panel=self)
-
-        time_string = datetime.now().strftime('%B %d, %I:%M %p')
-        if self.live:
-            embed.set_footer(text=f'Live updating. Updated: {time_string}')
-        else:
-            embed.set_footer(text=f'Created: {time_string}')
-
-        if attachment:
-            embed.set_image(url=f'attachment://{attachment.filename}')
-
-        return embed
-
-    def save(self):
-        row_data = {
-            'channel_id':self.channel.id,
-            'message_id':self.message.id
-        }
-        # Converts elements into a string of their class names separated by commas and no spaces
-        elements_string = ','.join([type(element).__name__ for element in self.elements])
-        row_data.update({'elements':elements_string})
-
-        self.bot.db.add_row('persistent_panels', row_data)
-
-    async def load(self, row: sqlalchemy.engine.Row) -> Union["HVZPanel", None]:
-        self.channel = self.bot.guild.get_channel(row['channel_id'])
-        try:
-            self.message = await self.channel.fetch_message(row['message_id'])
-        except discord.NotFound:
-            logger.warning('Could not find panel message. Removing it from the database.')
-            self.bot.db.delete_row('persistent_panels', 'message_id', row['message_id'])
-            return None
-
-        self.load_elements(row['elements'].split(','))
-        self.bot.add_listener(self.refresh, name='on_role_change')
-        return self
-
 
 
 """
