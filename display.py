@@ -1,9 +1,9 @@
-import logging
-import os, sys
-from inspect import getmembers, isclass
+import os
+import sys
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field, InitVar
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from inspect import getmembers, isclass
 from typing import TYPE_CHECKING, Dict, List, ClassVar, Union
 
 import discord
@@ -60,11 +60,6 @@ def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
 
     file = discord.File("plots/fig1.jpeg")
     return file
-
-
-# create_game_plot('db', filename='hvzdb_live.db')
-
-
 
 
 class PanelElement(ABC):
@@ -195,7 +190,9 @@ class HVZPanel:
         self.channel = channel
 
         embed, file = self.create_embed()
-        message = await self.channel.send(embed=embed, file=file)
+        kwargs = {'embed': embed}
+        if file: kwargs.update({'file': file})
+        message = await self.channel.send(**kwargs)
         self.message = message
         if self.live:
             self.cog.add_panel(self)
@@ -212,10 +209,10 @@ class HVZPanel:
         utilities.pool_function(self._refresh, 6.0)
 
     async def _refresh(self):
-        logger.info('Refreshing')
-        image = create_game_plot(self.bot.db, filename='hvzdb_live.db')
         embed, file = self.create_embed()
-        await self.message.edit(embed=embed, file=file)
+        kwargs = {'embed':embed}
+        if file: kwargs.update({'file':file})
+        await self.message.edit(**kwargs)
 
     def create_embed(self) -> (discord.Embed, discord.File):
         embed = discord.Embed(title='Game Status')
@@ -300,7 +297,7 @@ class DisplayCog(discord.Cog):
         await ctx.respond(message, file=file)
 
     @slash_command(guild_ids=guild_id_list, description='Post a message with various live-updating game statistics.')
-    async def post_embed(
+    async def post_panel(
             self,
             ctx: discord.ApplicationContext,
             element1: Option(str, required=True, choices=AVAILABLE_PANEL_ELEMENTS_STR, description='Element to add.'),
@@ -314,6 +311,7 @@ class DisplayCog(discord.Cog):
         selections = {element1, element2, element3, element4, element5, element6}
 
         panel = HVZPanel(self)
+        await ctx.response.defer(ephemeral=True)
         await panel.send(ctx.channel, selections, live=not static)
         await ctx.respond('Embed posted', ephemeral=True)
 
@@ -334,7 +332,6 @@ class DisplayCog(discord.Cog):
         changed = utilities.have_lists_changed(before.roles, after.roles, self.roles_to_watch)
         if not changed:
             return
-        logger.info('Dispatching')
         self.bot.dispatch('role_change')
         return
 
