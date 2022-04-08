@@ -4,10 +4,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from inspect import getmembers, isclass
-from typing import TYPE_CHECKING, Dict, List, ClassVar, Union
+from typing import TYPE_CHECKING, Dict, List, ClassVar, Union, Set
 
 import discord
 import pandas as pd
+import pandas.util
 import plotly.express as px
 import sqlalchemy
 from discord.commands import slash_command, permissions, Option
@@ -21,36 +22,42 @@ if TYPE_CHECKING:
     from discord_hvz import HVZBot
 
 guild_id_list = [config['available_servers'][config['active_server']]]
+last_game_plot_hash = None
 
 
 def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
+    #TODO: Finish implementing way to keep an image from regenerating all the time
     if not filename:
         filename = db.filename
     engine = sqlalchemy.create_engine(f"sqlite+pysqlite:///{filename}")
-    members_df = pd.read_sql_table('members', con=engine, columns=['Registration_Time', 'OZ'])
-    tags_df = pd.read_sql_table('tags', con=engine, columns=['Tag_Time', 'Revoked_Tag'])
+    members_df = pd.read_sql_table('members', con=engine, columns=['registration_time', 'oz'])
+    tags_df = pd.read_sql_table('tags', con=engine, columns=['tag_time', 'revoked_tag'])
+    hash = pandas.util.hash_pandas_object(tags_df)
 
     def total_players(x):
-        total = (members_df.Registration_Time < x.Tag_Time)
+        total = (members_df.registration_time < x.tag_time)
         return total.sum()
 
     def total_zombies(x):
-        total = ((tags_df.Tag_Time < x.Tag_Time) & (tags_df.Revoked_Tag == False))
+        total = ((tags_df.tag_time < x.tag_time) & (tags_df.revoked_tag == False))
         return total.sum()
 
-    oz_count = members_df['OZ'].sum()
+    oz_count = members_df['oz'].sum()
 
     player_count_sr = tags_df.apply(total_players, axis=1)
     tags_df = tags_df.assign(Player_Count=player_count_sr)
     zombie_count_sr = tags_df.apply(total_zombies, axis=1) + oz_count
     tags_df = tags_df.assign(Zombie_Count=zombie_count_sr)
     tags_df['Human_Count'] = tags_df['Player_Count'] - tags_df['Zombie_Count']
-    tags_df.sort_values(by='Tag_Time', inplace=True)
+    tags_df.sort_values(by='tag_time', inplace=True)
 
-    fig = px.line(tags_df, x="Tag_Time", y=["Zombie_Count", "Human_Count"], title='Tags over time', markers=True)
+    fig = px.line(tags_df, x="tag_time", y=["Zombie_Count", "Human_Count"], title='Players over Time', markers=True)
     fig.update_xaxes(
-        dtick=3600000 * 12,  # The big number is one hour
-        tickformat="%a %I:%M %p")
+        dtick=3600000 * 24,  # The big number is one hour
+        tickformat="%a %b %d",
+        ticks='outside',
+        ticklabelmode='period'
+    )
     # fig.show()
 
     if not os.path.exists("plots"):
@@ -152,7 +159,7 @@ class GamePlotElement(PanelElement):
         return 'on_role_change'
 
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> Union[None, discord.File]:
-        file = create_game_plot(panel.bot.db, filename='hvzdb_live.db')
+        file = create_game_plot(panel.bot.db)
         embed.set_image(url=f'attachment://{file.filename}')
         return file
 
@@ -172,14 +179,7 @@ class HVZPanel:
     message: discord.Message = field(init=False, default=None)
     elements: List[PanelElement] = field(init=False, default_factory=list)
     bot: "HVZBot" = field(init=False)
-    available_elements: ClassVar[List] = [
-        HumanElement,
-        ZombieElement,
-        PlayerElement,
-        PlayersTodayElement,
-        TagsTodayElement,
-        GamePlotElement
-    ]
+    listener_events: Set[str] = field(init=False, default_factory=set)
 
     def __post_init__(self):
         self.bot = self.cog.bot
@@ -255,9 +255,15 @@ class HVZPanel:
         return self
 
     def setup_listeners(self):
-        events = [element.refresh_event for element in self.elements]
-        for event in set(events):
-            self.bot.add_listener(self.refresh, name=event)
+        event_names = [element.refresh_event for element in self.elements]
+        self.listener_events.update(event_names)
+        for event_name in self.listener_events:
+            self.bot.add_listener(self.refresh, name=event_name)
+
+    def remove_listeners(self):
+        for event_name in self.listener_events:
+            self.bot.remove_listener(self.refresh, event_name)
+
 
 
 
@@ -283,18 +289,14 @@ class DisplayCog(discord.Cog):
             raise ValueError(f'Panel with id {panel.message.id} already exists.')
         self.panels[panel.message.id] = panel
 
-    @slash_command(guild_ids=guild_id_list)
-    @permissions.has_role('Admin')
-    async def display(
-            self,
-            ctx: discord.ApplicationContext,
-            message: Option(str, 'Optional message to include in the post.', default='')
-    ):
-        """
-        Description of the command
-        """
-        file = create_game_plot('db', filename='hvzdb_live.db')
-        await ctx.respond(message, file=file)
+    def delete_panel(self, message_id: int):
+        panel = self.panels.pop(message_id, None)
+        if panel:
+            panel.remove_listeners()
+        try:
+            self.bot.db.delete_row('persistent_panels', 'message_id', message_id)
+        except ValueError:
+            pass
 
     @slash_command(guild_ids=guild_id_list, description='Post a message with various live-updating game statistics.')
     async def post_panel(
@@ -309,7 +311,7 @@ class DisplayCog(discord.Cog):
             static: Option(bool, required=False, default=False, description='The data will never update if static.')
     ):
         selections = {element1, element2, element3, element4, element5, element6}
-
+        #TODO: PanelElement can't be an option
         panel = HVZPanel(self)
         await ctx.response.defer(ephemeral=True)
         await panel.send(ctx.channel, selections, live=not static)
@@ -338,10 +340,8 @@ class DisplayCog(discord.Cog):
     @discord.Cog.listener()
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
         panel = self.panels.get(payload.message_id)
-        if not panel:
-            return
-        self.panels.pop(payload.message_id)
-        logger.info(f'Removed panel with id: {payload.message_id}')
+        self.delete_panel(payload.message_id)
+        logger.debug(f'Removed panel with id: {payload.message_id}')
 
 
 """
