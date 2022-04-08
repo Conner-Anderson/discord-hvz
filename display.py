@@ -4,14 +4,14 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from inspect import getmembers, isclass
-from typing import TYPE_CHECKING, Dict, List, ClassVar, Union, Set
+from typing import TYPE_CHECKING, Dict, List, Union, Set
 
 import discord
 import pandas as pd
 import pandas.util
 import plotly.express as px
 import sqlalchemy
-from discord.commands import slash_command, permissions, Option
+from discord.commands import slash_command, Option
 from loguru import logger
 
 import utilities
@@ -22,50 +22,54 @@ if TYPE_CHECKING:
     from discord_hvz import HVZBot
 
 guild_id_list = [config['available_servers'][config['active_server']]]
-last_game_plot_hash = None
+LAST_GAME_PLOT_HASH = None
 
 
 def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
-    #TODO: Finish implementing way to keep an image from regenerating all the time
-    if not filename:
-        filename = db.filename
-    engine = sqlalchemy.create_engine(f"sqlite+pysqlite:///{filename}")
-    members_df = pd.read_sql_table('members', con=engine, columns=['registration_time', 'oz'])
-    tags_df = pd.read_sql_table('tags', con=engine, columns=['tag_time', 'revoked_tag'])
-    hash = pandas.util.hash_pandas_object(tags_df)
-
-    def total_players(x):
-        total = (members_df.registration_time < x.tag_time)
-        return total.sum()
-
-    def total_zombies(x):
-        total = ((tags_df.tag_time < x.tag_time) & (tags_df.revoked_tag == False))
-        return total.sum()
-
-    oz_count = members_df['oz'].sum()
-
-    player_count_sr = tags_df.apply(total_players, axis=1)
-    tags_df = tags_df.assign(Player_Count=player_count_sr)
-    zombie_count_sr = tags_df.apply(total_zombies, axis=1) + oz_count
-    tags_df = tags_df.assign(Zombie_Count=zombie_count_sr)
-    tags_df['Human_Count'] = tags_df['Player_Count'] - tags_df['Zombie_Count']
-    tags_df.sort_values(by='tag_time', inplace=True)
-
-    fig = px.line(tags_df, x="tag_time", y=["Zombie_Count", "Human_Count"], title='Players over Time', markers=True)
-    fig.update_xaxes(
-        dtick=3600000 * 24,  # The big number is one hour
-        tickformat="%a %b %d",
-        ticks='outside',
-        ticklabelmode='period'
-    )
-    # fig.show()
-
+    global LAST_GAME_PLOT_HASH
+    image_path = "plots/fig1.jpeg"
     if not os.path.exists("plots"):
         os.mkdir("plots")
 
-    fig.write_image("plots/fig1.jpeg", width=800, height=600, scale=1.5)
+    if not filename:
+        filename = db.filename
+    engine = sqlalchemy.create_engine(f"sqlite+pysqlite:///{filename}")
+    tags_df = pd.read_sql_table('tags', con=engine, columns=['tag_time', 'revoked_tag'])
 
-    file = discord.File("plots/fig1.jpeg")
+    new_hash = pandas.util.hash_pandas_object(tags_df).sum()
+    if LAST_GAME_PLOT_HASH != new_hash or not os.path.exists(image_path):
+        members_df = pd.read_sql_table('members', con=engine, columns=['registration_time', 'oz'])
+
+        def total_players(x):
+            total = (members_df.registration_time < x.tag_time)
+            return total.sum()
+
+        def total_zombies(x):
+            total = ((tags_df.tag_time < x.tag_time) & (tags_df.revoked_tag is False))
+            return total.sum()
+
+        oz_count = members_df['oz'].sum()
+
+        player_count_sr = tags_df.apply(total_players, axis=1)
+        tags_df = tags_df.assign(Player_Count=player_count_sr)
+        zombie_count_sr = tags_df.apply(total_zombies, axis=1) + oz_count
+        tags_df = tags_df.assign(Zombie_Count=zombie_count_sr)
+        tags_df['Human_Count'] = tags_df['Player_Count'] - tags_df['Zombie_Count']
+        tags_df.sort_values(by='tag_time', inplace=True)
+
+        fig = px.line(tags_df, x="tag_time", y=["Zombie_Count", "Human_Count"], title='Players over Time', markers=True)
+        fig.update_xaxes(
+            dtick=3600000 * 24,  # The big number is one hour
+            tickformat="%a %b %d",
+            ticks='outside',
+            ticklabelmode='period'
+        )
+        # fig.show()
+
+        fig.write_image(image_path, width=800, height=600, scale=1.5)
+        LAST_GAME_PLOT_HASH = new_hash
+
+    file = discord.File(image_path)
     return file
 
 
@@ -184,14 +188,15 @@ class HVZPanel:
     def __post_init__(self):
         self.bot = self.cog.bot
 
-    async def send(self, channel: discord.TextChannel, element_names: List[Union[str, PanelElement]], live = True):
-
+    async def send(self, channel: discord.TextChannel, element_names: List[Union[str, PanelElement]], live=True):
+        self.live = live
         self.load_elements(element_names)
         self.channel = channel
 
         embed, file = self.create_embed()
         kwargs = {'embed': embed}
-        if file: kwargs.update({'file': file})
+        if file:
+            kwargs.update({'file': file})
         message = await self.channel.send(**kwargs)
         self.message = message
         if self.live:
@@ -210,8 +215,9 @@ class HVZPanel:
 
     async def _refresh(self):
         embed, file = self.create_embed()
-        kwargs = {'embed':embed}
-        if file: kwargs.update({'file':file})
+        kwargs = {'embed': embed}
+        if file:
+            kwargs.update({'file': file})
         await self.message.edit(**kwargs)
 
     def create_embed(self) -> (discord.Embed, discord.File):
@@ -220,7 +226,8 @@ class HVZPanel:
 
         for element in self.elements:
             file = element.add(embed=embed, panel=self)
-            if file: output_file = file
+            if file:
+                output_file = file
 
         time_string = datetime.now().strftime('%B %d, %I:%M %p')
         if self.live:
@@ -265,9 +272,6 @@ class HVZPanel:
             self.bot.remove_listener(self.refresh, event_name)
 
 
-
-
-
 class DisplayCog(discord.Cog):
     bot: 'HVZBot'
     panels: Dict[int, "HVZPanel"]
@@ -303,15 +307,20 @@ class DisplayCog(discord.Cog):
             self,
             ctx: discord.ApplicationContext,
             element1: Option(str, required=True, choices=AVAILABLE_PANEL_ELEMENTS_STR, description='Element to add.'),
-            element2: Option(str, required=False, choices=AVAILABLE_PANEL_ELEMENTS_STR, default=None, description='Element to add.'),
-            element3: Option(str, required=False, choices=AVAILABLE_PANEL_ELEMENTS_STR, default=None, description='Element to add.'),
-            element4: Option(str, required=False, choices=AVAILABLE_PANEL_ELEMENTS_STR, default=None, description='Element to add.'),
-            element5: Option(str, required=False, choices=AVAILABLE_PANEL_ELEMENTS_STR, default=None, description='Element to add.'),
-            element6: Option(str, required=False, choices=AVAILABLE_PANEL_ELEMENTS_STR, default=None, description='Element to add.'),
+            element2: Option(str, required=False, choices=AVAILABLE_PANEL_ELEMENTS_STR, default=None,
+                             description='Element to add.'),
+            element3: Option(str, required=False, choices=AVAILABLE_PANEL_ELEMENTS_STR, default=None,
+                             description='Element to add.'),
+            element4: Option(str, required=False, choices=AVAILABLE_PANEL_ELEMENTS_STR, default=None,
+                             description='Element to add.'),
+            element5: Option(str, required=False, choices=AVAILABLE_PANEL_ELEMENTS_STR, default=None,
+                             description='Element to add.'),
+            element6: Option(str, required=False, choices=AVAILABLE_PANEL_ELEMENTS_STR, default=None,
+                             description='Element to add.'),
             static: Option(bool, required=False, default=False, description='The data will never update if static.')
     ):
         selections = {element1, element2, element3, element4, element5, element6}
-        #TODO: PanelElement can't be an option
+        # TODO: PanelElement can't be an option
         panel = HVZPanel(self)
         await ctx.response.defer(ephemeral=True)
         await panel.send(ctx.channel, selections, live=not static)
@@ -353,3 +362,6 @@ Tags today: On tag or role change
 New players today: On registration
 
 """
+if __name__ == '__main__':
+    create_game_plot('thing', filename='hvzdb.db')
+    create_game_plot('thing', filename='hvzdb.db')
