@@ -21,8 +21,6 @@ from config import config
 
 from loguru import logger
 
-log = logger
-
 def dump(obj):
     """Prints the passed object in a very detailed form for debugging"""
     for attr in dir(obj):
@@ -37,6 +35,11 @@ class HvzDb:
     metadata_obj: MetaData = field(init=False, default_factory=MetaData)
     tables: Dict[str, Table] = field(init=False, default_factory=dict)
     sheet_interface: sheets.SheetsInterface = field(init=False, default=None)
+    filename: str = 'hvzdb.db'
+    database_config: Dict[str, Dict[str, str]] = field(init=False, default_factory=dict)
+
+    # Table names that cannot be created in the config. Reserved for cogs / modules
+    reserved_table_names: ClassVar[List[str]] = ['persistent_panels']
 
     required_columns: ClassVar[Dict[str, Dict[str, str]]] = {
         'members': {
@@ -63,10 +66,11 @@ class HvzDb:
 
     
     def __post_init__(self):
-        database_config: Dict[str, Dict[str, str]] = copy.deepcopy(config['database_tables'])
-        self.engine = create_engine("sqlite+pysqlite:///hvzdb.db", future=True)
+        # TODO: Need to make sure the required tables are always created. Might be config-depended now...
+        self.database_config: Dict[str, Dict[str, str]] = copy.deepcopy(config['database_tables'])
+        self.engine = create_engine(f"sqlite+pysqlite:///{self.filename}", future=True)
 
-        for table_name, column_dict in database_config.items():
+        for table_name, column_dict in self.database_config.items():
             try:
                 self.tables[table_name] = Table(table_name, self.metadata_obj, autoload_with=self.engine)
                 continue
@@ -94,7 +98,7 @@ class HvzDb:
 
         self.metadata_obj.create_all(self.engine)
 
-
+        # TODO: Find a way to not need this
         # Give each table a table_names tuple which is all column names
         for name, table in self.tables.items():
             selection = select(table)
@@ -105,6 +109,31 @@ class HvzDb:
         if config['google_sheet_export'] == True:
             self.sheet_interface = sheets.SheetsInterface(self)
 
+    def prepare_table(self, table_name: str, columns: Dict[str, Union[str, type]]) -> None:
+        """
+        Creates a new table in the database if there is none, and loads the table from the database if it exists already.
+        """
+        try:
+            self.tables[table_name] = Table(table_name, self.metadata_obj, autoload_with=self.engine)
+        except NoSuchTableError:
+            logger.warning(
+                f'Creating table "{table_name}" since it was not found in the database.')
+
+            column_args = []
+            # Create Columns from the config
+            for column_name, column_type in columns.items():
+                column_args.append(self._create_column_object(column_name, column_type))
+
+            self.tables[table_name] = Table(table_name.casefold(), self.metadata_obj, *column_args)
+
+        self.metadata_obj.create_all(self.engine)
+        self.tables[table_name].column_names = columns.keys()
+
+    def delete_table(self, table_name: str):
+        self.tables[table_name].drop(bind=self.engine)
+        logger.warning(f'Deleted tabled named {table_name}')
+
+
     def _table_updated(self, table: Union[Table, str]) -> None:
         """
         To be called whenever a function changes a table. This lets the Google Sheet update.
@@ -114,28 +143,34 @@ class HvzDb:
         try:
             if isinstance(table, Table): table_name = table.name
             else: table_name = table
-            self.sheet_interface.update_table(table_name)
+            if table in self.database_config: # Only send to Sheets if the table is in config.yml
+                self.sheet_interface.update_table(table_name)
         except Exception as e:
             # Allow sheet failure to silently pass for the user.
             logger.exception(f'The database failed to update to the Google Sheet with this error: {e}')
 
 
-    def _create_column_object(self, column_name: str, column_type: str) -> Column:
+    def _create_column_object(self, column_name: str, column_type: Union[str, type]) -> Column:
         """
         Returns a Column object after forcing the name to lowercase and validating the type
         :param column_name:
         :param column_type: A string matching a valid column type
         :return: Column object
         """
-        try:
-            column_type_object = self.valid_column_types[column_type.casefold()]
-        except KeyError:
-            column_type_object = String
-        kwargs = {}
+        if not isinstance(column_type, str):
+            if column_type in self.valid_column_types.items():
+                column_type_object = column_type
+            else:
+                raise TypeError(f'column_type is an invalid type: {type(column_type)}')
+        else:
+            try:
+                column_type_object = self.valid_column_types[column_type.casefold()]
+            except KeyError:
+                column_type_object = String
 
+        kwargs = {}
         if column_type == 'incrementing_integer':
             kwargs = {'primary_key': True, 'nullable':False, 'autoincrement':True}
-
 
         return Column(column_name.casefold(), column_type_object, **kwargs)
 
@@ -327,7 +362,7 @@ class HvzDb:
         if isinstance(member, discord.abc.User):
             member_id = member.id
 
-        self.__delete_row(
+        self.delete_row(
             self.tables['members'],
             self.tables['members'].c.id,
             member_id
@@ -336,25 +371,41 @@ class HvzDb:
 
     def delete_tag(self, tag_id):
         table = self.tables['tags']
-        self.__delete_row(
+        self.delete_row(
             table,
             table.c.tag_id,
             tag_id
         )
         return
 
-    def __delete_row(self, table, search_column, search_value):
+    def delete_row(self, table: Union[Table, str], search_column, search_value):
+        if isinstance(table, str):
+            try:
+                table = self.tables[table]
+            except KeyError:
+                raise KeyError(f'{table} is not a table.') from None
 
         if search_column not in table.column_names:
             raise ValueError(f'{search_column} not a column in {table}')
 
-        deletor = delete(table).where(search_column == search_value)
+        deletor = delete(table).where(table.c[search_column] == search_value)
         with self.engine.begin() as conn:
-            conn.execute(deletor)
+            result = conn.execute(deletor)
+        if result.rowcount < 1:
+            raise ValueError(f'Could not find rows where \"{search_column}\" is \"{search_value}\"')
         self._table_updated(table)
         return True
 
-    def get_rows(self, table, search_column, search_value, exclusion_column=None, exclusion_value=None):
+    def get_rows(
+            self,
+            table: str,
+            search_column_name,
+            search_value=None,
+            lower_value=None,
+            upper_value=None,
+            exclusion_column_name=None,
+            exclusion_value=None
+    ):
         """
         Returns a list of Row objects where the specified value matches.
         Meant to be used within the class.
@@ -363,22 +414,38 @@ class HvzDb:
                 table (sqlalchemy.table): Table object
                 column (sqlalchemy.column): Column object to search for value
                 value (any): Value to search column for
-                exclusion_column (sqlalchemy.column) Optional. Reject rows where this column equals exclusion_value
+                exclusion_column_name (sqlalchemy.column) Optional. Reject rows where this column equals exclusion_value
                 exclusion_value (any) Optional. Required if exclusion_column is provided.
 
         Returns:
                 result_rows: List of Row objects. Access rows in these ways: row.some_row, row['some_row']
         """
         the_table = self.tables[table]
-        selection = select(the_table).where(the_table.c[search_column] == search_value)
-        if exclusion_column is not None:
-            if exclusion_value is None:
+        selection = select(the_table)
+        search_column = the_table.c[search_column_name]
+
+        if search_value:
+            selection = selection.where(search_column == search_value)
+        elif lower_value and upper_value:
+            selection = selection.where(search_column > lower_value).where(search_column < upper_value)
+        else:
+            raise ValueError('If search_value is not provided, both lower_value and upper_value must be.')
+
+        if exclusion_column_name:
+            exclusion_column = the_table.c[exclusion_column_name]
+            if not exclusion_value:
                 raise ValueError('No exclusion value provided.')
-            selection = selection.where(the_table.c[exclusion_column] != exclusion_value)
+            selection = selection.where(exclusion_column != exclusion_value)
+
         with self.engine.begin() as conn:
             result_rows = conn.execute(selection).all()
+
         if len(result_rows) == 0:
-            raise ValueError(f'Could not find rows where \"{search_column}\" is \"{search_value}\"')
+            if lower_value:
+                raise ValueError(f'Could not find rows where "{search_column_name}" is between "{lower_value}" and "{upper_value}"')
+            else:
+                raise ValueError(f'Could not find rows where \"{search_column_name}\" is \"{search_value}\"')
+
         return result_rows
 
 

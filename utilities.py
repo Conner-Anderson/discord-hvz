@@ -1,10 +1,9 @@
-import functools
-from inspect import iscoroutinefunction
 import asyncio
-from discord.ext import commands
-
-import string
 import random
+import string
+from inspect import iscoroutinefunction
+from typing import List, Union
+
 from loguru import logger
 
 log = logger
@@ -56,7 +55,7 @@ def generate_tag_tree(db):
             if level == 0:
                 output += ' (OZ)'
             try:
-                tags = db.get_rows('tags', 'tagger_id', r.id, exclusion_column='revoked_tag', exclusion_value=True)
+                tags = db.get_rows('tags', 'tagger_id', r.id, exclusion_column_name='revoked_tag', exclusion_value=True)
 
             except ValueError:
                 pass
@@ -76,10 +75,78 @@ def generate_tag_tree(db):
 
     return loop(oz_table, 0)
 
+class PoolItem:
+
+    def __init__(self, function: callable, *args, **kwargs):
+        self.function = function
+        self.args = args
+        self.kwargs = kwargs
+
+    def __eq__(self, other) -> bool:
+        try:
+            if self.function == other.function and self.args == other.args and self.kwargs == other.kwargs:
+                return True
+            else: return False
+        except:
+            return False
+
+    @property
+    def done(self) -> bool:
+        try:
+            if self.task.done():
+                return True
+            else:
+                return False
+        except:
+            return False
+
+    def start(self, wait_seconds: Union[int, float]) -> None:
+        self.task = asyncio.create_task(do_after_wait(self.function, wait_seconds, *self.args, **self.kwargs))
+
+pool_items: List[PoolItem] = []
+
+def pool_function(function: callable, wait_seconds: Union[float, int], *args, **kwargs) -> None:
+    """
+    Prevents a single function from being called too often by letting successive instances of it 'pool'
+    up until the wait time has elapsed without the function being called again.
+    For a function to pool with other instances of itself all arguments must == previously called instances.
+    Be cautious when passing functions that are not members of classes.
+
+    :param function: The function to call after the time has elapsed.
+    :param wait_seconds: The time to wait to call the function.
+    :param args: Positional arguments to pass to the function
+    :param kwargs: Keyword arguments to pass to the function
+    :return: None
+    """
+    item = PoolItem(function, *args, **kwargs)
+    try:
+        index = pool_items.index(item)
+        pool_items[index].task.cancel()
+        pool_items.pop(index)
+    except ValueError:
+        pass
+
+    pool_items.append(item)
+    item.start(wait_seconds)
+
 
 async def do_after_wait(func: callable, delay: float, *args, **kwargs):
     await asyncio.sleep(delay)
-    if iscoroutinefunction(func):
-        await func(*args, **kwargs)
-    else:
-        func(*args, **kwargs)
+
+    try:
+        if iscoroutinefunction(func):
+            await func(*args, **kwargs)
+        else:
+            func(*args, **kwargs)
+    except Exception as e:
+        logger.exception(e)
+
+def have_lists_changed(list1: List, list2: List, items: List) -> bool:
+    if list1 == list2:
+        return False
+    for item in items:
+        if item in list1 and item not in list2:
+            return True
+        elif item in list2 and item not in list1:
+            return True
+    return False

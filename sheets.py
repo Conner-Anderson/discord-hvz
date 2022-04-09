@@ -73,23 +73,12 @@ class SheetsInterface:
                 return
         self.setup(self.db)
 
-
     def update_table(self, table_name: str):
-        tables_to_pop = []
-        for table, task in self.waiting_tables.items():
-            if task.done():
-                tables_to_pop.append(table)
-            elif table == table_name:
-                task.cancel()
-                tables_to_pop.append(table)
-                break
-        for t in tables_to_pop: self.waiting_tables.pop(t)
-
-        # Set timer to _export table to sheet
-        task = asyncio.create_task(util.do_after_wait(self._export, 4.0, table_name))
-        self.waiting_tables[table_name] = task
-
-
+        util.pool_function(
+            function=self._export,
+            wait_seconds=10.0,
+            table_name=table_name
+        )
 
     def _export(self, table_name: str):
         # TODO: It would be nice if this didn't have to deal directly with the database. Not a huge deal.
@@ -141,7 +130,7 @@ class SheetsInterface:
         except Exception as e:
             s = str(e).split('Details: ')
             log.error('Error when excecuting read_sheet() with arguments \"%s\" and \"%s\"  ----> %s' % (
-            sheet_name, range, s[1]))
+                sheet_name, range, s[1]))
             return 0
         else:
             return result.get('values', 0)

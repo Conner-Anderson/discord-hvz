@@ -2,6 +2,7 @@
 __pycache__
 .env
 venv
+plots
 credentials.json
 token.json
 hvzdb.db
