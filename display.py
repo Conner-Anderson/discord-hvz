@@ -171,7 +171,7 @@ class GamePlotElement(PanelElement):
 # Create a list of PanelElement classes available in the module
 # Needs to be here for the sake of the slash_command decorator.
 this_module = sys.modules[__name__]
-AVAILABLE_PANEL_ELEMENTS = [cls[1] for cls in getmembers(this_module, isclass) if issubclass(cls[1], PanelElement)]
+AVAILABLE_PANEL_ELEMENTS = [cls[1] for cls in getmembers(this_module, isclass) if issubclass(cls[1], PanelElement) and cls[1] is not PanelElement]
 AVAILABLE_PANEL_ELEMENTS_STR = [element.__name__ for element in AVAILABLE_PANEL_ELEMENTS]
 
 
@@ -320,7 +320,6 @@ class DisplayCog(discord.Cog):
             static: Option(bool, required=False, default=False, description='The data will never update if static.')
     ):
         selections = {element1, element2, element3, element4, element5, element6}
-        # TODO: PanelElement can't be an option
         panel = HVZPanel(self)
         await ctx.response.defer(ephemeral=True)
         await panel.send(ctx.channel, selections, live=not static)
