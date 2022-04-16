@@ -18,7 +18,7 @@ async def registration_end(responses: Dict[str, Any], bot: HVZBot, target_member
     responses['faction'] = 'human'
     responses['id'] = str(target_member.id)
     responses['discord_name'] = target_member.name
-    responses['registration_time'] = datetime.today()
+    responses['registration_time'] = datetime.now(tz=config.time_zone)
     responses['oz'] = False
     responses['tag_code'] = make_tag_code(bot.db)
 
@@ -41,7 +41,7 @@ async def tag_logging_end(responses: Dict[str, Any], bot: HVZBot, target_member:
     responses['tagger_name'] = tagger_member_row.name
     responses['tagger_discord_name'] = tagger_member.name
     responses['tagger_nickname'] = tagger_member.nick
-    responses['report_time'] = datetime.today()
+    responses['report_time'] = datetime.now(tz=config.time_zone)
     responses['revoked_tag'] = False
 
 

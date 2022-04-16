@@ -119,13 +119,15 @@ class PlayersTodayElement(PanelElement):
     def refresh_event(self):
         return 'on_role_change'
 
+
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
         try:
             rows = panel.bot.db.get_rows(
                 table='members',
                 search_column_name='registration_time',
-                lower_value=datetime.now() - timedelta(days=1),
-                upper_value=datetime.now()
+                lower_value=datetime.now(tz=config.time_zone) - timedelta(days=1),
+                upper_value=datetime.now(tz=config.time_zone)
+
             )
             count = len(rows)
         except ValueError:
@@ -147,8 +149,8 @@ class TagsTodayElement(PanelElement):
             rows = panel.bot.db.get_rows(
                 table='tags',
                 search_column_name='tag_time',
-                lower_value=datetime.now() - timedelta(days=1),
-                upper_value=datetime.now()
+                lower_value=datetime.now(tz=config.time_zone) - timedelta(days=1),
+                upper_value=datetime.now(tz=config.time_zone)
             )
             count = len(rows)
         except ValueError:
@@ -229,7 +231,7 @@ class HVZPanel:
             if file:
                 output_file = file
 
-        time_string = datetime.now().strftime('%B %d, %I:%M %p')
+        time_string = datetime.now(tz=config.time_zone).strftime('%B %d, %I:%M %p')
         if self.live:
             embed.set_footer(text=f'Live updating. Updated: {time_string}')
         else:

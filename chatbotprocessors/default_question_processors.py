@@ -3,6 +3,7 @@ from typing import Dict, List
 from utilities import make_tag_code
 from datetime import datetime, timedelta
 from dateutil import parser
+from config import config
 
 from loguru import logger
 
@@ -68,13 +69,13 @@ def tag_code_to_member_id(input_text: str, bot: HVZBot) -> str:
 
 def tag_time(input_text: str, bot: HVZBot) -> datetime:
     given_tag_time: str = input_text
-    tag_datetime = datetime.today()
+    tag_datetime = datetime.now(tz=config.time_zone)
     if given_tag_time.casefold().find('yesterday') != -1:
         tag_datetime -= timedelta(days=1)
         given_tag_time = given_tag_time.replace('yesterday', '').replace('Yesterday', '')
     tag_datetime = parser.parse(given_tag_time + ' and 0 seconds', default=tag_datetime)
 
-    if tag_datetime > datetime.today():
+    if tag_datetime > datetime.now(tz=config.time_zone):
         raise ValueError('The tag time you stated is in the future. Try again.')
 
     return tag_datetime

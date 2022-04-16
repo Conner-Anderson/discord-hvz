@@ -1,4 +1,5 @@
 from ruamel.yaml import YAML
+from datetime import datetime, timedelta, timezone
 
 yaml = YAML()
 yaml.preserve_quotes = True
@@ -13,6 +14,10 @@ class HVZConfig:
         self.filename = filename
         with open(filename) as fp:
             self._config = yaml.load(fp)
+
+        self.time_zone = timezone(
+            offset= timedelta(hours=int(self._config['timezone']))
+        )
 
     def commit(self):
         with open(self.filename, mode='w') as fp:
