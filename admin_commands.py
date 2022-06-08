@@ -1,6 +1,6 @@
 # from __future__ import annotations
 import time
-from typing import Union, TYPE_CHECKING
+from typing import Union, TYPE_CHECKING, Optional
 
 import discord
 from discord.commands import Option
@@ -15,7 +15,8 @@ from config import config
 from permissions import check_admin_role
 
 if TYPE_CHECKING:
-    pass
+    from discord_hvz import HVZBot
+    from chatbot import ChatBotManager
 
 log = logger
 
@@ -39,7 +40,7 @@ def setup(bot):  # this is called by Pycord to setup the cog
 
 class AdminCommandsCog(commands.Cog):
 
-    def __init__(self, bot):
+    def __init__(self, bot: "HVZBot"):
         self.bot = bot
 
     member_group = SlashCommandGroup("member", "Commands for dealing with members.", guild_ids=guild_id_list)
@@ -315,7 +316,7 @@ class AdminCommandsCog(commands.Cog):
         msg = f'Tag {tag_id} restored. ' + msg
         await ctx.respond(msg)
 
-    @commands.command(guild_ids=guild_id_list, name='config')
+    @slash_command(guild_ids=guild_id_list, name='config')
     async def config_command(
             self,
             ctx,
@@ -350,7 +351,7 @@ class AdminCommandsCog(commands.Cog):
         config[setting] = choice
         await ctx.respond(f'Set \"{setting}\" to \"{choice}\"')
 
-    @commands.command(guild_ids=guild_id_list)
+    @slash_command(guild_ids=guild_id_list)
     async def code(self, ctx):
         """
         Gives you your tag code in a private reply. Keep it secret, keep it safe.
@@ -385,7 +386,7 @@ class AdminCommandsCog(commands.Cog):
                     await ctx.respond(buffer)
                     buffer = ''
 
-    @commands.command(guild_ids=guild_id_list, description='Shuts down the bot.')
+    @slash_command(name='shutdown', guild_ids=guild_id_list, description='Shuts down the bot.')
     async def shutdown(self, ctx):
         """
         Shuts down bot. If there are active chats, list them and don't shut down.
@@ -393,19 +394,19 @@ class AdminCommandsCog(commands.Cog):
         """
         bot = self.bot
         # TODO: Restore graceful shutdown function when chatbots are active
+        chatbot_cog: Optional[ChatBotManager] = bot.get_cog('ChatBotManager')
+        if chatbot_cog:
+            chatbot_list = chatbot_cog.list_active_chatbots()
+            if len(chatbot_list) > 0:
+                await ctx.respond(
+                    'The bot did not shut down because of these running chatbots: \n' + '\n'.join(chatbot_list)
+                )
+                return
+
         await ctx.respond('Shutting Down')
         log.critical('Shutting Down\n. . .\n\n')
         await bot.close()
         time.sleep(1)
-
-    @commands.command(guild_ids=guild_id_list, description='Prints current commands')
-    async def read_commands(self, ctx):
-        """
-        Shuts down bot. If there are active chats, list them and don't shut down.
-
-        """
-        # TODO: Restore graceful shutdown function when chatbots are active
-        await ctx.respond(self.bot.commands)
 
     @slash_command(guild_ids=guild_id_list, name='oz', checks=[check_admin_role])
     async def oz(

@@ -205,7 +205,6 @@ class ScriptData:
 class Script:
     data: ScriptData
     bot: HVZBot
-    kind: str = field(init=False, default=None)
     questions: Dict[int, QuestionData] = field(init=False, default_factory=dict)
     responses: Dict[int, Union[str, None]] = field(init=False, default_factory=dict)
     last_asked_question: int = field(init=False, default=0)
@@ -216,11 +215,17 @@ class Script:
         for i, q in enumerate(self.data.questions):
             self.questions[i] = q
             self.responses[i] = None
-        self.kind = self.data.kind
+
+    def __str__(self) -> str:
+        return f'[Type: {self.kind}, Table: {self.data.table} ]'
 
     @property
     def length(self):
         return len(self.questions)
+
+    @property
+    def kind(self):
+        return self.data.kind
 
     @property
     def completed_responses(self) -> Dict[str, str]:
@@ -338,6 +343,9 @@ class ChatBot:
         if self.target_member is None:
             self.target_member = self.chat_member
 
+    def __str__(self) -> str:
+        return f'<@{self.chat_member.id}>, Script: {str(self.script)}'
+
     async def ask_question(self, existing_chatbot: ChatBot = None, first: bool = False) -> bool:
         starting_processor = self.script.data.starting_processor
         if first and starting_processor:
@@ -386,7 +394,7 @@ class ChatBot:
 
 class ChatBotManager(commands.Cog):
     bot: HVZBot
-    active_chatbots: Dict[int, ChatBot] = {}
+    active_chatbots: Dict[int, ChatBot] = {} # Maps member ids to ChatBots
     loaded_scripts: Dict[str, ScriptData] = {}
 
     def __init__(self, bot: HVZBot):
@@ -511,6 +519,13 @@ class ChatBotManager(commands.Cog):
 
     def slice_custom_id(self, text: str):
         return text[:text.find(':')]
+
+    def list_active_chatbots(self) -> List[str]:
+        output_list = []
+        for id, chatbot in self.active_chatbots.items():
+            output_list.append(str(chatbot))
+        return output_list
+
 
 def setup(bot): # this is called by Pycord to setup the cog
     bot.add_cog(ChatBotManager(bot)) # add the cog to the bot

@@ -13,7 +13,7 @@ available_servers:
 registration: true
 
 # Is tag logging enabled on the server? Useful for making sure the game doesn't start too early.
-tag_logging: false
+tag_logging: true
 
 # If true, the OZ's identity will not be included in tag announcements. 
 silent_oz: false
