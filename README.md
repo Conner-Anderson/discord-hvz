@@ -12,6 +12,8 @@ The information below is for anyone who wants to use this Discord bot for their 
 
 ### Important: I offer personal support for anyone who wants to use this bot for HvZ. Email at the end of this document.
 
+### WARNING: The discord API changed since the latest released version of this, so there is a breaking bug now. I intend to merge the major-rework branch eventually which fixes this bug and adds various features.
+
 ## Features
 discord-hvz is an HvZ helper app made for games that primarily communicate through Discord. 
 Its features are tailored to the way that LeTourneau University plays its games, which are simple
