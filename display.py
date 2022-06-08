@@ -353,6 +353,9 @@ class DisplayCog(discord.Cog):
         self.delete_panel(payload.message_id)
         logger.debug(f'Removed panel with id: {payload.message_id}')
 
+def setup(bot): # this is called by Pycord to setup the cog
+    bot.add_cog(DisplayCog(bot)) # add the cog to the bot
+
 
 """
 Possible content:

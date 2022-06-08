@@ -173,3 +173,5 @@ class HVZButtonCog(commands.Cog):
         self.bot.add_application_command(command)
         await self.bot.sync_commands(guild_ids=guild_id_list, register_guild_commands=True)
 
+def setup(bot): # this is called by Pycord to setup the cog
+    bot.add_cog(HVZButtonCog(bot)) # add the cog to the bot

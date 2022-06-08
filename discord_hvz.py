@@ -73,7 +73,7 @@ class StartupError(Exception):
             super().__init__(message)
 
 
-class HVZBot(discord.Bot):
+class HVZBot(discord.ext.commands.Bot):
     guild: Guild | None
     db: HvzDb
     roles: Dict[str, discord.Role]
@@ -257,12 +257,14 @@ class HVZBot(discord.Bot):
 
 try:
     bot = HVZBot()
-    bot.add_cog(ChatBotManager(bot))
-    bot.add_cog(AdminCommandsCog(bot))
-    bot.add_cog(HVZButtonCog(bot))
-    bot.add_cog(DisplayCog(bot))
+
+    bot.load_extension('chatbot')
+    bot.load_extension('admin_commands')
+    bot.load_extension('buttons')
+    bot.load_extension('display')
 
     bot.run(token)
+
 except ConfigError as e:
     logger.error(e)
 

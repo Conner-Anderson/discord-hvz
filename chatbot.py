@@ -511,3 +511,6 @@ class ChatBotManager(commands.Cog):
 
     def slice_custom_id(self, text: str):
         return text[:text.find(':')]
+
+def setup(bot): # this is called by Pycord to setup the cog
+    bot.add_cog(ChatBotManager(bot)) # add the cog to the bot
