@@ -3,14 +3,12 @@ import time
 from typing import Union, TYPE_CHECKING, Optional
 
 import discord
-from discord.commands import Option
-from discord.commands import SlashCommandGroup
-from discord.commands import slash_command
+from discord.commands import Option, SlashCommandGroup, slash_command
+from discord.commands import context
 from discord.ext import commands
 from loguru import logger
 
 import utilities as util
-from chatbot import ChatBotManager
 from config import config
 from permissions import check_admin_role
 
@@ -367,12 +365,13 @@ class AdminCommandsCog(commands.Cog):
             log.exception(e)
 
     @tag_group.command(guild_ids=guild_id_list, name='tree')
-    async def tag_tree(self, ctx):
+    async def tag_tree(self, ctx: context.ApplicationContext):
         """
         Sends a message with a family tree of the zombies in the game.
 
         """
         bot = self.bot
+        await ctx.response.defer()
         tree = util.generate_tag_tree(bot.db).splitlines(True)
         buffer = '**THE ZOMBIE FAMILY TREE\n**'
         for i, x in enumerate(tree):

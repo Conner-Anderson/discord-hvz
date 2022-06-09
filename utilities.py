@@ -1,8 +1,13 @@
+from __future__ import annotations
 import asyncio
 import random
 import string
 from inspect import iscoroutinefunction
-from typing import List, Union
+from typing import Dict, List, TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    from hvzdb import HvzDb
+    import sqlalchemy
 
 from loguru import logger
 
@@ -42,38 +47,69 @@ def member_from_string(member_string, db, ctx=None):
         (f'Could not find a member that matched \"{member_string}\". Can be member ID, Name, Discord_Name, or Nickname.')
 
 
-def generate_tag_tree(db):
-    oz_table = db.get_rows('members', 'OZ', True)
+def generate_tag_tree(db: HvzDb) -> str:
+    #oz_table = db.get_rows('members', 'oz', True) Old, easy way of getting OZs.
+    oz_table = _get_ozs(db)
+    # └
+    return _tag_tree_loop(db, oz_table, 0)
 
-    def loop(table, level):
-        output = ''
-        for r in table:
-            output += '\n'
-            for x in range(level):
-                output += '    '
-            output += f'- <@{r.id}>'
-            if level == 0:
-                output += ' (OZ)'
-            try:
-                tags = db.get_rows('tags', 'tagger_id', r.id, exclusion_column_name='revoked_tag', exclusion_value=True)
+def _tag_tree_loop(db: HvzDb, table: List[sqlalchemy.engine.Row], level: int) -> str:
+    output = ''
+    for row in table:
+        output += '\n'
+        for x in range(level):
+            output += '    '
+        output += f'- <@{row.id}>'
+        if level == 0:
+            output += ' (OZ)'
+        try:
+            tags = db.get_rows('tags', 'tagger_id', row.id, exclusion_column_name='revoked_tag', exclusion_value=True)
+        # If the player had no tags...
+        except ValueError:
+            pass
+        # If the player had tags...
+        else:
 
-            except ValueError:
-                pass
-            else:
+            output += f', {len(tags)} tag'
+            if len(tags) > 1:
+                output += 's'
+            output += ':'
+            tagged_members = []
+            for tag_row in tags:
+                tagged_members.append(db.get_member(tag_row.tagged_id))
 
-                output += f', {len(tags)} tag'
-                if len(tags) > 1:
-                    output += 's'
-                output += ':'
-                tagged_members = []
-                for t in tags:
-                    tagged_members.append(db.get_member(t.tagged_id))
+            output += _tag_tree_loop(db, tagged_members, level + 1)
 
-                output += loop(tagged_members, level + 1)
+    return output
 
-        return output
+def _get_ozs(db: HvzDb) -> List[sqlalchemy.engine.Row]:
+    """
+    This function identifies OZs without relying on the OZ tag.
+    That means any strange manual editing shenanigans regarding OZs shouldn't break the tag tree system
+    :param db:
+    :return:
+    """
+    tags = db.get_table('tags')
+    first_pass = set()
+    oz_member_rows = []
 
-    return loop(oz_table, 0)
+    for tag in tags:
+        first_pass.add(tag.tagger_id)
+
+    for tagger_id in first_pass:
+        try:
+            db.get_rows('tags', 'tagged_id', tagger_id)
+            continue
+        except ValueError: pass
+        try:
+            oz_member_rows.append(db.get_member(tagger_id))
+        except ValueError:
+            logger.warning(f'While making the tag tree, member in tags table not found in the members table.')
+    return oz_member_rows
+
+
+
+
 
 class PoolItem:
 

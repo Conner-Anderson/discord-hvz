@@ -194,7 +194,7 @@ class HvzDb:
 
 
 
-    def get_member(self, value, column: str = None) -> Row:
+    def get_member(self, value: discord.abc.User | int, column: str = None) -> Row:
         """
         Returns a Row object that represents a single member in the database
 
@@ -405,7 +405,7 @@ class HvzDb:
             upper_value=None,
             exclusion_column_name=None,
             exclusion_value=None
-    ):
+    ) -> List[Row]:
         """
         Returns a list of Row objects where the specified value matches.
         Meant to be used within the class.
@@ -438,7 +438,7 @@ class HvzDb:
             selection = selection.where(exclusion_column != exclusion_value)
 
         with self.engine.begin() as conn:
-            result_rows = conn.execute(selection).all()
+            result_rows: List[Row] = conn.execute(selection).all()
 
         if len(result_rows) == 0:
             if lower_value:
