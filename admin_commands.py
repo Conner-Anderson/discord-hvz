@@ -393,7 +393,6 @@ class AdminCommandsCog(commands.Cog):
 
         """
         bot = self.bot
-        # TODO: Restore graceful shutdown function when chatbots are active
         chatbot_cog: Optional[ChatBotManager] = bot.get_cog('ChatBotManager')
         if chatbot_cog:
             chatbot_list = chatbot_cog.list_active_chatbots()

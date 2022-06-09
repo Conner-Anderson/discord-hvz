@@ -258,9 +258,9 @@ class HVZBot(discord.ext.commands.Bot):
 try:
     bot = HVZBot()
 
+    bot.load_extension('buttons')
     bot.load_extension('chatbot')
     bot.load_extension('admin_commands')
-    bot.load_extension('buttons')
     bot.load_extension('display')
 
     bot.run(token)
