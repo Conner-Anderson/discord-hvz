@@ -48,20 +48,18 @@ def member_from_string(member_string, db, ctx=None):
 
 
 def generate_tag_tree(db: HvzDb) -> str:
-    #oz_table = db.get_rows('members', 'oz', True) Old, easy way of getting OZs.
+    # oz_table = db.get_rows('members', 'oz', True) Old, easy way of getting OZs.
     oz_table = _get_ozs(db)
     # └
     return _tag_tree_loop(db, oz_table, 0)
 
+
 def _tag_tree_loop(db: HvzDb, table: List[sqlalchemy.engine.Row], level: int) -> str:
     output = ''
-    for row in table:
+    for i, row in enumerate(table):
         output += '\n'
-        for x in range(level):
-            output += '    '
-        output += f'- <@{row.id}>'
-        if level == 0:
-            output += ' (OZ)'
+        output += _add_indention(level, True if i == len(table) - 1 else False)
+        output += f'<@{row.id}>'
         try:
             tags = db.get_rows('tags', 'tagger_id', row.id, exclusion_column_name='revoked_tag', exclusion_value=True)
         # If the player had no tags...
@@ -69,7 +67,6 @@ def _tag_tree_loop(db: HvzDb, table: List[sqlalchemy.engine.Row], level: int) ->
             pass
         # If the player had tags...
         else:
-
             output += f', {len(tags)} tag'
             if len(tags) > 1:
                 output += 's'
@@ -81,6 +78,25 @@ def _tag_tree_loop(db: HvzDb, table: List[sqlalchemy.engine.Row], level: int) ->
             output += _tag_tree_loop(db, tagged_members, level + 1)
 
     return output
+
+
+def _add_indention(level: int, last=False):
+    """
+    Add indentation characters for a tag tree based on recursion depth, with pretty terminators.
+    """
+    output = ''
+    for i, x in enumerate(range(level)):
+        if i == level - 1:
+            if last:
+                output += '└──'
+            else:
+                output += '├──'
+        else:
+            output += '│  '
+    if level == 0:
+        return output
+    return '`' + output + '`'
+
 
 def _get_ozs(db: HvzDb) -> List[sqlalchemy.engine.Row]:
     """
@@ -100,15 +116,13 @@ def _get_ozs(db: HvzDb) -> List[sqlalchemy.engine.Row]:
         try:
             db.get_rows('tags', 'tagged_id', tagger_id)
             continue
-        except ValueError: pass
+        except ValueError:
+            pass
         try:
             oz_member_rows.append(db.get_member(tagger_id))
         except ValueError:
             logger.warning(f'While making the tag tree, member in tags table not found in the members table.')
     return oz_member_rows
-
-
-
 
 
 class PoolItem:
@@ -122,7 +136,8 @@ class PoolItem:
         try:
             if self.function == other.function and self.args == other.args and self.kwargs == other.kwargs:
                 return True
-            else: return False
+            else:
+                return False
         except:
             return False
 
@@ -139,7 +154,9 @@ class PoolItem:
     def start(self, wait_seconds: Union[int, float]) -> None:
         self.task = asyncio.create_task(do_after_wait(self.function, wait_seconds, *self.args, **self.kwargs))
 
+
 pool_items: List[PoolItem] = []
+
 
 def pool_function(function: callable, wait_seconds: Union[float, int], *args, **kwargs) -> None:
     """
@@ -177,6 +194,7 @@ async def do_after_wait(func: callable, delay: float, *args, **kwargs):
     except Exception as e:
         logger.exception(e)
 
+
 def have_lists_changed(list1: List, list2: List, items: List) -> bool:
     if list1 == list2:
         return False
@@ -186,3 +204,21 @@ def have_lists_changed(list1: List, list2: List, items: List) -> bool:
         elif item in list2 and item not in list1:
             return True
     return False
+
+
+if __name__ == '__main__':
+    from hvzdb import HvzDb
+
+    db = HvzDb()
+    tree = generate_tag_tree(db).splitlines(True)
+    buffer = '**THE ZOMBIE FAMILY TREE\n**'
+    for i, x in enumerate(tree):
+        buffer += x
+        try:
+            next_length = len(tree[i + 1]) + len(buffer)
+        except IndexError:
+            print(buffer)
+        else:
+            if next_length > 3000:
+                print(buffer)
+                buffer = ''
