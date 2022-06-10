@@ -233,7 +233,7 @@ class HvzDb:
             if search_column not in table.column_names:
                 raise ValueError(f'{search_column} not a column in {table}')
         else:
-            search_column = 'Tag_ID'
+            search_column = 'tag_id'
 
         if filter_revoked is False:
             tag_row = self.__get_row(table, table.c[search_column], value)

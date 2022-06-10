@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 guild_id_list = [config['available_servers'][config['active_server']]]
 LAST_GAME_PLOT_HASH = None
 
-
+# TODO: Repair this function
 def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
     global LAST_GAME_PLOT_HASH
     image_path = "plots/fig1.jpeg"
@@ -164,7 +164,7 @@ class GamePlotElement(PanelElement):
     def refresh_event(self):
         return 'on_role_change'
 
-    def add(self, embed: discord.Embed, panel: "HVZPanel") -> Union[None, discord.File]:
+    def add(self, embed: discord.Embed, panel: "HVZPanel") -> discord.File:
         file = create_game_plot(panel.bot.db)
         embed.set_image(url=f'attachment://{file.filename}')
         return file
