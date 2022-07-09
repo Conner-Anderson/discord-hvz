@@ -8,6 +8,7 @@ from discord.commands import context
 from discord.ext import commands
 from loguru import logger
 
+import utilities
 import utilities as util
 from config import config
 from permissions import check_admin_role
@@ -372,18 +373,11 @@ class AdminCommandsCog(commands.Cog):
         """
         bot = self.bot
         await ctx.response.defer()
-        tree = util.generate_tag_tree(bot.db).splitlines(True)
-        buffer = '**THE ZOMBIE FAMILY TREE\n**'
-        for i, x in enumerate(tree):
-            buffer += x
-            try:
-                next_length = len(tree[i + 1]) + len(buffer)
-            except IndexError:
-                await ctx.respond(buffer)
-            else:
-                if next_length > 3000:
-                    await ctx.respond(buffer)
-                    buffer = ''
+        tree = util.generate_tag_tree(bot.db)
+        tree = '**THE ZOMBIE FAMILY TREE\n**' + tree
+
+        await utilities.respond_paginated(ctx, tree, max_char=300)
+
 
     @slash_command(name='shutdown', guild_ids=guild_id_list, description='Shuts down the bot.')
     async def shutdown(self, ctx):

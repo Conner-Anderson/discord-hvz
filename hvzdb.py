@@ -178,7 +178,7 @@ class HvzDb:
         # Old function acting as an alias
         return self.add_row(table, row)
 
-    def add_row(self, table_selection:str, input_row: Dict):
+    def add_row(self, table_selection:str, input_row: Dict) -> sqlalchemy.engine.CursorResult:
         table = self.tables[table_selection.casefold()]
 
         row = {}

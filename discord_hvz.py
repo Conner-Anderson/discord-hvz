@@ -262,6 +262,7 @@ try:
     bot.load_extension('chatbot')
     bot.load_extension('admin_commands')
     bot.load_extension('display')
+    bot.load_extension('item_tracker')
 
     bot.run(token)
 
