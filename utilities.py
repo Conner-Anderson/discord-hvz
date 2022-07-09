@@ -5,6 +5,9 @@ import string
 from inspect import iscoroutinefunction
 from typing import Dict, List, TYPE_CHECKING, Union
 
+import discord
+from discord.ext import pages
+
 if TYPE_CHECKING:
     from hvzdb import HvzDb
     import sqlalchemy
@@ -96,6 +99,33 @@ def _add_indention(level: int, last=False):
     if level == 0:
         return output
     return '`' + output + '`'
+
+def divide_string(input: str, max_char: int = 1995) -> List:
+
+    input_lines = input.splitlines(True)
+    buffer = ''
+    output_lines = []
+    for i, x in enumerate(input_lines):
+        buffer += x
+        try:
+            next_length = len(input_lines[i + 1]) + len(buffer)
+        except IndexError:
+            # Happens if at the end of the string
+            output_lines.append(buffer + '\n ooo \n')
+        else:
+            if next_length > max_char:
+                output_lines.append(buffer)
+                buffer = '\n uuu \n'
+
+    return output_lines
+
+async def respond_paginated(context: discord.ApplicationContext, message: str, max_char: int = 1995, **kwargs):
+    divided_message = divide_string(message, max_char=max_char)
+    if len(divided_message) == 1:
+        await context.respond(message, **kwargs)
+        return
+    paginator = pages.Paginator(pages=divided_message)
+    await paginator.respond(context.interaction, **kwargs)
 
 
 def _get_ozs(db: HvzDb) -> List[sqlalchemy.engine.Row]:
@@ -210,6 +240,14 @@ if __name__ == '__main__':
     from hvzdb import HvzDb
 
     db = HvzDb()
+    result = divide_string(generate_tag_tree(db), 200)
+    for x in result: print(x)
+
+
+    """
+    from hvzdb import HvzDb
+
+    db = HvzDb()
     tree = generate_tag_tree(db).splitlines(True)
     buffer = '**THE ZOMBIE FAMILY TREE\n**'
     for i, x in enumerate(tree):
@@ -217,8 +255,11 @@ if __name__ == '__main__':
         try:
             next_length = len(tree[i + 1]) + len(buffer)
         except IndexError:
-            print(buffer)
+            # Happens if at the end of the string
+            print(buffer + '\n ooo \n')
         else:
-            if next_length > 3000:
+            if next_length > 200:
                 print(buffer)
-                buffer = ''
+                buffer = '\n uuu \n'
+                
+    """

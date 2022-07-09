@@ -1,24 +1,25 @@
-#from __future__ import annotations
+# from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import List, Union, Dict
 from typing import TYPE_CHECKING
+from typing import Union
 
 import discord
-import regex
-from discord.commands import slash_command, SlashCommandGroup, Option
+from discord.commands import SlashCommandGroup, Option
 from discord.ext import commands
-from loguru import logger
+from sqlalchemy.engine import Row
+
+import utilities
 
 if TYPE_CHECKING:
     from discord_hvz import HVZBot
 
-from config import config, ConfigError
+from config import config
 
 # Used for creating commands
 guild_id_list = [config['available_servers'][config['active_server']]]
 
 table_name = 'items'
+
 
 # Each item is unique and non-duplicable. Each player can have any number of items.
 # Items are passed by ID, not by name. Names, while saved, are changeable. An item maintains identity
@@ -30,12 +31,14 @@ table_name = 'items'
 # The reason for objects is to enable future features
 # Items can be owned by no one, which is to say they belong to the admins
 
-def setup(bot): # this is called by Pycord to setup the cog
-    bot.add_cog(ItemTrackerCog(bot)) # add the cog to the bot
+def setup(bot):  # this is called by Pycord to setup the cog
+    bot.add_cog(ItemTrackerCog(bot))  # add the cog to the bot
 
 
 class ItemTrackerCog(commands.Cog):
     bot: 'HVZBot'
+
+    item_group = SlashCommandGroup('item', 'Commands for managing items', guild_ids=guild_id_list)
 
     def __init__(self, bot: "HVZBot"):
         self.bot = bot
@@ -46,22 +49,57 @@ class ItemTrackerCog(commands.Cog):
             'owner': 'integer'
         })
 
-    item_group = SlashCommandGroup('item', 'Commands for managing items', guild_ids=guild_id_list)
+    def get_item(self, id: int) -> Row:
+        try:
+            return self.bot.db.get_rows(table_name, 'id', id)[0]
+        except ValueError:
+            raise ValueError(f'There is no item with the id {id} in the database.')
+
+    def edit_item(self, id: int, attribute: str, value: Union[str, int]) -> None:
+        # TODO: Remove need for private database method use
+        db = self.bot.db
+        db._edit_row(
+            db.tables[table_name],
+            db.tables[table_name].c.id,
+            id,
+            attribute,
+            value
+        )
 
     @item_group.command(name='list', guild_ids=guild_id_list)
-    async def item_list(self, ctx: discord.ApplicationContext):
+    async def item_list(
+            self, ctx: discord.ApplicationContext,
+            member: Option(discord.Member, description='Show only items for this player.', default=None)
+    ):
         """
         Lists all items in the game.
         """
         # TODO: Enable message overflow
         # TODO: Make the printout a bit more elegant
-        msg = '*Items:*'
-        items = self.bot.db.get_table(table_name)
+
+        if member:
+            try:
+                items = self.bot.db.get_rows(table_name, 'owner', member.id)
+                msg = f'*Items belonging to <@{member.id}>:*'
+            except ValueError:
+                await ctx.respond(f'<@{member.id}> has no items.')
+                return
+        else:
+            items = self.bot.db.get_table(table_name)
+            msg = '*All Items:*'
+
+        if len(items) == 0:
+            await ctx.respond(f'There are no items yet. Use `/item create` to make one.')
+            return
 
         for item in items:
-            msg += f"\n{item.id}  {item.name}  <@{item.owner}>"
+            if item.owner == 0:
+                owner = '*In Storage*'
+            else:
+                owner = f'<@{item.owner}>'
+            msg += f"\n{item.id}  {item.name} {owner} "
 
-        await ctx.respond(msg)
+        await utilities.respond_paginated(ctx, msg)
 
     @item_group.command(name='create', guild_ids=guild_id_list)
     async def item_create(
@@ -101,7 +139,7 @@ class ItemTrackerCog(commands.Cog):
         Completely deletes an item.
         """
         try:
-            item = self.bot.db.get_rows(table_name, 'id', id)[0]
+            item = self.get_item(id)
         except ValueError:
             await ctx.respond(f'There is no item with the id "{id}".')
             return
@@ -111,10 +149,29 @@ class ItemTrackerCog(commands.Cog):
         owner = item['owner']
         if owner != 0:
             msg += f', owned by <@{owner}>.'
-        else: msg += '.'
+        else:
+            msg += '.'
 
         await ctx.respond(msg)
 
+    @item_group.command(name='delete_all', guild_ids=guild_id_list)
+    async def item_delete_all(
+            self, ctx: discord.ApplicationContext,
+            are_you_sure: Option(bool, description='There is no undo.', )
+    ):
+        """
+        Completely deletes all items and resets ids.
+        """
+        if not are_you_sure:
+            await ctx.respond('Did not delete anything.')
+            return
+
+        table = self.bot.db.get_table(table_name)
+
+        for row in table:
+            self.bot.db.delete_row(table_name, 'id', row['id'])
+
+        await ctx.respond('Deleted all items.')
 
     @item_group.command(name='transfer', guild_ids=guild_id_list)
     async def item_transfer(
@@ -125,10 +182,8 @@ class ItemTrackerCog(commands.Cog):
         """
         Transfers an item to a player from either storage or another player.
         """
-        # TODO: Remove need for private database method use
-        db = self.bot.db
         try:
-            item = self.bot.db.get_rows(table_name, 'id', id)[0]
+            item = self.get_item(id)
         except ValueError:
             await ctx.respond(f'There is no item with the id "{id}".')
             return
@@ -139,13 +194,7 @@ class ItemTrackerCog(commands.Cog):
             await ctx.respond('The given member is not a registered player.')
             return
 
-        db._edit_row(
-            db.tables[table_name],
-            db.tables[table_name].c.id,
-            id,
-            'owner',
-            target_player.id
-        )
+        self.edit_item(id, 'owner', target_player.id)
 
         if item.owner == 0:
             original_owner = 'storage'
@@ -153,7 +202,6 @@ class ItemTrackerCog(commands.Cog):
             original_owner = f'<@{item.owner}>'
 
         await ctx.respond(f'Item "{item.name}" taken from {original_owner} and given to <@{target_player.id}>.')
-
 
     @item_group.command(name='take', guild_ids=guild_id_list)
     async def item_take(
@@ -163,10 +211,9 @@ class ItemTrackerCog(commands.Cog):
         """
         Transfers an item from a player to storage.
         """
-        # TODO: Remove need for private database method use
-        db = self.bot.db
+
         try:
-            item = self.bot.db.get_rows(table_name, 'id', id)[0]
+            item = self.get_item(id)
         except ValueError:
             await ctx.respond(f'There is no item with the id "{id}".')
             return
@@ -175,13 +222,7 @@ class ItemTrackerCog(commands.Cog):
             await ctx.respond(f'"{item.name}" is already in storage.')
             return
 
-        db._edit_row(
-            db.tables[table_name],
-            db.tables[table_name].c.id,
-            id,
-            'owner',
-            0
-        )
+        self.edit_item(id, 'owner', 0)
 
         await ctx.respond(f'Item "{item.name}" taken from <@{item.owner}> and put in storage.')
 
@@ -194,10 +235,8 @@ class ItemTrackerCog(commands.Cog):
         """
         Changes an item's name.
         """
-        # TODO: Remove need for private database method use
-        db = self.bot.db
         try:
-            item = self.bot.db.get_rows(table_name, 'id', id)[0]
+            item = self.get_item(id)
         except ValueError:
             await ctx.respond(f'There is no item with the id "{id}".')
             return
@@ -206,13 +245,6 @@ class ItemTrackerCog(commands.Cog):
             await ctx.respond(f'Item is already named "{item.name}".')
             return
 
-        db._edit_row(
-            db.tables[table_name],
-            db.tables[table_name].c.id,
-            id,
-            'name',
-            new_name
-        )
+        self.edit_item(id, 'name', new_name)
 
         await ctx.respond(f'Item "{item.name}" renamed to {new_name}.')
-
