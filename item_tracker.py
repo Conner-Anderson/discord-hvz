@@ -56,11 +56,10 @@ class ItemTrackerCog(commands.Cog):
             raise ValueError(f'There is no item with the id {id} in the database.')
 
     def edit_item(self, id: int, attribute: str, value: Union[str, int]) -> None:
-        # TODO: Remove need for private database method use
         db = self.bot.db
-        db._edit_row(
-            db.tables[table_name],
-            db.tables[table_name].c.id,
+        db.edit_row(
+            table_name,
+            'id',
             id,
             attribute,
             value
@@ -74,7 +73,6 @@ class ItemTrackerCog(commands.Cog):
         """
         Lists all items in the game.
         """
-        # TODO: Enable message overflow
         # TODO: Make the printout a bit more elegant
 
         if member:

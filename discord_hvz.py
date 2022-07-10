@@ -228,11 +228,11 @@ class HVZBot(discord.ext.commands.Bot):
                 zombie = self.roles['zombie'] in after.roles
                 human = self.roles['human'] in after.roles
                 if zombie and not human:
-                    self.db.edit_member(after, 'faction', 'zombie')
+                    self.db.edit_row('members', 'id', after.id, 'faction', 'zombie')
                 elif human and not zombie:
-                    self.db.edit_member(after, 'faction', 'human')
+                    self.db.edit_row('members', 'id', after.id, 'faction', 'human')
             if not before.nick == after.nick:
-                self.db.edit_member(after, 'nickname', after.nick)
+                self.db.edit_row('members', 'id', after.id, 'nickname', after.nick)
                 log.debug(f'{after.name} changed their nickname.')
 
     def get_member(self, user_id: int):

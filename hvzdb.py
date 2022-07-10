@@ -2,24 +2,22 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-from typing import List, Union, Dict, TYPE_CHECKING, ClassVar
+from typing import List, Union, Dict, Tuple, TYPE_CHECKING, ClassVar
 
 import discord
+import sqlalchemy
+from loguru import logger
+from sqlalchemy import Table, Column, Integer, String, DateTime, Boolean
+from sqlalchemy import create_engine, MetaData
+from sqlalchemy import select, delete, update
+from sqlalchemy.engine import Row
+from sqlalchemy.exc import NoSuchTableError
+
 import sheets
+from config import config
 
 if TYPE_CHECKING:
     pass
-
-import sqlalchemy
-from sqlalchemy.engine import Row
-from sqlalchemy import create_engine, MetaData
-from sqlalchemy import Table, Column, Integer, String, DateTime, Boolean
-from sqlalchemy import select, delete, update
-from sqlalchemy.exc import NoSuchTableError
-
-from config import config
-
-from loguru import logger
 
 def dump(obj):
     """Prints the passed object in a very detailed form for debugging"""
@@ -98,14 +96,6 @@ class HvzDb:
 
         self.metadata_obj.create_all(self.engine)
 
-        # TODO: Find a way to not need this
-        # Give each table a table_names tuple which is all column names
-        for name, table in self.tables.items():
-            selection = select(table)
-            with self.engine.begin() as conn:
-                result = conn.execute(selection)
-                table.column_names = result.keys()
-
         if config['google_sheet_export'] == True:
             self.sheet_interface = sheets.SheetsInterface(self)
 
@@ -133,6 +123,31 @@ class HvzDb:
         self.tables[table_name].drop(bind=self.engine)
         logger.warning(f'Deleted tabled named {table_name}')
 
+    def _validate_table_selection(self, table: str | Table) -> Table:
+        if isinstance(table, str):
+            try:
+                return self.tables[table]
+            except KeyError:
+                raise KeyError(f'{table} is not a table.') from None
+        elif isinstance(table, Table):
+            return table
+        else:
+            raise KeyError(f'{table} is not recognized as a table.')
+
+    def _validate_column_selection(self, table: Table, *args: str) -> Column | List[Column]:
+        if len(args) == 0:
+            raise ValueError('Must supply a column name to validate.')
+        result: List[Column] = []
+        for column in args:
+            try:
+                result.append(table.c[column])
+            except KeyError:
+                raise ValueError(f'{column} not a column in {table.name}')
+
+        if len(result) == 1:
+            return result[0]
+        else:
+            return result
 
     def _table_updated(self, table: Union[Table, str]) -> None:
         """
@@ -143,7 +158,7 @@ class HvzDb:
         try:
             if isinstance(table, Table): table_name = table.name
             else: table_name = table
-            if table in self.database_config: # Only send to Sheets if the table is in config.yml
+            if table_name in self.database_config: # Only send to Sheets if the table is in config.yml
                 self.sheet_interface.update_table(table_name)
         except Exception as e:
             # Allow sheet failure to silently pass for the user.
@@ -190,9 +205,6 @@ class HvzDb:
             result = conn.execute(table.insert().values(row))
             self._table_updated(table)
             return result
-
-
-
 
     def get_member(self, value: discord.abc.User | int, column: str = None) -> Row:
         """
@@ -269,126 +281,33 @@ class HvzDb:
         return result_row
 
     def get_table(self, table) -> List[Row]:
-        """
-        Returns a list of all members in the database
-
-        Parameters:
-                table (str): The name of the table to fetch. Lower case
-
-        Returns:
-                result (list[Row]): List of Rows. Rows are like tuples, but with dictionary
-                                                keys. Like this: row['Name'] or row.Name
-        """
-        selection = select(self.tables[table])
+        _table = self._validate_table_selection(table)
+        selection = select(_table)
         with self.engine.begin() as conn:
             result = conn.execute(selection).all()
             return result
 
-    # Legacy method left in here for reference
-    def get_column(self, table: str, column: str):
-        # Returns the first column that matches. The column is a list.
-        sql = f'SELECT {column} FROM {table}'
-        cur = self.conn.cursor()
-
-        output = cur.execute(sql).fetchall()
-
-        return output
-
-    def edit_member(self, member, column, value):
-        """
-        Edits an attribute of a member in the database
-
-        Parameters:
-                member (int or user): A user id or a discord.abc.User object
-                column (str): A string matching the column to change. Case sensitive.
-                value (any?): Value to change the cell to.
-
-        Returns:
-                result (bool): True if the edit was successful, False if it was not.
-        """
-        member_id = member
-        if isinstance(member, discord.abc.User):
-            member_id = member.id
-        result = self._edit_row(
-            self.tables['members'],
-            self.tables['members'].c.id,
-            member_id,
-            column,
-            value
-        )
-        return result
-
-    def edit_tag(self, tag_id, column, value):
-        """
-        Edits an attribute of a tag in the database
-
-        Parameters:
-                tag_id (int or user): A tag ID
-                column (str): A string matching the column to change. Case sensitive.
-                value (any?): Value to change the cell to.
-
-        Returns:
-                result (bool): True if the edit was successful, False if it was not.
-        """
-
-        result = self._edit_row(
-            self.tables['tags'],
-            self.tables['tags'].c.tag_id,
-            tag_id,
-            column,
-            value
-        )
-        return result
-
-    def _edit_row(self, table: Table, search_column, search_value, target_column, target_value):
+    def edit_row(self, table: Table | str, search_column: str, search_value, target_column: str, target_value):
+        _table = self._validate_table_selection(table)
+        _search_column, _target_column = self._validate_column_selection(_table, search_column, target_column)
         updator = (
-            update(table).where(search_column == search_value).
-                values({target_column: target_value})
+            update(_table).where(_search_column == search_value).
+                values({_target_column: target_value})
         )
-
-        if target_column not in table.column_names:
-            raise ValueError(f'{search_column} not a column in {table}')
 
         with self.engine.begin() as conn:
             result = conn.execute(updator)
         if result.rowcount > 0:
-            self._table_updated(table)
+            self._table_updated(_table)
             return True
         else:
             raise ValueError(f'\"{search_value}\" not found in \"{search_column}\" column.')
 
-    def delete_member(self, member):
-        member_id = member
-        if isinstance(member, discord.abc.User):
-            member_id = member.id
+    def delete_row(self, table: Union[Table, str], search_column: str, search_value):
+        _table = self._validate_table_selection(table)
+        _search_column = self._validate_column_selection(_table, search_column)
 
-        self.delete_row(
-            self.tables['members'],
-            self.tables['members'].c.id,
-            member_id
-        )
-        return
-
-    def delete_tag(self, tag_id):
-        table = self.tables['tags']
-        self.delete_row(
-            table,
-            table.c.tag_id,
-            tag_id
-        )
-        return
-
-    def delete_row(self, table: Union[Table, str], search_column, search_value):
-        if isinstance(table, str):
-            try:
-                table = self.tables[table]
-            except KeyError:
-                raise KeyError(f'{table} is not a table.') from None
-
-        if search_column not in table.column_names:
-            raise ValueError(f'{search_column} not a column in {table}')
-
-        deletor = delete(table).where(table.c[search_column] == search_value)
+        deletor = delete(_table).where(_search_column == search_value)
         with self.engine.begin() as conn:
             result = conn.execute(deletor)
         if result.rowcount < 1:
@@ -399,11 +318,11 @@ class HvzDb:
     def get_rows(
             self,
             table: str,
-            search_column_name,
+            search_column_name: str,
             search_value=None,
             lower_value=None,
             upper_value=None,
-            exclusion_column_name=None,
+            exclusion_column_name: str =None,
             exclusion_value=None
     ) -> List[Row]:
         """
@@ -415,27 +334,27 @@ class HvzDb:
                 column (sqlalchemy.column): Column object to search for value
                 value (any): Value to search column for
                 exclusion_column_name (sqlalchemy.column) Optional. Reject rows where this column equals exclusion_value
-                exclusion_value (any) Optional. Required if exclusion_column is provided.
+                exclusion_value (any) Optional. Required if exclusion_column_name is provided.
 
         Returns:
                 result_rows: List of Row objects. Access rows in these ways: row.some_row, row['some_row']
         """
-        the_table = self.tables[table]
-        selection = select(the_table)
-        search_column = the_table.c[search_column_name]
+        _table = self._validate_table_selection(table)
+        selection = select(_table)
+        _search_column = self._validate_column_selection(_table, search_column_name)
 
         if search_value:
-            selection = selection.where(search_column == search_value)
+            selection = selection.where(_search_column == search_value)
         elif lower_value and upper_value:
-            selection = selection.where(search_column > lower_value).where(search_column < upper_value)
+            selection = selection.where(_search_column > lower_value).where(_search_column < upper_value)
         else:
             raise ValueError('If search_value is not provided, both lower_value and upper_value must be.')
 
         if exclusion_column_name:
-            exclusion_column = the_table.c[exclusion_column_name]
+            _exclusion_column = self._validate_column_selection(_table, exclusion_column_name)
             if not exclusion_value:
                 raise ValueError('No exclusion value provided.')
-            selection = selection.where(exclusion_column != exclusion_value)
+            selection = selection.where(_exclusion_column != exclusion_value)
 
         with self.engine.begin() as conn:
             result_rows: List[Row] = conn.execute(selection).all()
@@ -451,6 +370,4 @@ class HvzDb:
 
 # Below is just for testing when this file is run from the command line
 if __name__ == '__main__':
-    db = HvzDb()
-    result = db.get_rows('members', 'OZ', True)
-    print(result)
+    pass

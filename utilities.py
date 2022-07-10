@@ -111,11 +111,11 @@ def divide_string(input: str, max_char: int = 1995) -> List:
             next_length = len(input_lines[i + 1]) + len(buffer)
         except IndexError:
             # Happens if at the end of the string
-            output_lines.append(buffer + '\n ooo \n')
+            output_lines.append(buffer)
         else:
             if next_length > max_char:
                 output_lines.append(buffer)
-                buffer = '\n uuu \n'
+                buffer = ''
 
     return output_lines
 

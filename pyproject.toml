@@ -7,7 +7,7 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "3.9.7"
-py-cord = "2.0.0rc1"
+py-cord = "2.0.0"
 SQLAlchemy = "^1.4.32"
 loguru = "^0.6.0"
 "ruamel.yaml" = "^0.17.21"

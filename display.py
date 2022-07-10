@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 guild_id_list = [config['available_servers'][config['active_server']]]
 LAST_GAME_PLOT_HASH = None
 
-# TODO: Repair this function
+# TODO: Repair this function. Something broke
 def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
     global LAST_GAME_PLOT_HASH
     image_path = "plots/fig1.jpeg"

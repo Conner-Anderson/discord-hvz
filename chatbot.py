@@ -21,7 +21,7 @@ from buttons import HVZButton
 import chatbotprocessors
 
 log = logger
-yaml=YAML(typ='safe')
+yaml = YAML(typ='safe')
 
 # Used for creating commands
 guild_id_list = [config['available_servers'][config['active_server']]]
@@ -363,6 +363,7 @@ class ChatBot:
         message = message.strip()
         if message.casefold() == 'cancel':
             await self.chat_member.send(f'Chat "{self.script.kind}" cancelled.')
+            logger.info(f'Chatbot "{self.script.kind}" cancelled by {self.chat_member.name} (Nickname: {self.chat_member.nick})')
             return True
         try:
             responses = self.script.receive_response(message, target_member=self.target_member)
@@ -376,6 +377,9 @@ class ChatBot:
                     await self.chat_member.send(str(e))
                 else:
                     await self.chat_member.send(self.script.ending)
+                    logger.info(
+                        f'Chatbot "{self.script.kind}" with {self.chat_member.name} (Nickname: {self.chat_member.nick}) completed successfully.'
+                    )
                 return True
 
         await self.ask_question()
@@ -394,7 +398,7 @@ class ChatBot:
 
 class ChatBotManager(commands.Cog):
     bot: HVZBot
-    active_chatbots: Dict[int, ChatBot] = {} # Maps member ids to ChatBots
+    active_chatbots: Dict[int, ChatBot] = {}  # Maps member ids to ChatBots
     loaded_scripts: Dict[str, ScriptData] = {}
 
     def __init__(self, bot: HVZBot):
@@ -429,6 +433,8 @@ class ChatBotManager(commands.Cog):
 
         self.active_chatbots[chat_member.id] = new_chatbot
 
+        logger.info(f'Chatbot "{chatbot_kind}" started with {chat_member.name} (Nickname: {chat_member.nick})')
+
     async def start_chatbot_from_interaction(self, interaction: discord.Interaction):
         msg = ''
         try:
@@ -444,10 +450,6 @@ class ChatBotManager(commands.Cog):
             msg = 'Check your private messages.'
         finally:
             await interaction.response.send_message(msg, ephemeral=True)
-
-    @slash_command(guild_ids=guild_id_list)
-    async def chatbots(self, ctx):
-        pass
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -527,5 +529,5 @@ class ChatBotManager(commands.Cog):
         return output_list
 
 
-def setup(bot): # this is called by Pycord to setup the cog
-    bot.add_cog(ChatBotManager(bot)) # add the cog to the bot
+def setup(bot):  # this is called by Pycord to setup the cog
+    bot.add_cog(ChatBotManager(bot))  # add the cog to the bot

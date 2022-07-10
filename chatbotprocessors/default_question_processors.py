@@ -46,7 +46,6 @@ Example: raise ValueError('You have entered a bad value. Please try again.')
 """
 
 def name(input_text: str, bot: HVZBot):
-    print('Success!')
     return input_text
 
 def generate_tag_code(input_text: str, bot: HVZBot) -> str:

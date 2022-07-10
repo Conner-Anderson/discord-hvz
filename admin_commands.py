@@ -63,7 +63,7 @@ class AdminCommandsCog(commands.Cog):
         bot = self.bot
         member_row = bot.db.get_member(member)
         member_id = member_row.id
-        bot.db.delete_member(member_id)
+        bot.db.delete_row('members', 'id', member_id)
 
         member = bot.guild.get_member(int(member_id))
         await member.remove_roles(bot.roles['human'])
@@ -100,7 +100,7 @@ class AdminCommandsCog(commands.Cog):
             return
 
         original_value = member_row[attribute]
-        bot.db.edit_member(member_row.id, attribute, value)
+        bot.db.edit_row('members', 'id', member_row.id, attribute, value)
         await ctx.respond(
             f'The value of {attribute} for <@{member_row.id}> was changed from \"{original_value}\"" to \"{value}\"')
         # bot.sheets_interface.export_to_sheet('members')
@@ -111,32 +111,18 @@ class AdminCommandsCog(commands.Cog):
         Lists all members. The Google Sheet is probably better.
 
         """
-        bot = self.bot
-        table_name = 'members'
 
-        try:
-            column_string = ""
-            char_length = 0
+        members = self.bot.db.get_table('members')
+        if not members:
+            await ctx.respond(
+                f'No members found.')
+        # TODO: Reconcile the fact that this function requires an email cell
+        message = ''
+        for member in members:
+            sub_string = f'<@!{member.id}>\t{member.name}\t{member.email}\n'
+            message += sub_string
 
-            data = bot.db.get_table('members')
-            # TODO: Reconcile the fact that this function requires an email cell
-            if data:
-                for m in data:
-                    sub_string = f'<@!{m.id}>\t{m.name}\t{m.email}\n'
-                    char_length += len(sub_string)
-                    if char_length > DISCORD_MESSAGE_MAX_LENGTH:
-                        await ctx.respond(f'{column_string}')
-                        column_string = ""
-                        char_length = len(sub_string)
-                    column_string += sub_string
-                await ctx.respond(f'{column_string}')
-            else:
-                await ctx.respond(
-                    f'Could not find columns in table "{table_name}". You may not have any members yet.')
-
-        except ValueError as e:
-            log.exception(e)
-            await ctx.respond(f'Bad command! Error: {e}')
+        await utilities.respond_paginated(ctx, message)
 
     @member_group.command(guild_ids=guild_id_list, name='register')
     async def member_register(
@@ -202,7 +188,7 @@ class AdminCommandsCog(commands.Cog):
         """
         bot = self.bot
         tag_row = bot.db.get_tag(tag_id)
-        bot.db.delete_tag(tag_id)
+        bot.db.delete_row('tags', 'tag_id', tag_id)
         msg = ''
         # TODO: This might use optional column values. At least need to think about it.
         tagged_member = bot.guild.get_member(int(tag_row.tagged_id))
@@ -242,7 +228,7 @@ class AdminCommandsCog(commands.Cog):
         tag_row = bot.db.get_tag(tag_id)
 
         original_value = tag_row[attribute]
-        bot.db.edit_tag(tag_row.tag_id, attribute, value)
+        bot.db.edit_row('tags', 'tag_id', tag_row.tag_id, attribute, value)
         await ctx.respond(
             f'The value of {attribute} for tag {tag_row.tag_id} was changed from \"{original_value}\"" to \"{value}\"')
 
@@ -263,7 +249,7 @@ class AdminCommandsCog(commands.Cog):
         bot = self.bot
         tag_row = bot.db.get_tag(tag_id)
 
-        bot.db.edit_tag(tag_id, 'revoked_tag', True)
+        bot.db.edit_row('tags', 'tag_id', tag_id, 'revoked_tag', True)
 
         msg = ''
 
@@ -300,7 +286,7 @@ class AdminCommandsCog(commands.Cog):
         bot = self.bot
         tag_row = bot.db.get_tag(tag_id)
 
-        bot.db.edit_tag(tag_id, 'revoked_tag', False)
+        bot.db.edit_row('tags', 'tag_id', tag_id, 'revoked_tag', False)
 
         msg = ''
 
@@ -376,7 +362,7 @@ class AdminCommandsCog(commands.Cog):
         tree = util.generate_tag_tree(bot.db)
         tree = '**THE ZOMBIE FAMILY TREE\n**' + tree
 
-        await utilities.respond_paginated(ctx, tree, max_char=300)
+        await utilities.respond_paginated(ctx, tree)
 
 
     @slash_command(name='shutdown', guild_ids=guild_id_list, description='Shuts down the bot.')
@@ -429,7 +415,7 @@ class AdminCommandsCog(commands.Cog):
             await ctx.respond(
                 f'{member_row.name}\'s OZ status is {member_row.oz}. Give a True or False argument to change their setting.')
             return
-        bot.db.edit_member(member_row.id, 'oz', setting)
+        bot.db.edit_row('members', 'id', member_row.id, 'oz', setting)
 
         await ctx.respond(f'Changed <@{member_row.id}>\'s OZ status to {setting}')
 
