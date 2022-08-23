@@ -289,7 +289,7 @@ class Script:
         self.last_asked_question = this_question
         return message, view
 
-    def receive_response(self, response: str, target_member: discord.Member) -> Union[None, dict]:
+    def receive_response(self, response: str, target_member: discord.Member) -> Union[None, dict[str, str]]:
         # A messy do-it-all function. Could use improvement.
         if self.last_asked_question >= self.length:
             if not self.modifying:
@@ -333,6 +333,7 @@ class Script:
 @dataclass
 class ChatBot:
     script: Script
+    script_data: ScriptData
     bot: HVZBot
     chat_member: discord.Member
     target_member: discord.Member = None,
