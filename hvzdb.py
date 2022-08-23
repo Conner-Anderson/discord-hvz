@@ -242,8 +242,6 @@ class HvzDb:
         table = self.tables['tags']
         if column is not None:
             search_column = column
-            if search_column not in table.column_names:
-                raise ValueError(f'{search_column} not a column in {table}')
         else:
             search_column = 'tag_id'
 

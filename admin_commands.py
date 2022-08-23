@@ -196,7 +196,7 @@ class AdminCommandsCog(commands.Cog):
             msg += f'Roles not changed since <@{tag_row.tagged_id}> ({tag_row.tagged_name}) is no longer on the server.'
         else:
             try:
-                existing_tag = bot.db.get_tag(tag_row.tagged_id, column='Tagged_ID', filter_revoked=True)
+                existing_tag = bot.db.get_tag(tag_row.tagged_id, column='tagged_id', filter_revoked=True)
                 # Change to human if there are no previous tags on the tagged member
                 msg += (f'Left <@{tagged_member.id}> as zombie because <@{existing_tag.tagger_id}> '
                         f'({existing_tag.tagger_name}) still tagged them in tag {existing_tag.tag_id}')
