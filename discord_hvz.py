@@ -159,7 +159,7 @@ class HVZBot(discord.ext.commands.Bot):
                         channel_name = needed_channel
                     for found_channel in self.guild.channels:
                         if found_channel.name.lower() == channel_name:
-                            self.channels[needed_channel] = channel_name
+                            self.channels[needed_channel] = found_channel
                             break
                     else:
                         missing_channels.append(needed_channel)

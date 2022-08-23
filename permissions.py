@@ -6,6 +6,7 @@ from loguru import logger
 
 
 # Permissions utilities for discord-hvz
+# TODO: Make permissions work
 
 def check_admin_role(ctx: ApplicationContext) -> bool:
     if ctx.bot.roles['admin'] in ctx.interaction.user.roles:

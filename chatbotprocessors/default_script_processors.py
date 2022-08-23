@@ -18,6 +18,7 @@ async def registration_end(responses: Dict[str, Any], bot: HVZBot, target_member
     responses['faction'] = 'human'
     responses['id'] = str(target_member.id)
     responses['discord_name'] = target_member.name
+    responses['nickname'] = target_member.nick
     responses['registration_time'] = datetime.now(tz=config.time_zone)
     responses['oz'] = False
     responses['tag_code'] = make_tag_code(bot.db)
@@ -47,9 +48,10 @@ async def tag_logging_end(responses: Dict[str, Any], bot: HVZBot, target_member:
 
     await tagged_member.add_roles(bot.roles['zombie'])
     await tagged_member.remove_roles(bot.roles['human'])
+    bot.db.edit_row('members', 'id', tagged_member.id, 'faction', 'zombie')
     await bot.announce_tag(tagged_member, tagger_member, responses['tag_time'])
 
-    bot.db.edit_row('members', 'id', tagged_member, 'faction', 'zombie')
+
 
     # Try to make a useful console output, but don't worry if it fails.
     try:
