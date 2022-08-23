@@ -12,6 +12,11 @@ if TYPE_CHECKING:
     from hvzdb import HvzDb
     import discord
 
+# A starting function returns None. An ending function must return a dict[str, Any] (a dictionary that maps database
+# column names to values).
+# If any of these processor functions return a ValueError exception, the error message will be displayed to the user.
+# All other exceptions are reported to them as generic errors.
+
 
 async def registration_end(responses: Dict[str, Any], bot: HVZBot, target_member: discord.Member) -> Dict[str, Any]:
 
@@ -50,8 +55,6 @@ async def tag_logging_end(responses: Dict[str, Any], bot: HVZBot, target_member:
     await tagged_member.remove_roles(bot.roles['human'])
     bot.db.edit_row('members', 'id', tagged_member.id, 'faction', 'zombie')
     await bot.announce_tag(tagged_member, tagger_member, responses['tag_time'])
-
-
 
     # Try to make a useful console output, but don't worry if it fails.
     try:
