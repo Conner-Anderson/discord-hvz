@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Any
 from typing import TYPE_CHECKING
+
+from enum import Enum
 
 import discord
 import regex
@@ -99,6 +101,7 @@ class QuestionData:
                 raise e
 
 
+
 @dataclass(frozen=True)
 class ScriptData:
     """
@@ -114,6 +117,9 @@ class ScriptData:
     starting_processor: callable = None
     ending_processor: callable = None
     _postable_button: HVZButton = None
+
+    def __str__(self) -> str:
+        return f'[Type: {self.kind}, Table: {self.table} ]'
 
     @classmethod
     def build(cls, kind: str, script: Dict, chatbotmanager: ChatBotManager) -> ScriptData:
@@ -199,6 +205,14 @@ class ScriptData:
 
     def get_query(self, question_number: int):
         return self.questions[question_number].query
+
+    def get_review_string(self, responses: dict[int, Any]) -> str:
+        # Return a string list of questions and responses
+        output = ''
+        for i, q in enumerate(self.questions):
+            response = responses[i]
+            output += f"**{q.display_name}**: {response}\n"
+        return output
 
 
 @dataclass()
@@ -329,16 +343,23 @@ class Script:
         else:
             self.next_question = self.last_asked_question + 1
 
+class ChatbotState(Enum):
+    BEGINNING = 1
+    QUESTIONING = 2
+    REVIEWING = 3
+    MODIFYING_SELECTION = 4
+    MODIFYING = 5
 
 @dataclass
 class ChatBot:
-    script: Script
-    script_data: ScriptData
+    script: ScriptData
     bot: HVZBot
     chat_member: discord.Member
     target_member: discord.Member = None,
     processing: bool = field(default=False, init=False)
-    reviewing: bool = field(default=False, init=False)
+    next_question: int = field(init=False, default = 0)
+    responses: dict[int, Any] = field(init=False, default_factory=dict)
+    state: ChatbotState = ChatbotState.BEGINNING
 
     def __post_init__(self, ):
         if self.target_member is None:
@@ -347,15 +368,42 @@ class ChatBot:
     def __str__(self) -> str:
         return f'<@{self.chat_member.id}>, Script: {str(self.script)}'
 
-    async def ask_question(self, existing_chatbot: ChatBot = None, first: bool = False) -> bool:
-        starting_processor = self.script.data.starting_processor
-        if first and starting_processor:
-            await starting_processor(self.target_member, self.bot)
+    async def ask_question(self, existing_chatbot: ChatBot = None) -> bool:
+        msg = ''
+        view = None
+        if self.state.BEGINNING:
+            if self.script.starting_processor:
+                await self.script.starting_processor(self.target_member, self.bot)
+            if existing_chatbot is not None:
+                msg += f'Cancelled the previous {existing_chatbot.script.kind} conversation.\n'
+            if self.target_member != self.chat_member:
+                msg += f'The following is for <@{self.target_member.id}>.\n'
+            msg += f'{self.script.beginning} \n\n'
 
-        msg, view = self.script.ask_next_question(existing_script=getattr(existing_chatbot, 'script', None),
-                                                  first=first)
-        if first and self.target_member != self.chat_member:
-            await self.chat_member.send(f'The following is for <@{self.target_member.id}>.')
+        elif self.state is ChatbotState.QUESTIONING:
+            question = self.script.questions[self.next_question]
+            msg += question.query
+
+            if question.button_options:
+                view = discord.ui.View(timeout=None)
+                for button in question.button_options:
+                    view.add_item(button)
+
+        elif self.state is ChatbotState.REVIEWING:
+            # TODO: Reviewing mode should not show processor results to the user
+            self.reviewing = True
+            log.debug('Entered reviewing mode')
+            view = discord.ui.View(timeout=None)
+
+            view.add_item(self.script.special_buttons['submit'])
+            view.add_item(self.script.special_buttons['modify'])
+            msg = self.script.get_review_string(self.responses)
+
+        elif self.state is ChatbotState.MODIFYING_SELECTION:
+            view = discord.ui.View(timeout=None)
+            for button in self.script.review_selection_buttons:
+                view.add_item(button)
+            msg = 'Select answer to modify:'
 
         await self.chat_member.send(msg, view=view)
         return False
@@ -366,6 +414,48 @@ class ChatBot:
             await self.chat_member.send(f'Chat "{self.script.kind}" cancelled.')
             logger.info(f'Chatbot "{self.script.kind}" cancelled by {self.chat_member.name} (Nickname: {self.chat_member.nick})')
             return True
+
+        if self.state is ChatbotState.QUESTIONING:
+            question = self.script.questions[self.next_question]
+            if question.valid_regex:
+                match = regex.fullmatch(r'{}'.format(question.valid_regex), message)
+                if match is None:
+                    msg = f'{question.rejection_response} Please try again.'
+                    await self.chat_member.send(msg)
+
+            # Here is where I need to deal with submitted response vs. processed response.
+            if question.processor:
+                try:
+                    response = question.processor(input_text=message, bot=self.bot)
+                except ValueError as e:
+                    raise ResponseError(e)
+
+            self.responses[self.next_question] = response
+            if self.modifying:
+                self.next_question = self.length
+                self.modifying = False
+            else:
+                self.next_question = self.last_asked_question + 1
+
+        if self.state is ChatbotState.REVIEWING:
+            choice = message.casefold()
+            if choice == 'submit':
+                # Complete chatbot here
+                pass
+            elif choice == 'modify':
+                self.state = ChatbotState.MODIFYING_SELECTION
+                # Needs to move directly to asking the modifying question
+
+        elif self.state is ChatbotState.MODIFYING_SELECTION:
+            selection = message.casefold()
+            for i, q in enumerate(self.script.questions):
+                if selection == (q.name.casefold() or q.display_name.casefold()):
+                    self.next_question = i
+                    self.state = ChatbotState.MODIFYING
+                    #Needs to move directly to asking the chosen question
+            else:
+                message = f"'{selection}' is not a valid option. Please try again.'"
+                raise ResponseError(message)
         try:
             responses = self.script.receive_response(message, target_member=self.target_member)
         except ResponseError as e:
@@ -423,14 +513,14 @@ class ChatBotManager(commands.Cog):
         existing = self.active_chatbots.get(chat_member.id)
 
         new_chatbot = ChatBot(
-            Script(self.loaded_scripts[chatbot_kind], self.bot),
+            self.loaded_scripts[chatbot_kind],
             self.bot,
             chat_member,
             target_member
 
         )
 
-        await new_chatbot.ask_question(existing, first=True)
+        await new_chatbot.ask_question(existing)
 
         self.active_chatbots[chat_member.id] = new_chatbot
 
