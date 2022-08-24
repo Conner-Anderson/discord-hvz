@@ -366,7 +366,11 @@ class AdminCommandsCog(commands.Cog):
 
 
     @slash_command(name='shutdown', guild_ids=guild_id_list, description='Shuts down the bot.')
-    async def shutdown(self, ctx):
+    async def shutdown(
+            self,
+            ctx,
+            force: Option(bool, 'Shuts down regardless of active chatbots.', required=False, default=False)
+    ):
         """
         Shuts down bot. If there are active chats, list them and don't shut down.
 
@@ -376,10 +380,15 @@ class AdminCommandsCog(commands.Cog):
         if chatbot_cog:
             chatbot_list = chatbot_cog.list_active_chatbots()
             if len(chatbot_list) > 0:
-                await ctx.respond(
-                    'The bot did not shut down because of these running chatbots: \n' + '\n'.join(chatbot_list)
-                )
-                return
+                if force:
+                    await ctx.respond(
+                        'These chatbots are being destroyed: \n' + '\n'.join(chatbot_list)
+                    )
+                else:
+                    await ctx.respond(
+                        'The bot did not shut down due to the following active chatbots. Use the "force" option to override. \n' + '\n'.join(chatbot_list)
+                    )
+                    return
 
         await ctx.respond('Shutting Down')
         log.critical('Shutting Down\n. . .\n\n')
