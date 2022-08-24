@@ -213,7 +213,7 @@ class ScriptData:
         # Return a string list of questions and responses
         output = ''
         for i, q in enumerate(self.questions):
-            response = responses[i].processed_response
+            response = responses[i].raw_response
             output += f"**{q.display_name}**: {response}\n"
         return output
 
@@ -245,9 +245,10 @@ class ChatBot:
         return f'<@{self.chat_member.id}>, Script: {str(self.script)}'
 
     async def ask_question(self, existing_chatbot: ChatBot = None):
+        logger.debug(f'Asking question: next_question is {self.next_question}. State: {self.state.name}')
         msg = ''
         view = None
-        if self.state.BEGINNING:
+        if self.state is ChatbotState.BEGINNING:
             if self.script.starting_processor:
                 await self.script.starting_processor(self.target_member, self.bot)
             if existing_chatbot is not None:
@@ -255,8 +256,10 @@ class ChatBot:
             if self.target_member != self.chat_member:
                 msg += f'The following is for <@{self.target_member.id}>.\n'
             msg += f'{self.script.beginning} \n\n'
+            self.state = ChatbotState.QUESTIONING
 
-        elif self.state is ChatbotState.QUESTIONING:
+        if self.state in (ChatbotState.QUESTIONING, ChatbotState.MODIFYING):
+            logger.debug(f'QUESTIONING or MODIFYING')
             question = self.script.questions[self.next_question]
             msg += question.query
 
@@ -292,20 +295,24 @@ class ChatBot:
                 f'Chatbot "{self.script.kind}" cancelled by {self.chat_member.name} (Nickname: {self.chat_member.nick})')
             return True
 
-        elif self.state is ChatbotState.QUESTIONING or ChatbotState.MODIFYING:
+        elif self.state in (ChatbotState.QUESTIONING, ChatbotState.MODIFYING):
+            logger.debug(f'receive method got "{message}" as a message, and is processing the question.')
             question = self.script.questions[self.next_question]
             if question.valid_regex:
+                logger.debug('Processing regex...')
                 match = regex.fullmatch(r'{}'.format(question.valid_regex), message)
                 if match is None:
                     msg = f'{question.rejection_response} Please try again.'
                     await self.chat_member.send(msg)
+                    return False
 
-            # Here is where I need to deal with submitted response vs. processed response.
             if question.processor:
+                logger.debug('Using processor function...')
                 try:
                     processed_response = question.processor(input_text=message, bot=self.bot)
                 except ValueError as e:
-                    raise ResponseError(e)
+                    await self.chat_member.send(str(e))
+                    return False
 
             self.responses[self.next_question] = Response(message, processed_response)
             self.next_question += 1
@@ -331,6 +338,9 @@ class ChatBot:
 
             elif choice == 'modify':
                 self.state = ChatbotState.MODIFYING_SELECTION
+            else:
+                await self.chat_member.send('That is an invalid response. Please use the buttons to select, or type "cancel"')
+                return False
 
         elif self.state is ChatbotState.MODIFYING_SELECTION:
             selection = message.casefold()
@@ -338,9 +348,10 @@ class ChatBot:
                 if selection == (q.name.casefold() or q.display_name.casefold()):
                     self.next_question = i
                     self.state = ChatbotState.MODIFYING
+                    break
             else:
-                message = f"'{selection}' is not a valid option. Please try again.'"
-                raise ResponseError(message)
+                await self.chat_member.send('That is an invalid response. Please use the buttons to select, or type "cancel"')
+                return False
 
         await self.ask_question()
         return False
