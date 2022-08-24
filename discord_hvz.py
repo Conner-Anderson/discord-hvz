@@ -150,7 +150,7 @@ class HVZBot(discord.ext.commands.Bot):
                     else:
                         missing_roles.append(needed_role)
 
-                needed_channels = ['tag-announcements', 'report-tags', 'landing', 'zombie-chat', 'bot-output']
+                needed_channels = ['tag-announcements', 'report-tags', 'zombie-chat', 'bot-output']
                 missing_channels = []
                 for needed_channel in needed_channels:
                     try:

@@ -78,7 +78,6 @@ database_tables:
 channel_names:
   tag-announcements: tag-announcements
   report-tags: report-tags
-  landing: hvz-first-things-first
   zombie-chat: zombie-chat
   bot-output: bot-output
 

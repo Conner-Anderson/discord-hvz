@@ -432,7 +432,7 @@ class AdminCommandsCog(commands.Cog):
         t_channel = bot.channels['report-tags']
         c_channel = bot.channels['zombie-chat']
         try:
-            if setting is True:
+            if setting:
                 await t_channel.set_permissions(member, read_messages=True)
                 await c_channel.set_permissions(member, read_messages=True)
             else:
