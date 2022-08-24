@@ -10,6 +10,7 @@ from discord.ext import pages
 
 if TYPE_CHECKING:
     from hvzdb import HvzDb
+    from discord_hvz import HVZBot
     import sqlalchemy
 
 from loguru import logger
@@ -17,7 +18,7 @@ from loguru import logger
 log = logger
 
 
-def make_tag_code(db):
+def make_tag_code(db: HvzDb):
     code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '0125IOUDQVSZ'))
 
     tag_code = ''
@@ -50,19 +51,23 @@ def member_from_string(member_string, db, ctx=None):
         (f'Could not find a member that matched \"{member_string}\". Can be member ID, Name, Discord_Name, or Nickname.')
 
 
-def generate_tag_tree(db: HvzDb) -> str:
+def generate_tag_tree(db: HvzDb, bot: HVZBot) -> str:
     # oz_table = db.get_rows('members', 'oz', True) Old, easy way of getting OZs.
     oz_table = _get_ozs(db)
     # └
-    return _tag_tree_loop(db, oz_table, 0)
+    return _tag_tree_loop(db, bot, oz_table, 0)
 
 
-def _tag_tree_loop(db: HvzDb, table: List[sqlalchemy.engine.Row], level: int) -> str:
+def _tag_tree_loop(db: HvzDb, bot: HVZBot, table: List[sqlalchemy.engine.Row], level: int) -> str:
     output = ''
     for i, row in enumerate(table):
         output += '\n'
         output += _add_indention(level, True if i == len(table) - 1 else False)
-        output += f'<@{row.id}>'
+
+        if bot.get_member(row.id):
+            output += f'<@{row.id}>'
+        else:
+            output += f'{row.name}'
         try:
             tags = db.get_rows('tags', 'tagger_id', row.id, exclusion_column_name='revoked_tag', exclusion_value=True)
         # If the player had no tags...
@@ -78,7 +83,7 @@ def _tag_tree_loop(db: HvzDb, table: List[sqlalchemy.engine.Row], level: int) ->
             for tag_row in tags:
                 tagged_members.append(db.get_member(tag_row.tagged_id))
 
-            output += _tag_tree_loop(db, tagged_members, level + 1)
+            output += _tag_tree_loop(db, bot, tagged_members, level + 1)
 
     return output
 

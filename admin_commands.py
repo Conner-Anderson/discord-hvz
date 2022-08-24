@@ -359,7 +359,7 @@ class AdminCommandsCog(commands.Cog):
         """
         bot = self.bot
         await ctx.response.defer()
-        tree = util.generate_tag_tree(bot.db)
+        tree = util.generate_tag_tree(bot.db, bot)
         tree = '**THE ZOMBIE FAMILY TREE\n**' + tree
 
         await utilities.respond_paginated(ctx, tree)
