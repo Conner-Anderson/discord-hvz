@@ -380,6 +380,7 @@ class AdminCommandsCog(commands.Cog):
             chatbot_list = chatbot_cog.list_active_chatbots()
             if len(chatbot_list) > 0:
                 if force:
+                    await chatbot_cog.shutdown()
                     await ctx.respond(
                         'These chatbots are being destroyed: \n' + '\n'.join(chatbot_list)
                     )

@@ -507,6 +507,13 @@ class ChatBotManager(commands.Cog):
             output_list.append(str(chatbot))
         return output_list
 
+    async def shutdown(self):
+        # Sends a shutdown message to all members in a chatbot
+        for i, chatbot in self.active_chatbots.items():
+            await chatbot.chat_member.send(
+                'Unfortunately, the bot has shut down. You will need to restart this chatbot when it comes back online.'
+            )
+
 
 def setup(bot):  # this is called by Pycord to setup the cog
     bot.add_cog(ChatBotManager(bot))  # add the cog to the bot
