@@ -140,11 +140,15 @@ class HVZBot(discord.ext.commands.Bot):
                 await self.guild.fetch_channels()
                 await self.guild.fetch_roles()
 
-                needed_roles = ['admin', 'zombie', 'human', 'player']
+                needed_roles = ['zombie', 'human', 'player']
                 missing_roles = []
                 for needed_role in needed_roles:
+                    try:
+                        role_name = config['role_names'][needed_role]
+                    except KeyError:
+                        role_name = needed_role
                     for found_role in self.guild.roles:
-                        if found_role.name.lower() == needed_role:
+                        if found_role.name.lower() == role_name:
                             self.roles[needed_role] = found_role
                             break
                     else:

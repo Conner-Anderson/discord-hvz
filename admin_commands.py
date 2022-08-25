@@ -11,7 +11,6 @@ from loguru import logger
 import utilities
 import utilities as util
 from config import config
-from permissions import check_admin_role
 
 if TYPE_CHECKING:
     from discord_hvz import HVZBot
@@ -395,7 +394,7 @@ class AdminCommandsCog(commands.Cog):
         await bot.close()
         time.sleep(1)
 
-    @slash_command(guild_ids=guild_id_list, name='oz', checks=[check_admin_role])
+    @slash_command(guild_ids=guild_id_list, name='oz')
     async def oz(
             self,
             ctx,

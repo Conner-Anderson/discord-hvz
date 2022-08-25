@@ -81,6 +81,12 @@ channel_names:
   zombie-chat: zombie-chat
   bot-output: bot-output
 
+# Assign the real role names on the right to the variables on the left
+role_names:
+  zombie: zombie
+  human: human
+  player: player
+
 # Valid button colors: blurple, gray, green, red, url
 # Buttons must match the names of the functions they call
 buttons:
