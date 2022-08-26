@@ -41,7 +41,7 @@ class Response:
 
 @dataclass(frozen=True)
 class QuestionData:
-    name: str
+    column: str
     display_name: str
     query: str
     valid_regex: str = None
@@ -90,17 +90,17 @@ class QuestionData:
             return QuestionData(**question_data)
         except TypeError as e:
             e_text = repr(e)
-            name = question_data.get('name')
-            if name is None:
-                name = ''
+            column = question_data.get('column')
+            if column is None:
+                column = ''
             if 'missing' in e_text:
                 attribute = e_text[e_text.find('\''):-2]  # Pulls the attribute from the error message
                 raise ConfigError(
-                    f'Question {name} is missing the required attribute {attribute}. Check scripts.yml') from e
+                    f'Question {column} is missing the required attribute {attribute}. Check scripts.yml') from e
             elif 'unexpected' in e_text:
                 attribute = e_text[e_text.find('\''):-2]
                 raise ConfigError(
-                    f'Question {name} has the unknown attribute {attribute}. Check scripts.yml') from e
+                    f'Question {column} has the unknown attribute {attribute}. Check scripts.yml') from e
             else:
                 raise e
 
@@ -136,7 +136,7 @@ class ScriptData:
             questions.append(question)
             review_selection_buttons.append(HVZButton(
                 chatbotmanager.receive_interaction,
-                custom_id=question.name,
+                custom_id=question.column,
                 label=question.display_name,
                 color='blurple',
                 unique=True
@@ -345,7 +345,7 @@ class ChatBot:
         elif self.state is ChatbotState.MODIFYING_SELECTION:
             selection = message.casefold()
             for i, q in enumerate(self.script.questions):
-                if selection == (q.name.casefold() or q.display_name.casefold()):
+                if selection == (q.column.casefold() or q.display_name.casefold()):
                     self.next_question = i
                     self.state = ChatbotState.MODIFYING
                     break
@@ -361,8 +361,8 @@ class ChatBot:
 
         # Convert the dictionary of indexed response objects to a map of question names to response values
         for i, response in self.responses.items():
-            name = self.script.questions[i].name
-            response_map[name] = response.processed_response
+            column = self.script.questions[i].column
+            response_map[column] = response.processed_response
         try:
             response_map_processed = await self.script.ending_processor(
                 responses=response_map,

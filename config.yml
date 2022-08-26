@@ -60,29 +60,29 @@ role_names:
 # tags: Tag_ID, Tagger_ID, Tagger_Name
 database_tables:
   members:
-    ID: String
-    Name: String
-    Nickname: String
-    Discord_Name: String
-    CPO: String
-    Faction: String
-    Tag_Code: String
-    OZ_Desire: String
-    Email: String
-    Want_Bandana: String
-    Registration_Time: DateTime
-    OZ: Boolean
+    id: String
+    name: String
+    nickname: String
+    discord_name: String
+    cpo: String
+    faction: String
+    tag_code: String
+    oz_desire: String
+    email: String
+    want_bandana: String
+    registration_time: DateTime
+    oz: Boolean
   tags:
-    Tag_ID: incrementing_integer
-    Tagger_ID: String
-    Tagger_Name: String
-    Tagger_Nickname: String
-    Tagger_Discord_Name: String
-    Tagged_ID: String
-    Tagged_Name: String
-    Tagged_Nickname: String
-    Tagged_Discord_Name: String
-    Tag_Time: DateTime
-    Report_Time: DateTime
-    Revoked_Tag: String
+    tag_id: incrementing_integer
+    tagger_id: String
+    tagger_name: String
+    tagger_nickname: String
+    tagger_discord_name: String
+    tagged_id: String
+    tagged_name: String
+    tagged_nickname: String
+    tagged_discord_name: String
+    tag_time: DateTime
+    report_time: DateTime
+    revoked_tag: String
 
