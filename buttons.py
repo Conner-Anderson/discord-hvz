@@ -66,9 +66,9 @@ class HVZButton(discord.ui.Button):
             label = function.__name__
         if not style:
             if color is None:
-                color = config['buttons'][function.__name__]['color']
+                color = 'green'
 
-            if color.casefold() not in self.valid_colors:
+            elif color.casefold() not in self.valid_colors:
                 log.warning(f'"{color}" is not a valid button color. Valid colors: {self.valid_colors}')
                 color = 'green'
 

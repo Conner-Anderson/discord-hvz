@@ -21,10 +21,6 @@ silent_oz: false
 # Will the database be automatically exported to a Google Sheet? Requires some setup.
 google_sheet_export: true
 
-# The timezone offset from UTC that the bot should record and report times in.
-# -7 is US West Coast, -5 is US Central, -4 is US East Coast, Central Europe is +2
-timezone: -5
-
 # The IDs of the Google Sheets that the bot will send its data to.
 # The ID can be found in the URL, like this: https://docs.google.com/spreadsheets/d/1YUXeRoEpV9MukZ7B_xVlBkc-D6DNEfVxLBmJlf1Fm-0/edit#gid=0
 # It's the long string of characters near the end.
@@ -34,10 +30,26 @@ sheet_ids:
   letu: 1H8dlyi1xj3jCP7-TrMCPGcfuDQ-LAHq1BmyrFORpCA8
   dev: 1fLYdmc_sp-Rx25794zmPekp48I02lbctyqiLvaLDIwQ
 
+# The timezone offset from UTC that the bot should record and report times in.
+# -7 is US West Coast, -5 is US Central, -4 is US East Coast, Central Europe is +2
+timezone: -5
+
 sheet_names:
   members: Members
   tags: Tags
 
+# Assign the real channel names on the right to the variables on the left
+channel_names:
+  tag-announcements: tag-announcements
+  report-tags: report-tags
+  zombie-chat: zombie-chat
+  bot-output: bot-output
+
+# Assign the real role names on the right to the variables on the left
+role_names:
+  zombie: zombie
+  human: human
+  player: player
 
 # The below lists define database tables. When the bot boots up, it will create any tables that don't exist.
 # It WILL NOT edit existing tables to match this config. To add or subtract columns, the table or database must be deleted
@@ -73,31 +85,4 @@ database_tables:
     Tag_Time: DateTime
     Report_Time: DateTime
     Revoked_Tag: String
-
-# Assign the real channel names on the right to the variables on the left
-channel_names:
-  tag-announcements: tag-announcements
-  report-tags: report-tags
-  zombie-chat: zombie-chat
-  bot-output: bot-output
-
-# Assign the real role names on the right to the variables on the left
-role_names:
-  zombie: zombie
-  human: human
-  player: player
-
-# Valid button colors: blurple, gray, green, red, url
-# Buttons must match the names of the functions they call
-buttons:
-  register:
-    message: "Use the button below and check your Direct Messages to register for\
-      \ HvZ!"
-    label: "Register for HvZ"
-    color: green
-  tag_log:
-    message: "Use the button below and check your Direct Messages to log a tag."
-    label: "Log Tag"
-    color: green
-
 
