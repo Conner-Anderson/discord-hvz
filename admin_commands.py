@@ -48,10 +48,11 @@ class AdminCommandsCog(commands.Cog):
     async def member_delete(
             self,
             ctx,
-            member: Option(discord.Member, 'Member to delete from the database. Stays on server.')
+            member: Option(discord.Member, 'Member to delete from the database.', default=None),
+            id: Option(str, 'Delete member by ID instead.', default=None)
     ):
         """
-        Removes the specified member from the game. Dangerous!
+        Removes the specified member from the game: stays on the server.
 
         member_string must be a @mentioned member in the channel, an ID, a Discord_Name,
         a Nickname, or a Name.
@@ -60,17 +61,38 @@ class AdminCommandsCog(commands.Cog):
         Deletion works even on players who have left the server.
         """
         bot = self.bot
-        member_row = bot.db.get_member(member)
-        member_id = member_row.id
+
+        msg = ''
+        if member:
+            member_id = member.id
+
+            if id:
+                msg += 'Both member and ID supplied. Ignoring ID.\n'
+
+        elif id:
+            member_id = id
+            member: discord.Member = bot.get_member(id)
+        else:
+            await ctx.respond('No member or ID provided: nothing deleted.')
+            return
+        try:
+            member_row = bot.db.get_member(member)
+        except ValueError:
+            await ctx.respond('That member is not in the database, and so there is nothing to delete.')
+            return
         bot.db.delete_row('members', 'id', member_id)
 
-        member = bot.guild.get_member(int(member_id))
-        await member.remove_roles(bot.roles['human'])
-        await member.remove_roles(bot.roles['zombie'])
-        await member.remove_roles(bot.roles['player'])
+        if member:
+            await member.remove_roles(bot.roles['human'])
+            await member.remove_roles(bot.roles['zombie'])
+            await member.remove_roles(bot.roles['player'])
+            msg += f'<@{member_id}> deleted from the game. Roles revoked, expunged from the database.'
+        else:
+            msg += f'{member_row.id} deleted from the game and expunged from the database.'
 
-        await ctx.respond(
-            f'<@{member_id}> deleted from the game. Roles revoked, expunged from the database. Any tags will still exist.')
+        msg += ' Any tags will still exist.'
+
+        await ctx.respond(msg)
 
     @member_group.command(guild_ids=guild_id_list, name='edit')
     async def member_edit(
