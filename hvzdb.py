@@ -41,16 +41,16 @@ class HvzDb:
 
     required_columns: ClassVar[Dict[str, Dict[str, str]]] = {
         'members': {
-            'ID': 'String',
-            'Name': 'String',
-            'Faction': 'String',
-            'Tag_Code': 'String',
-            'OZ': 'Boolean'
+            'id': 'String',
+            'name': 'String',
+            'faction': 'String',
+            'tag_code': 'String',
+            'oz': 'Boolean'
         },
         'tags': {
-            'Tag_ID': 'Integer',
-            'Tagger_ID': 'String',
-            'Tagger_Name': 'String'
+            'tag_id': 'Integer',
+            'tagger_id': 'String',
+            'tagger_name': 'String'
         }
     }
 
