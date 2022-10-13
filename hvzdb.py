@@ -249,7 +249,7 @@ class HvzDb:
             tag_row = self.__get_row(table, table.c[search_column], value)
         else:
             tag_row = self.__get_row(table, table.c[search_column], value,
-                                     exclusion_column=table.c['Revoked_Tag'], exclusion_value=True)
+                                     exclusion_column=table.c['revoked_tag'], exclusion_value=True)
         return tag_row
 
     def __get_row(self, table, search_column, search_value, exclusion_column=None, exclusion_value=None):
