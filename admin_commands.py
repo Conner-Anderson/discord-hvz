@@ -45,6 +45,15 @@ class AdminCommandsCog(commands.Cog):
     member_group = SlashCommandGroup("member", "Commands for dealing with members.", guild_ids=guild_id_list)
     tag_group = SlashCommandGroup("tag", "Commands for dealing with tags.", guild_ids=guild_id_list)
 
+    async def tag_select_callback(self, value, original_context: discord.ApplicationContext):
+        await self.tag_revoke(original_context, value)
+
+    async def tag_selection(self, ctx: discord.ApplicationContext, select_placeholder: str):
+        selection_format = "**Tag {tag_id}:** <@{tagger_id}> ({tagger_name}) tagged <@{tagged_id}> ({tagged_name}). Revoked: {revoked_tag}"
+        rows = self.bot.db.get_table('tags')
+        await table_to_selection(ctx, rows, 'tag_id', selection_format, self.tag_select_callback, select_placeholder,
+                                 reversed=True)
+
     @member_group.command(guild_ids=guild_id_list, name='delete')
     async def member_delete(
             self,
@@ -199,7 +208,7 @@ class AdminCommandsCog(commands.Cog):
     async def tag_delete(
             self,
             ctx,
-            tag_id: Option(int, 'Tag ID from the Google Sheet')
+            tag_id: Option(int, 'Tag ID from the Google Sheet. Omit to select from a list.', required=False, default=None)
     ):
         """
         Removes the tag by its ID, changing tagged member to human.
@@ -209,6 +218,10 @@ class AdminCommandsCog(commands.Cog):
         human if there aren't any remaining tags on them.
         """
         bot = self.bot
+        if not tag_id:
+            await self.tag_selection(ctx, 'Select tag to revoke')
+            return
+
         tag_row = bot.db.get_tag(tag_id)
         bot.db.delete_row('tags', 'tag_id', tag_id)
         msg = ''
@@ -258,7 +271,7 @@ class AdminCommandsCog(commands.Cog):
     async def tag_revoke(
             self,
             ctx,
-            tag_id: Option(int, 'Tag ID from Google sheet to revoke.')
+            tag_id: Option(int, 'Tag ID from Google sheet to revoke. Omit to select from a list.', required=False, default=None)
     ):
         """
         Sets Tag_Revoked for a tag to True and leaves it in the database. Changes tagged member to human.
@@ -269,8 +282,12 @@ class AdminCommandsCog(commands.Cog):
         tag that makes them a zombie.
         """
         bot = self.bot
-        tag_row = bot.db.get_tag(tag_id)
 
+        if not tag_id:
+            await self.tag_selection(ctx, 'Select tag to revoke')
+            return
+
+        tag_row = bot.db.get_tag(tag_id)
         bot.db.edit_row('tags', 'tag_id', tag_id, 'revoked_tag', True)
 
         msg = ''
@@ -296,7 +313,7 @@ class AdminCommandsCog(commands.Cog):
     async def tag_restore(
             self,
             ctx,
-            tag_id: Option(int, 'Tag ID from Google Sheet to restore.')
+            tag_id: Option(int, 'Tag ID from Google Sheet to restore. Omit to select from a list.', required=False, default=None)
     ):
         """
         Sets Tag_Revoked for a tag to False. Changes roles.
@@ -306,6 +323,10 @@ class AdminCommandsCog(commands.Cog):
         Restores the tagged member to zombie.
         """
         bot = self.bot
+
+        if not tag_id:
+            await self.tag_selection(ctx, 'Select tag to revoke')
+            return
         tag_row = bot.db.get_tag(tag_id)
 
         bot.db.edit_row('tags', 'tag_id', tag_id, 'revoked_tag', False)
@@ -464,16 +485,4 @@ class AdminCommandsCog(commands.Cog):
         except Exception as e:
             await ctx.respond('Could not change permissions in the channels. Please give the bot permission to.')
             log.warning(e)
-
-    async def test_callback(self, value, original_context: discord.ApplicationContext):
-
-        await self.tag_revoke(original_context, value)
-
-    @slash_command(name='selection_test', guild_ids=guild_id_list, description='Shuts down the bot.')
-    async def selection_test(self, ctx):
-
-        selection_format = "**Tag {tag_id}:** <@{tagger_id}> ({tagger_name}) tagged <@{tagged_id}> ({tagged_name}). Revoked: {revoked_tag}"
-        rows = self.bot.db.get_table('tags')
-        await table_to_selection(ctx, rows, 'tag_id', selection_format, self.test_callback, reversed=True)
-
 

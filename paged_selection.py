@@ -14,6 +14,7 @@ async def paged_selection(
         context: discord.ApplicationContext,
         content: List[Tuple[str, str]],
         callback: callable,
+        select_placeholder: str = 'Make a selection'
 ):
     page_size = 5
 
@@ -28,7 +29,7 @@ async def paged_selection(
     content_index = 0
     while content_index < len(content):
         page_content = ""
-        dropdown = discord.ui.Select()
+        dropdown = discord.ui.Select(placeholder=select_placeholder)
         while len(dropdown.options) < page_size and content_index < len(content):
             item = content[content_index]
             page_content += (item[0] + "\n")
@@ -55,6 +56,7 @@ async def table_to_selection(
         selection_column: str,
         format: str,
         callback: callable,
+        select_placeholder = 'Make a selection',
         reversed = False
 ):
     content = []
@@ -64,7 +66,7 @@ async def table_to_selection(
         item = format.format(**row)
         content.append((item, str(row[selection_column])))
 
-    await paged_selection(context, content, callback)
+    await paged_selection(context, content, callback, select_placeholder)
 
 
 
