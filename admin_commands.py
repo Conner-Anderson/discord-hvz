@@ -10,6 +10,7 @@ from loguru import logger
 
 import utilities
 import utilities as util
+from paged_selection import table_to_selection
 from config import config
 
 if TYPE_CHECKING:
@@ -463,3 +464,16 @@ class AdminCommandsCog(commands.Cog):
         except Exception as e:
             await ctx.respond('Could not change permissions in the channels. Please give the bot permission to.')
             log.warning(e)
+
+    async def test_callback(self, value, original_context: discord.ApplicationContext):
+
+        await self.tag_revoke(original_context, value)
+
+    @slash_command(name='selection_test', guild_ids=guild_id_list, description='Shuts down the bot.')
+    async def selection_test(self, ctx):
+
+        selection_format = "**Tag {tag_id}:** <@{tagger_id}> ({tagger_name}) tagged <@{tagged_id}> ({tagged_name}). Revoked: {revoked_tag}"
+        rows = self.bot.db.get_table('tags')
+        await table_to_selection(ctx, rows, 'tag_id', selection_format, self.test_callback, reversed=True)
+
+
