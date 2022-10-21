@@ -368,6 +368,8 @@ class AdminCommandsCog(commands.Cog):
             tag_code = bot.db.get_member(ctx.author).tag_code
             await ctx.respond(f'Your tag code is: {tag_code}\nHave this ready to give to a zombie who tags you.',
                               ephemeral=True)
+        except ValueError:
+            await ctx.respond('You aren\'t registered for the game.', ephemeral=True)
         except Exception as e:
             await ctx.author.send('Sorry, something went wrong with that command. Derp.')
             log.exception(e)
