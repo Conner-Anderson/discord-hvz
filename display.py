@@ -150,7 +150,7 @@ class PlayersTodayElement(PanelElement):
         extra = ''
         if not config['registration']:
             extra = ' (Registration Closed)'
-        embed.add_field(name='New Players Today', value=str(count) + extra)
+        embed.add_field(name='New Players, Last 24h', value=str(count) + extra)
 
 
 class TagsTodayElement(PanelElement):
