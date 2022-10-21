@@ -45,7 +45,7 @@ def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
             return total.sum()
 
         def total_zombies(x):
-            total = ((tags_df.tag_time < x.tag_time) & (tags_df.revoked_tag is False))
+            total = ((tags_df.tag_time < x.tag_time) & (tags_df.revoked_tag == False))
             return total.sum()
 
         oz_count = members_df['oz'].sum()
@@ -58,6 +58,20 @@ def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
         tags_df.sort_values(by='tag_time', inplace=True)
 
         fig = px.line(tags_df, x="tag_time", y=["Zombie_Count", "Human_Count"], title='Players over Time', markers=True)
+        fig.update_layout(
+            xaxis_title = 'Tag Time',
+            yaxis_title = 'Player Count',
+            legend_title = 'Plots',
+            title_xanchor = 'auto'
+        )
+        fig.update_traces(
+            patch={'line_color': '#32C744'},
+            selector={'name': 'Zombie_Count'}
+        )
+        fig.update_traces(
+            patch={'line_color': '#F1C40F'},
+            selector={'name': 'Human_Count'}
+        )
         fig.update_xaxes(
             dtick=3600000 * 24,  # The big number is one hour
             tickformat="%a %b %d",
