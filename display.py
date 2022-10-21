@@ -24,7 +24,6 @@ if TYPE_CHECKING:
 guild_id_list = [config['available_servers'][config['active_server']]]
 LAST_GAME_PLOT_HASH = None
 
-# TODO: Repair this function. Something broke
 def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
     global LAST_GAME_PLOT_HASH
     image_path = "plots/fig1.jpeg"
@@ -35,9 +34,15 @@ def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
         filename = db.filename
     engine = sqlalchemy.create_engine(f"sqlite+pysqlite:///{filename}")
     tags_df = pd.read_sql_table('tags', con=engine, columns=['tag_time', 'revoked_tag'])
-
     new_hash = pandas.util.hash_pandas_object(tags_df).sum()
-    if LAST_GAME_PLOT_HASH != new_hash or not os.path.exists(image_path):
+
+    if len(tags_df.index) == 0:
+        fig = px.line(tags_df, x="tag_time", y=["Zombie_Count", "Human_Count"], title='Error: There are no tags yet', markers=True)
+        fig.write_image(image_path, width=800, height=600, scale=1.5)
+        LAST_GAME_PLOT_HASH = new_hash
+
+
+    elif LAST_GAME_PLOT_HASH != new_hash or not os.path.exists(image_path):
         members_df = pd.read_sql_table('members', con=engine, columns=['registration_time', 'oz'])
 
         def total_players(x):
@@ -241,7 +246,11 @@ class HVZPanel:
         output_file = None
 
         for element in self.elements:
-            file = element.add(embed=embed, panel=self)
+            try:
+                file = element.add(embed=embed, panel=self)
+            except Exception as e:
+                logger.exception(e)
+                raise e
             if file:
                 output_file = file
 
