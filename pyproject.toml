@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "discord-hvz"
-version = "0.2.0"
+version = "1.0.0"
 description = "A run-yourself Discord bot to manage Humans vs. Zombies games."
 authors = ["ConnerHAnderson <conneranderson.dev@gmail.com>"]
 license = "MIT"
 
 [tool.poetry.dependencies]
 python = "3.9.7"
-py-cord = "2.0.1"
+py-cord = "^2.2.0"
 SQLAlchemy = "^1.4.32"
 loguru = "^0.6.0"
 "ruamel.yaml" = "^0.17.21"
@@ -20,10 +20,11 @@ python-dotenv = "^0.20.0"
 plotly = "^5.6.0"
 pandas = "^1.4.1"
 kaleido = "0.2.1"
-line-profiler = "^3.5.1"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 radon = "^5.1.0"
+line-profiler = "^3.5.1"
+pyinstaller = "^5.6.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
