@@ -21,3 +21,4 @@ testbed.py
 .idea
 *.zip
 chatbotprocessors/custom_question_processors.py
+/dist/

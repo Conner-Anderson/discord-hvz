@@ -7,7 +7,7 @@ active_server: dev
 # A dictionary of servers and their ids. 
 available_servers:
   dev: 767126786617114635
-  letu: 760568283723202630
+  live: 760568283723202630
 
 #Is registration enabled?
 registration: true
@@ -27,7 +27,7 @@ google_sheet_export: true
 # The Google Account that the bot is logged into must have edit access to this sheet
 # These sheets will be chosen based on the active_server selected above
 sheet_ids:
-  letu: 1H8dlyi1xj3jCP7-TrMCPGcfuDQ-LAHq1BmyrFORpCA8
+  live: 1H8dlyi1xj3jCP7-TrMCPGcfuDQ-LAHq1BmyrFORpCA8
   dev: 1fLYdmc_sp-Rx25794zmPekp48I02lbctyqiLvaLDIwQ
 
 # The timezone offset from UTC that the bot should record and report times in.
