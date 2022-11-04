@@ -23,6 +23,7 @@ from chatbot import ChatBotManager
 from config import config, ConfigError
 from discord_io import DiscordStream
 from display import DisplayCog
+from item_tracker import ItemTrackerCog
 from hvzdb import HvzDb
 
 

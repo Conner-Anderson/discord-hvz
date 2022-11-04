@@ -16,7 +16,6 @@ sqalchemytest.py
 *.db
 build
 *.exe
-*.spec
 testbed.py
 .idea
 *.zip

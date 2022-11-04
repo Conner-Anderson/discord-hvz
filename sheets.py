@@ -68,7 +68,11 @@ class SheetsInterface:
             with open('token.json', 'w') as token:
                 token.write(creds.to_json())
 
-        service = build('sheets', 'v4', credentials=creds)
+        try:
+            service = build('sheets', 'v4', credentials=creds)
+        except:
+            DISCOVERY_SERVICE_URL = 'https://sheets.googleapis.com/$discovery/rest?version=v4'
+            service = build('sheets', 'v4', credentials=creds, discoveryServiceUrl=DISCOVERY_SERVICE_URL)
 
         # Call the Sheets API and save it for other functions globally
         self.spreadsheets = service.spreadsheets()
