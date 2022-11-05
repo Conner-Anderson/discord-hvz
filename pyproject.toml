@@ -5,8 +5,13 @@ description = "A run-yourself Discord bot to manage Humans vs. Zombies games."
 authors = ["ConnerHAnderson <conneranderson.dev@gmail.com>"]
 license = "MIT"
 
+[tool.poetry.scripts]
+discord_hvz = "discord_hvz:main"
+main = "discord_hvz:main"
+
+
 [tool.poetry.dependencies]
-python = "3.9.7"
+python = ">=3.9.7,<3.11"
 py-cord = "^2.2.0"
 SQLAlchemy = "^1.4.32"
 loguru = "^0.6.0"
@@ -20,6 +25,9 @@ python-dotenv = "^0.20.0"
 plotly = "^5.6.0"
 pandas = "^1.4.1"
 kaleido = "0.2.1"
+
+[tool.poetry.group.dev]
+optional = true
 
 [tool.poetry.group.dev.dependencies]
 radon = "^5.1.0"

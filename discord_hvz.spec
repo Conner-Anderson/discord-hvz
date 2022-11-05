@@ -3,6 +3,11 @@
 
 block_cipher = None
 
+data_files = [
+    ('*.yml', '.'),
+    ('/default_data_files/*', '.')
+]
+
 
 a = Analysis(
     ['discord_hvz.py'],
