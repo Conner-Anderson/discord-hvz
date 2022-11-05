@@ -135,8 +135,8 @@ class AdminCommandsCog(commands.Cog):
 
         members = self.bot.db.get_table('members')
         if not members:
-            await ctx.respond(
-                f'No members found.')
+            await ctx.respond(f'No members found.')
+            return
         # TODO: Reconcile the fact that this function requires an email cell
         message = ''
         for member in members:
