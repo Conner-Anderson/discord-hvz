@@ -434,7 +434,7 @@ hook-testing = ["execnet (>=1.5.0)", "psutil", "pytest (>=2.7.3)"]
 
 [[package]]
 name = "pyinstaller-hooks-contrib"
-version = "2022.11"
+version = "2022.12"
 description = "Community maintained hooks for PyInstaller"
 category = "dev"
 optional = false
@@ -687,8 +687,8 @@ multidict = ">=4.0"
 
 [metadata]
 lock-version = "1.1"
-python-versions = ">=3.9.7,<3.12"
-content-hash = "2e472cf2232b9b57641574207e1a4781146a983fda18fd9f2276f7d3a80bdabb"
+python-versions = ">=3.9.7,<3.11"
+content-hash = "21ca03f7cd267694d0be0db3a03cde5266f3118cb9628fc6fc7571a822fda4cf"
 
 [metadata.files]
 aiohttp = [
@@ -1211,8 +1211,8 @@ pyinstaller = [
     {file = "pyinstaller-5.6.2.tar.gz", hash = "sha256:865025b6809d777bb0f66d8f8ab50cc97dc3dbe0ff09a1ef1f2fd646432714fc"},
 ]
 pyinstaller-hooks-contrib = [
-    {file = "pyinstaller-hooks-contrib-2022.11.tar.gz", hash = "sha256:2e1870350bb9ef2e09c1c1bb30347eb3185c5ef38c040ed04190d6d0b4b5df62"},
-    {file = "pyinstaller_hooks_contrib-2022.11-py2.py3-none-any.whl", hash = "sha256:8db4064d9c127940455ec363bebbf74228be21cdafb44f7ea4f44cf434d9bcaa"},
+    {file = "pyinstaller-hooks-contrib-2022.12.tar.gz", hash = "sha256:2c3b81b78d26149babddb76b94442f6e0edc31e4792a694ac32a2c2e884c0630"},
+    {file = "pyinstaller_hooks_contrib-2022.12-py2.py3-none-any.whl", hash = "sha256:d7b5e2a4008f9d66df5b50e90ce456ce014bcb61857eef87732f45225d6f4e77"},
 ]
 pyparsing = [
     {file = "pyparsing-3.0.9-py3-none-any.whl", hash = "sha256:5026bae9a10eeaefb61dab2f09052b9f4307d44aee4eda64b309723d8d206bbc"},
