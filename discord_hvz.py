@@ -259,20 +259,27 @@ class HVZBot(discord.ext.commands.Bot):
 
         await self.channels['tag-announcements'].send(msg)
 
+def main():
+    try:
+        bot = HVZBot()
 
-try:
-    bot = HVZBot()
+        bot.load_extension('buttons')
+        bot.load_extension('chatbot')
+        bot.load_extension('admin_commands')
+        bot.load_extension('display')
+        bot.load_extension('item_tracker')
 
-    bot.load_extension('buttons')
-    bot.load_extension('chatbot')
-    bot.load_extension('admin_commands')
-    bot.load_extension('display')
-    bot.load_extension('item_tracker')
+        bot.run(token)
 
-    bot.run(token)
+    except ConfigError as e:
+        logger.error(e)
 
-except ConfigError as e:
-    logger.error(e)
+    except Exception as e:
+        if str(e) == 'Event loop is closed':
+            logger.success('Bot shutdown safely. The below error is normal.')
+        else:
+            logger.exception(e)
 
-except Exception as e:
-    logger.exception(e)
+main()
+logger.success('Press Enter to close.')
+input()

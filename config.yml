@@ -19,6 +19,7 @@ tag_logging: true
 silent_oz: false
 
 # Will the database be automatically exported to a Google Sheet? Requires some setup.
+# Turn this off if you're having trouble with Google Sheets
 google_sheet_export: true
 
 # The IDs of the Google Sheets that the bot will send its data to.
