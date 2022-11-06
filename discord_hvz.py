@@ -21,7 +21,6 @@ from admin_commands import AdminCommandsCog
 from buttons import HVZButtonCog
 from chatbot import ChatBotManager
 from config import config, ConfigError
-from discord_io import DiscordStream
 from display import DisplayCog
 from item_tracker import ItemTrackerCog
 from hvzdb import HvzDb
@@ -61,11 +60,6 @@ class InterceptHandler(logging.Handler):
 
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
-
-discord_logger = logging.getLogger('discord')
-discord_logger.propagate = False
-discord_logger.setLevel(logging.WARNING)
-discord_logger.addHandler(InterceptHandler())
 
 
 class StartupError(Exception):
@@ -176,14 +170,6 @@ class HVZBot(discord.ext.commands.Bot):
                     msg += f'These required channels are missing on the server: {missing_channels}\n'
                 if msg:
                     raise StartupError(msg)
-
-                self.discord_handler = logger.add(
-                    DiscordStream(self).write,
-                    level='INFO',
-                    enqueue=True,
-                    format='{level} | {name}:{function}:{line} - {message}'
-                )
-                logger.remove(self.discord_handler)
 
                 log.success(
                     f'Discord-HvZ Bot launched correctly! Logged in as: {self.user.name} ------------------------------------------')
