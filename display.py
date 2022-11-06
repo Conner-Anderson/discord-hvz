@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from hvzdb import HvzDb
     from discord_hvz import HVZBot
 
-guild_id_list = [config['available_servers'][config['active_server']]]
+guild_id_list = [config['server_id']]
 LAST_GAME_PLOT_HASH = None
 
 def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:

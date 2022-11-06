@@ -1,15 +1,21 @@
 # Configuration file for the discord-hvz bot, in YAML format. These settings only apply on program start.
 # YAML Reference: https://camel.readthedocs.io/en/latest/yamlref.html
 
-# The server for the bot to activate on. Only one at a time. Must be in available_servers
-active_server: dev
+# The ID of the Discord server to connect to.
+server_id: 767126786617114635
 
-# A dictionary of servers and their ids. 
-available_servers:
-  dev: 767126786617114635
-  live: 760568283723202630
+# The ID of the Google Sheet that the bot will send its data to.
+# The ID can be found in the URL, like this: https://docs.google.com/spreadsheets/d/1YUXeRoEpV9MukZ7B_xVlBkc-D6DNEfVxLBmJlf1Fm-0/edit#gid=0
+# In the URL above, the ID is 1YUXeRoEpV9MukZ7B_xVlBkc-D6DNEfVxLBmJlf1Fm-0
+# The Google Account that the bot is logged into must have edit access to this sheet
 
-#Is registration enabled?
+sheet_id: 1fLYdmc_sp-Rx25794zmPekp48I02lbctyqiLvaLDIwQ
+
+# The timezone offset from UTC that the bot should record and report times in.
+# -7 is US West Coast, -5 is US Central, -4 is US East Coast, Central Europe is +2
+timezone: -5
+
+# Is registration enabled?
 registration: true
 
 # Is tag logging enabled on the server? Useful for making sure the game doesn't start too early.
@@ -22,18 +28,7 @@ silent_oz: false
 # Turn this off if you're having trouble with Google Sheets
 google_sheet_export: true
 
-# The IDs of the Google Sheets that the bot will send its data to.
-# The ID can be found in the URL, like this: https://docs.google.com/spreadsheets/d/1YUXeRoEpV9MukZ7B_xVlBkc-D6DNEfVxLBmJlf1Fm-0/edit#gid=0
-# It's the long string of characters near the end.
-# The Google Account that the bot is logged into must have edit access to this sheet
-# These sheets will be chosen based on the active_server selected above
-sheet_ids:
-  live: 1H8dlyi1xj3jCP7-TrMCPGcfuDQ-LAHq1BmyrFORpCA8
-  dev: 1fLYdmc_sp-Rx25794zmPekp48I02lbctyqiLvaLDIwQ
-
-# The timezone offset from UTC that the bot should record and report times in.
-# -7 is US West Coast, -5 is US Central, -4 is US East Coast, Central Europe is +2
-timezone: -5
+# The names of the sheets on the Google Sheet to use.
 
 sheet_names:
   members: Members

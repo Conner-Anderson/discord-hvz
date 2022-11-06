@@ -28,7 +28,7 @@ logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 # ID of Google Sheet: can be taken from the sheet address. Google account must have permission
-SPREADSHEET_ID = config['sheet_ids'][config['active_server']]
+SPREADSHEET_ID = config['sheet_id']
 SAMPLE_RANGE_NAME = 'Output!A2:B'
 
 
@@ -117,6 +117,8 @@ class SheetsInterface:
 
         values.insert(0, column_order)
         sheet_name = config['sheet_names'][table_name]
+
+        # TODO: Make the range the Sheet writes to dynamic
 
         # Erases entire sheet below row 1!
         self.spreadsheets.values().clear(spreadsheetId=SPREADSHEET_ID, range=f'\'{sheet_name}\'!A1:L').execute()

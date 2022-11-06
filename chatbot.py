@@ -24,7 +24,7 @@ log = logger
 yaml = YAML(typ='safe')
 
 # Used for creating commands
-guild_id_list = [config['available_servers'][config['active_server']]]
+guild_id_list = [config['server_id']]
 
 
 class ResponseError(ValueError):

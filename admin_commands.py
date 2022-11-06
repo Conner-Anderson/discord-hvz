@@ -27,7 +27,7 @@ def dump(obj):
 
 DISCORD_MESSAGE_MAX_LENGTH = 2000
 
-guild_id_list = [config['available_servers'][config['active_server']]]
+guild_id_list = [config['server_id']]
 
 CONFIG_CHOICES = ['registration', 'tag_logging', 'silent_oz', 'google_sheet_export']
 

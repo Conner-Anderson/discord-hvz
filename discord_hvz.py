@@ -130,7 +130,7 @@ class HVZBot(discord.ext.commands.Bot):
             try:
                 try:
                     for guild in self.guilds:
-                        if guild.id == config['available_servers'][config['active_server']]:
+                        if guild.id == config['server_id']:
                             self.guild = guild
                             break
                 except Exception as e:

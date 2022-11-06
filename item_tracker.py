@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 from config import config
 
 # Used for creating commands
-guild_id_list = [config['available_servers'][config['active_server']]]
+guild_id_list = [config['server_id']]
 
 table_name = 'items'
 
