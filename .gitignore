@@ -2,6 +2,7 @@
 __pycache__
 .env
 venv
+plots
 credentials.json
 token.json
 hvzdb.db
@@ -15,7 +16,8 @@ sqalchemytest.py
 *.db
 build
 *.exe
-*.spec
 testbed.py
 .idea
 *.zip
+chatbotprocessors/custom_question_processors.py
+/dist/

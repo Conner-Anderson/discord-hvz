@@ -3,61 +3,73 @@
 # If you need to use special characters like $ # @ * etc., surround your message in " "
 #See those little |- symbols? Those tell the config file that there's a block of text coming up.
 
+# Each question's 'name' variable must match a database column, or the bot will give an error on startup
+
 registration:
+  table: members
   beginning: I'll register you for HvZ. Type 'cancel' at any time to stop this conversation.
   ending: You are registered for HvZ! Please read the rules. New channels are available to you.
+  starting_processor: registration_start
+  ending_processor: registration_end
+  postable_button_color: green
+  postable_button_label: Register
   questions:
-  - name: Name
+  - column: Name
     display_name: Name
     query: |-
       What is your name? Use the name you would use for the mail center, like John Smith.
     valid_regex: '\D*'
     rejection_response: No numbers allowed in names.
-  - name: CPO
+    processor: name
+  - column: CPO
     display_name: CPO
     query: |-
       What is your CPO? This is used for player band delivery.
       If you don\'t have one (such as commuters), please type "None"
     valid_regex: '(?i)\d*|none'
-    rejection_response: I'm looking for a single number here, or None.
-  - name: Email
+    rejection_response: I'm looking for a single number here, or \'None\'.
+  - column: Email
     display_name: Email
     query: What is your @LETU.edu email?
     valid_regex: '(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)'
     rejection_response: That isn\'t a valid email.
-  - name: OZ_Desire
+  - column: OZ_Desire
     display_name: Original Zombie Desire
-    query: |-
-      Do you want a chance to be one of the original zombies? If chosen, you won\'t be a human this game.
-      Answer "yes" or "no".
-    valid_regex: '(?i)\s*(yes|no)\s*'
+    query: Do you want a chance to be one of the original zombies? If chosen, you won\'t be a human this game.
+    valid_regex: '(?i)(yes|no)'
     rejection_response: Just need a yes or no here.
-  - name: Want_Bandana
+    button_options:
+      'Yes': Green
+      'No': Red
+  - column: Want_Bandana
     display_name: Want Bandana
     query: |-
       Do you want us to give you a green bandana with your tag code on it?
       If no, you will need to write the code we give you on your own green bandana yourself.
-      Answer "yes" or "no".
     valid_regex: '(?i)\s*(yes|no)\s*'
     rejection_response: Just need a yes or no here.
+    button_options:
+      'Yes': Green
+      'No': Red
 
 tag_logging:
+  table: tags
   beginning: Let's log a tag. Type 'cancel' at any time to stop this conversation.
   ending: Tag logged! Make sure your newly-brainless friend feels welcome in the hoard.
+  starting_processor: tag_logging_start
+  ending_processor: tag_logging_end
   questions:
-  - name: Tag_Code
+  - column: tagged_id
     display_name: Tag Code
     query: What is the tag code of the human you tagged?
     valid_regex: '[a-zA-Z\d]{6}'
     rejection_response: 'The tag code is 6 characters of numbers and capital
       letters. None of these: 0 O Q I 1 D V U 5 S 2 Z'
-  - name: Tag_Day
-    display_name: Tag Day
-    query: Did the tag happen "today" or "yesterday"?
-    valid_regex: "(?i)(today)|yesterday"
-    rejection_response: Respond with either "today" or "yesterday"
-  - name: Tag_Time
+    processor: tag_code_to_member_id
+  - column: tag_time
     display_name: Tag Time
-    query: About what time did the tag happen? Use the format 3:04pm
-    valid_regex: '(?i)\d{1,2}:[0-5]?[0-9]\s?(am|pm)'
+    query: About what time did the tag happen? Use the format 3:04pm. If it was yesterday, add "yesterday" to the end.
+    valid_regex: '(?i)\d{1,2}:[0-5]?[0-9]\s?(am|pm)\s?(yesterday)?'
     rejection_response: Please use a format like 12:26pm or 7:00 am
+    processor: tag_time
+

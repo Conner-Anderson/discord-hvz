@@ -1,116 +1,212 @@
+from __future__ import annotations
+
+import copy
+from dataclasses import dataclass, field
+from typing import List, Union, Dict, Tuple, TYPE_CHECKING, ClassVar
+
 import discord
-import os.path
-
-from sqlalchemy import create_engine
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-from sqlalchemy import MetaData
-from sqlalchemy import Table, Column, Integer, String, DateTime, Boolean
-from sqlalchemy import ForeignKey
-from sqlalchemy import insert, select, delete, update
-from sqlalchemy import func, cast
-from sqlalchemy.exc import NoSuchTableError
-from sqlalchemy import and_
-
+import sqlalchemy
 from loguru import logger
+from sqlalchemy import Table, Column, Integer, String, DateTime, Boolean
+from sqlalchemy import create_engine, MetaData
+from sqlalchemy import select, delete, update
+from sqlalchemy.engine import Row
+from sqlalchemy.exc import NoSuchTableError
 
-log = logger
+import sheets
+from config import config
 
+if TYPE_CHECKING:
+    pass
 
+def dump(obj):
+    """Prints the passed object in a very detailed form for debugging"""
+    for attr in dir(obj):
+        try:
+            print("obj.%s = %r" % (attr, getattr(obj, attr)))
+        except Exception:
+            print('TYPE ERROR')
+
+@dataclass
 class HvzDb:
-    def __init__(self):
-        self.metadata_obj = MetaData()
-        self.engine = create_engine("sqlite+pysqlite:///hvzdb.db", future=True)
+    engine: sqlalchemy.engine.Engine = field(init=False)
+    metadata_obj: MetaData = field(init=False, default_factory=MetaData)
+    tables: Dict[str, Table] = field(init=False, default_factory=dict)
+    sheet_interface: sheets.SheetsInterface = field(init=False, default=None)
+    filename: str = 'hvzdb.db'
+    database_config: Dict[str, Dict[str, str]] = field(init=False, default_factory=dict)
 
-        self.tables = {'members': None, 'tags': None}
-        for n in self.tables:
+    # Table names that cannot be created in the config. Reserved for cogs / modules
+    reserved_table_names: ClassVar[List[str]] = ['persistent_panels']
 
+    required_columns: ClassVar[Dict[str, Dict[str, str]]] = {
+        'members': {
+            'id': 'String',
+            'name': 'String',
+            'faction': 'String',
+            'tag_code': 'String',
+            'oz': 'Boolean'
+        },
+        'tags': {
+            'tag_id': 'Integer',
+            'tagger_id': 'String',
+            'tagger_name': 'String'
+        }
+    }
+
+    valid_column_types: ClassVar[Dict[str, type]] = {
+        'string': String,
+        'integer': Integer,
+        'incrementing_integer': Integer,
+        'boolean': Boolean,
+        'datetime': DateTime
+    }
+
+    
+    def __post_init__(self):
+        # TODO: Need to make sure the required tables are always created. Might be config-depended now...
+        self.database_config: Dict[str, Dict[str, str]] = copy.deepcopy(config['database_tables'])
+        self.engine = create_engine(f"sqlite+pysqlite:///{self.filename}", future=True)
+
+        for table_name, column_dict in self.database_config.items():
             try:
-                self.tables[n] = Table(n, self.metadata_obj, autoload_with=self.engine)
-            except NoSuchTableError:
-                if n == 'members':
-                    log.critical('There is no members table, so I\'m making it.')
-                    self.tables[n] = Table(
-                        'members',
-                        self.metadata_obj,
-                        Column('ID', String, primary_key=True, nullable=False),
-                        Column('Name', String),
-                        Column('Nickname', String),
-                        Column('Discord_Name', String),
-                        Column('CPO', String),
-                        Column('Faction', String),
-                        Column('Tag_Code', String),
-                        Column('OZ_Desire', String),
-                        Column('Email', String),
-                        Column('Want_Bandana', String),
-                        Column('Registration_Time', DateTime),
-                        Column('OZ', Boolean)
-                    )
-                elif n == 'tags':
-                    log.critical('There is no tags table, so I\'m making it.')
-                    self.tables[n] = Table(
-                        'tags',
-                        self.metadata_obj,
-                        Column('Tag_ID', Integer, primary_key=True, nullable=False, autoincrement=True),
-                        Column('Tagger_ID', String),
-                        Column('Tagger_Name', String),
-                        Column('Tagger_Nickname', String),
-                        Column('Tagger_Discord_Name', String),
-                        Column('Tagged_ID', String),
-                        Column('Tagged_Name', String),
-                        Column('Tagged_Nickname', String),
-                        Column('Tagged_Discord_Name', String),
-                        Column('Tag_Time', DateTime),
-                        Column('Report_Time', DateTime),
-                        Column('Revoked_Tag', Boolean)
-                    )
+                self.tables[table_name] = Table(table_name, self.metadata_obj, autoload_with=self.engine)
+                continue
+            except NoSuchTableError: pass
+            logger.warning(f'Found a table called "{table_name}" in the config, but not in the database. Creating the table.')
+
+
+            column_args = []
+            # Add any required columns that are missing
+
+
+            # Create Columns from the config
+            for column_name, type_string in column_dict.items():
+                column_args.append(self._create_column_object(column_name, type_string))
+
+            if table_name in self.required_columns:
+                required_columns_table = self.required_columns[table_name]
+                for column_name, type_string in required_columns_table.items():
+                    if column_name in column_dict:
+                        continue
+                    column_args.append(self._create_column_object(column_name, type_string))
+                    logger.warning(f'The required column "{column_name}" was not found in the config for the table "{table_name}". Creating it.')
+
+            self.tables[table_name] = Table(table_name.casefold(), self.metadata_obj, *column_args)
 
         self.metadata_obj.create_all(self.engine)
 
-        # self.tag_logging_table = Table('tag_logging', self.metadata_obj, autoload_with=self.engine)
+        if config['google_sheet_export'] == True:
+            self.sheet_interface = sheets.SheetsInterface(self)
 
-        # Give each table a keys tuple which is all column names
-        for n, t in self.tables.items():
-            selection = select(t)
-            with self.engine.begin() as conn:
-                result = conn.execute(selection)
-                t.keys = result.keys()
-
-    def add_member(self, member_row):
+    def prepare_table(self, table_name: str, columns: Dict[str, Union[str, type]]) -> None:
         """
-        Adds a member to the database
-
-        Parameters:
-                member_row (dict): A dict with pairs of column_name:value. Example:
-                                    {'Name': 'George Soros', 'CPO': 9001, ...}
-
-        Returns:
-                result (result object?): This needs work.
+        Creates a new table in the database if there is none, and loads the table from the database if it exists already.
         """
-        result = self.__add_row(self.tables['members'], member_row)
-        return result
+        try:
+            self.tables[table_name] = Table(table_name, self.metadata_obj, autoload_with=self.engine)
+        except NoSuchTableError:
+            logger.warning(
+                f'Creating table "{table_name}" since it was not found in the database.')
 
-    def add_tag(self, tag_row):
-        '''
-        Adds a tag to the database
+            column_args = []
+            # Create Columns from the config
+            for column_name, column_type in columns.items():
+                column_args.append(self._create_column_object(column_name, column_type))
 
-        Parameters:
-                tag_row (dict): A dict with pairs of column_name:value. Example:
-                                    {'Tag_ID': 'George Soros', 'CPO': 9001, ...}
+            self.tables[table_name] = Table(table_name.casefold(), self.metadata_obj, *column_args)
 
-        Returns:
-                result (result object?): This needs work.
-        '''
-        result = self.__add_row(self.tables['tags'], tag_row)
-        return result
+        self.metadata_obj.create_all(self.engine)
+        self.tables[table_name].column_names = columns.keys()
 
-    def __add_row(self, table, row):
+    def delete_table(self, table_name: str):
+        self.tables[table_name].drop(bind=self.engine)
+        logger.warning(f'Deleted tabled named {table_name}')
 
-        with self.engine.begin() as conn:
-            result = conn.execute(insert(table), row)
+    def _validate_table_selection(self, table: str | Table) -> Table:
+        if isinstance(table, str):
+            try:
+                return self.tables[table]
+            except KeyError:
+                raise KeyError(f'{table} is not a table.') from None
+        elif isinstance(table, Table):
+            return table
+        else:
+            raise KeyError(f'{table} is not recognized as a table.')
+
+    def _validate_column_selection(self, table: Table, *args: str) -> Column | List[Column]:
+        if len(args) == 0:
+            raise ValueError('Must supply a column name to validate.')
+        result: List[Column] = []
+        for column in args:
+            try:
+                result.append(table.c[column])
+            except KeyError:
+                raise ValueError(f'{column} not a column in {table.name}')
+
+        if len(result) == 1:
+            return result[0]
+        else:
             return result
 
-    def get_member(self, value, column=None):
+    def _table_updated(self, table: Union[Table, str]) -> None:
+        """
+        To be called whenever a function changes a table. This lets the Google Sheet update.
+        :param table:
+        :return:
+        """
+        try:
+            if isinstance(table, Table): table_name = table.name
+            else: table_name = table
+            if table_name in self.database_config: # Only send to Sheets if the table is in config.yml
+                self.sheet_interface.update_table(table_name)
+        except Exception as e:
+            # Allow sheet failure to silently pass for the user.
+            logger.exception(f'The database failed to update to the Google Sheet with this error: {e}')
+
+
+    def _create_column_object(self, column_name: str, column_type: Union[str, type]) -> Column:
+        """
+        Returns a Column object after forcing the name to lowercase and validating the type
+        :param column_name:
+        :param column_type: A string matching a valid column type
+        :return: Column object
+        """
+        if not isinstance(column_type, str):
+            if column_type in self.valid_column_types.items():
+                column_type_object = column_type
+            else:
+                raise TypeError(f'column_type is an invalid type: {type(column_type)}')
+        else:
+            try:
+                column_type_object = self.valid_column_types[column_type.casefold()]
+            except KeyError:
+                column_type_object = String
+
+        kwargs = {}
+        if column_type == 'incrementing_integer':
+            kwargs = {'primary_key': True, 'nullable':False, 'autoincrement':True}
+
+        return Column(column_name.casefold(), column_type_object, **kwargs)
+
+    def __add_row(self, table, row):
+        # Old function acting as an alias
+        return self.add_row(table, row)
+
+    def add_row(self, table_selection:str, input_row: Dict) -> sqlalchemy.engine.CursorResult:
+        table = self.tables[table_selection.casefold()]
+
+        row = {}
+        # Convert all column names to lowercase
+        for k, i in input_row.items():
+            row[k.casefold()] = i
+
+        with self.engine.begin() as conn:
+            result = conn.execute(table.insert().values(row))
+            self._table_updated(table)
+            return result
+
+    def get_member(self, value: discord.abc.User | int, column: str = None) -> Row:
         """
         Returns a Row object that represents a single member in the database
 
@@ -122,9 +218,9 @@ class HvzDb:
         """
         if column is not None:
             search_value = value
-            search_column = column
+            search_column = column.casefold()
         else:
-            search_column = 'ID'
+            search_column = 'id'
             if isinstance(value, discord.abc.User):
                 search_value = value.id
             else:
@@ -146,16 +242,14 @@ class HvzDb:
         table = self.tables['tags']
         if column is not None:
             search_column = column
-            if search_column not in table.keys:
-                raise ValueError(f'{search_column} not a column in {table}')
         else:
-            search_column = 'Tag_ID'
+            search_column = 'tag_id'
 
         if filter_revoked is False:
             tag_row = self.__get_row(table, table.c[search_column], value)
         else:
             tag_row = self.__get_row(table, table.c[search_column], value,
-                                     exclusion_column=table.c['Revoked_Tag'], exclusion_value=True)
+                                     exclusion_column=table.c['revoked_tag'], exclusion_value=True)
         return tag_row
 
     def __get_row(self, table, search_column, search_value, exclusion_column=None, exclusion_value=None):
@@ -184,126 +278,51 @@ class HvzDb:
             raise ValueError(f'Could not find a row where \"{search_column}\" is \"{search_value}\"')
         return result_row
 
-    def get_table(self, table):
-        """
-        Returns a list of all members in the database
-
-        Parameters:
-                table (str): The name of the table to fetch. Lower case
-
-        Returns:
-                result (list[Row]): List of Rows. Rows are like tuples, but with dictionary
-                                                keys. Like this: row['Name'] or row.Name
-        """
-        selection = select(self.tables[table])
+    def get_table(self, table) -> List[Row]:
+        _table = self._validate_table_selection(table)
+        selection = select(_table)
         with self.engine.begin() as conn:
             result = conn.execute(selection).all()
             return result
 
-    # Legacy method left in here for reference
-    def get_column(self, table: str, column: str):
-        # Returns the first column that matches. The column is a list.
-        sql = f'SELECT {column} FROM {table}'
-        cur = self.conn.cursor()
-
-        output = cur.execute(sql).fetchall()
-
-        return output
-
-    def edit_member(self, member, column, value):
-        """
-        Edits an attribute of a member in the database
-
-        Parameters:
-                member (int or user): A user id or a discord.abc.User object
-                column (str): A string matching the column to change. Case sensitive.
-                value (any?): Value to change the cell to.
-
-        Returns:
-                result (bool): True if the edit was successful, False if it was not.
-        """
-        member_id = member
-        if isinstance(member, discord.abc.User):
-            member_id = member.id
-        result = self.__edit_row(
-            self.tables['members'],
-            self.tables['members'].c.ID,
-            member_id,
-            column,
-            value
-        )
-        return result
-
-    def edit_tag(self, tag_id, column, value):
-        """
-        Edits an attribute of a tag in the database
-
-        Parameters:
-                tag_id (int or user): A tag ID
-                column (str): A string matching the column to change. Case sensitive.
-                value (any?): Value to change the cell to.
-
-        Returns:
-                result (bool): True if the edit was successful, False if it was not.
-        """
-
-        result = self.__edit_row(
-            self.tables['tags'],
-            self.tables['tags'].c.Tag_ID,
-            tag_id,
-            column,
-            value
-        )
-        return result
-
-    def __edit_row(self, table, search_column, search_value, target_column, target_value):
+    def edit_row(self, table: Table | str, search_column: str, search_value, target_column: str, target_value):
+        _table = self._validate_table_selection(table)
+        _search_column, _target_column = self._validate_column_selection(_table, search_column, target_column)
         updator = (
-            update(table).where(search_column == search_value).
-                values({target_column: target_value})
+            update(_table).where(_search_column == search_value).
+                values({_target_column: target_value})
         )
-
-        if target_column not in table.keys:
-            raise ValueError(f'{search_column} not a column in {table}')
 
         with self.engine.begin() as conn:
             result = conn.execute(updator)
         if result.rowcount > 0:
+            self._table_updated(_table)
             return True
         else:
             raise ValueError(f'\"{search_value}\" not found in \"{search_column}\" column.')
 
-    def delete_member(self, member):
-        member_id = member
-        if isinstance(member, discord.abc.User):
-            member_id = member.id
+    def delete_row(self, table: Union[Table, str], search_column: str, search_value):
+        _table = self._validate_table_selection(table)
+        _search_column = self._validate_column_selection(_table, search_column)
 
-        self.__delete_row(
-            self.tables['members'],
-            self.tables['members'].c.ID,
-            member_id
-        )
-        return
-
-    def delete_tag(self, tag_id):
-        table = self.tables['tags']
-        self.__delete_row(
-            table,
-            table.c.Tag_ID,
-            tag_id
-        )
-        return
-
-    def __delete_row(self, table, search_column, search_value):
-
-        if search_column not in table.keys:
-            raise ValueError(f'{search_column} not a column in {table}')
-
-        deletor = delete(table).where(search_column == search_value)
+        deletor = delete(_table).where(_search_column == search_value)
         with self.engine.begin() as conn:
-            conn.execute(deletor)
-            return True
+            result = conn.execute(deletor)
+        if result.rowcount < 1:
+            raise ValueError(f'Could not find rows where \"{search_column}\" is \"{search_value}\"')
+        self._table_updated(table)
+        return True
 
-    def get_rows(self, table, search_column, search_value, exclusion_column=None, exclusion_value=None):
+    def get_rows(
+            self,
+            table: str,
+            search_column_name: str,
+            search_value=None,
+            lower_value=None,
+            upper_value=None,
+            exclusion_column_name: str =None,
+            exclusion_value=None
+    ) -> List[Row]:
         """
         Returns a list of Row objects where the specified value matches.
         Meant to be used within the class.
@@ -312,27 +331,41 @@ class HvzDb:
                 table (sqlalchemy.table): Table object
                 column (sqlalchemy.column): Column object to search for value
                 value (any): Value to search column for
-                exclusion_column (sqlalchemy.column) Optional. Reject rows where this column equals exclusion_value
-                exclusion_value (any) Optional. Required if exclusion_column is provided.
+                exclusion_column_name (sqlalchemy.column) Optional. Reject rows where this column equals exclusion_value
+                exclusion_value (any) Optional. Required if exclusion_column_name is provided.
 
         Returns:
                 result_rows: List of Row objects. Access rows in these ways: row.some_row, row['some_row']
         """
-        the_table = self.tables[table]
-        selection = select(the_table).where(the_table.c[search_column] == search_value)
-        if exclusion_column is not None:
-            if exclusion_value is None:
+        _table = self._validate_table_selection(table)
+        selection = select(_table)
+        _search_column = self._validate_column_selection(_table, search_column_name)
+
+        if search_value:
+            selection = selection.where(_search_column == search_value)
+        elif lower_value and upper_value:
+            selection = selection.where(_search_column > lower_value).where(_search_column < upper_value)
+        else:
+            raise ValueError('If search_value is not provided, both lower_value and upper_value must be.')
+
+        if exclusion_column_name:
+            _exclusion_column = self._validate_column_selection(_table, exclusion_column_name)
+            if not exclusion_value:
                 raise ValueError('No exclusion value provided.')
-            selection = selection.where(the_table.c[exclusion_column] != exclusion_value)
+            selection = selection.where(_exclusion_column != exclusion_value)
+
         with self.engine.begin() as conn:
-            result_rows = conn.execute(selection).all()
+            result_rows: List[Row] = conn.execute(selection).all()
+
         if len(result_rows) == 0:
-            raise ValueError(f'Could not find rows where \"{search_column}\" is \"{search_value}\"')
+            if lower_value:
+                raise ValueError(f'Could not find rows where "{search_column_name}" is between "{lower_value}" and "{upper_value}"')
+            else:
+                raise ValueError(f'Could not find rows where \"{search_column_name}\" is \"{search_value}\"')
+
         return result_rows
 
 
 # Below is just for testing when this file is run from the command line
 if __name__ == '__main__':
-    db = HvzDb()
-    result = db.get_rows('members', 'OZ', True)
-    print(result)
+    pass
