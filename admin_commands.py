@@ -383,6 +383,8 @@ class AdminCommandsCog(commands.Cog):
         bot = self.bot
         await ctx.response.defer()
         tree = util.generate_tag_tree(bot.db, bot)
+        if tree == '':
+            tree = 'There are no tags yet! Try again when there are.'
         tree = '**THE ZOMBIE FAMILY TREE\n**' + tree
 
         await utilities.respond_paginated(ctx, tree)
