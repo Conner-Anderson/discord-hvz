@@ -410,6 +410,7 @@ class AdminCommandsCog(commands.Cog):
                     await ctx.respond(
                         'These chatbots are being destroyed: \n' + '\n'.join(chatbot_list)
                     )
+
                 else:
                     await ctx.respond(
                         'The bot did not shut down due to the following active chatbots. Use the "force" option to override. \n' + '\n'.join(chatbot_list)

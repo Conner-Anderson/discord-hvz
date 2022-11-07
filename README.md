@@ -29,8 +29,6 @@ Read the release information for details on how to update.
  - Wrote an extensive documentation site
  - Updated and improved many things under the hood
 
-### Important: I offer personal support for anyone who wants to use this bot for HvZ. Email at the end of this document.
-
 
 
 ## Helping with Development

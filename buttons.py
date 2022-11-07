@@ -6,6 +6,7 @@ from typing import List, Optional
 
 import discord
 from discord.commands import Option
+from discord.commands import permissions
 # from discord.commands import slash_command
 from discord.ext import commands
 from loguru import logger
@@ -156,6 +157,31 @@ class HVZButtonCog(commands.Cog):
         self.bot = bot
         self.postable_buttons = []
         self.readied = False
+        button_options = []
+        for option in config['buttons']:
+            button_options.append(option)
+
+        # make sure to set the guild ID here to whatever server you want the buttons in
+        @bot.command(guild_ids=guild_id_list)
+        @permissions.has_role('Admin')
+        async def post(
+                ctx,
+                function_name: Option(str, 'Which button to post.', choices=button_options, name='function',
+                                      required=True),
+                message: Option(str, 'Message to replace the default.', required=False, default=None)
+        ):
+            """Post a message with a button: registration or tag log. Can change message."""
+
+            # timeout is None because we want this view to be persistent
+            view = discord.ui.View(timeout=None)
+            function = getattr(self.bot, function_name)
+            view.add_item(HVZButton(function))
+
+            if message is None:
+                message = config['buttons'][function_name]['message']
+
+            await ctx.channel.send(message, view=view)
+            await ctx.respond('Posted message with button.', ephemeral=True)
 
     @commands.Cog.listener()
     async def on_ready(self):
