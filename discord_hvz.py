@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import functools
+import asyncio
 import logging
 import sys
 import time
@@ -250,6 +251,8 @@ class HVZBot(discord.ext.commands.Bot):
 
 def main():
     logger.info(f'Launching Discord-HvZ version {VERSION}  ...')
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     try:
         bot = HVZBot()
 
@@ -264,12 +267,18 @@ def main():
     except ConfigError as e:
         logger.error(e)
 
+    except KeyboardInterrupt:
+        logger.info('Keyboard Interrupt!')
+
     except Exception as e:
         if str(e) == 'Event loop is closed':
             logger.success('Bot shutdown safely. The below error is normal.')
         else:
             logger.exception(e)
 
-main()
-logger.success('Press Enter to close.')
-input()
+    logger.success('The bot has shut down. Press Enter to close.')
+    input()
+    #logger.info('The below error is normal.')
+
+if __name__ == "__main__":
+    main()
