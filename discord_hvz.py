@@ -25,6 +25,9 @@ from display import DisplayCog
 from item_tracker import ItemTrackerCog
 from hvzdb import HvzDb
 
+# The latest Discord HvZ release this code is, or is based on.
+VERSION = "0.2.0"
+
 
 def dump(obj):
     """Prints the passed object in a very detailed form for debugging"""
@@ -246,6 +249,7 @@ class HVZBot(discord.ext.commands.Bot):
         await self.channels['tag-announcements'].send(msg)
 
 def main():
+    logger.info(f'Launching Discord-HvZ version {VERSION}  ...')
     try:
         bot = HVZBot()
 
