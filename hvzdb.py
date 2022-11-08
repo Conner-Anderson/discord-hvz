@@ -193,6 +193,14 @@ class HvzDb:
         # Old function acting as an alias
         return self.add_row(table, row)
 
+    def get_column_names(self, table: str) -> List[str]:
+        # Returns a list of column names in a table
+        _table = self._validate_table_selection(table)
+        output = []
+        for c in _table.c:
+            output.append(c.name)
+        return output
+
     def add_row(self, table_selection:str, input_row: Dict) -> sqlalchemy.engine.CursorResult:
         table = self.tables[table_selection.casefold()]
 
