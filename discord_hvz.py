@@ -276,7 +276,7 @@ def main():
         else:
             logger.exception(e)
 
-    logger.success('The bot has shut down. Press Enter to close.')
+    logger.success('The bot has shut down. Press any key to close.')
     input()
     #logger.info('The below error is normal.')
 

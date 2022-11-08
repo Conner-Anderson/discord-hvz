@@ -121,7 +121,7 @@ class HvzDb:
 
     def delete_table(self, table_name: str):
         self.tables[table_name].drop(bind=self.engine)
-        logger.warning(f'Deleted tabled named {table_name}')
+        logger.warning(f'Deleted table named {table_name}')
 
     def _validate_table_selection(self, table: str | Table) -> Table:
         if isinstance(table, str):
