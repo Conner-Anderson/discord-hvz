@@ -25,6 +25,7 @@ from config import config, ConfigError
 from display import DisplayCog
 from item_tracker import ItemTrackerCog
 from hvzdb import HvzDb
+import setup_checker
 
 # The latest Discord HvZ release this code is, or is based on.
 VERSION = "0.2.0"
@@ -37,7 +38,7 @@ def dump(obj):
 
 
 load_dotenv()  # Load the Discord token from the .env file
-token = getenv("TOKEN")
+TOKEN = getenv("TOKEN")
 
 log = logger
 logger.remove()
@@ -126,13 +127,13 @@ class HVZBot(discord.ext.commands.Bot):
         @self.listen()  # Always using listen() because it allows multiple events to respond to one thing
         async def on_ready():
             try:
-                try:
-                    for guild in self.guilds:
-                        if guild.id == config['server_id']:
-                            self.guild = guild
-                            break
-                except Exception as e:
-                    raise Exception(f'Cannot find a valid server. Check config.yml. Error --> {e}')
+
+                for guild in self.guilds:
+                    if guild.id == config['server_id']:
+                        self.guild = guild
+                        break
+                else:
+                    raise ConfigError(f'Cannot find a valid server. Check server_id in config.yml.')
 
                 # Updates the cache with all members and channels and roles
                 await self.guild.fetch_members(limit=500).flatten()
@@ -250,10 +251,19 @@ class HVZBot(discord.ext.commands.Bot):
         await self.channels['tag-announcements'].send(msg)
 
 def main():
-    logger.info(f'Launching Discord-HvZ version {VERSION}  ...')
-    if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     try:
+        logger.info(f'Launching Discord-HvZ version {VERSION}  ...')
+        if sys.platform == 'win32':
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        if not TOKEN:
+            logger.error("You need your Discord bot token to be in a file called '.env' "
+                         "Find this on your Application's general information page on your Discord Developer Console. "
+                         "The entire file should contain only this: TOKEN='replace_me_with_your_token'")
+            return
+        if not config.check_setup_prelaunch():
+            logger.error('The bot did not launch due to the above Errors.')
+            return
+
         bot = HVZBot()
 
         bot.load_extension('buttons')
@@ -262,23 +272,22 @@ def main():
         bot.load_extension('display')
         bot.load_extension('item_tracker')
 
-        bot.run(token)
+        bot.run(TOKEN)
 
-    except ConfigError as e:
-        logger.error(e)
-
+    except discord.errors.LoginFailure as e:
+        logger.error(f'Discord failed to log in: {e}')
     except KeyboardInterrupt:
         logger.info('Keyboard Interrupt!')
-
+    except ConfigError as e:
+        logger.error(e)
     except Exception as e:
-        if str(e) == 'Event loop is closed':
-            logger.success('Bot shutdown safely. The below error is normal.')
-        else:
-            logger.exception(e)
-
-    logger.success('The bot has shut down. Press any key to close.')
-    input()
-    #logger.info('The below error is normal.')
+        logger.exception(e)
+    else:
+        logger.success('The bot has shut down normally.')
+    finally:
+        logger.info('Press Enter to close.')
+        input()
 
 if __name__ == "__main__":
     main()
+
