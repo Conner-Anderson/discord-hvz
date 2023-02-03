@@ -25,7 +25,7 @@ from config import config, ConfigError
 from display import DisplayCog
 from item_tracker import ItemTrackerCog
 from hvzdb import HvzDb
-import setup_checker
+#import setup_checker
 
 # The latest Discord HvZ release this code is, or is based on.
 VERSION = "0.2.0"
@@ -133,7 +133,7 @@ class HVZBot(discord.ext.commands.Bot):
                         self.guild = guild
                         break
                 else:
-                    raise ConfigError(f'Cannot find a valid server. Check server_id in config.yml.')
+                    raise ConfigError(f'This bot is not on any server matching the "server_id" set in config.yml. Either the ID is set wrong, or the bot account has not joined the server.')
 
                 # Updates the cache with all members and channels and roles
                 await self.guild.fetch_members(limit=500).flatten()
@@ -183,9 +183,11 @@ class HVZBot(discord.ext.commands.Bot):
                 await self.close()
                 time.sleep(1)
             except Exception as e:
-                log.exception(f'Bot startup failed with this error: \n{e}')
+                log.error('Bot startup failed.')
+                log.exception(e)
                 await self.close()
                 time.sleep(1)
+
 
         @self.listen()
         async def on_application_command_error(ctx, error):
