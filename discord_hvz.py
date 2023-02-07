@@ -150,39 +150,41 @@ class HVZBot(discord.ext.commands.Bot):
                 await self.guild.fetch_channels()
                 await self.guild.fetch_roles()
 
-                needed_roles = ['zombie', 'human', 'player']
-                missing_roles = []
-                for needed_role in needed_roles:
+                needed_roles_names = ['zombie', 'human', 'player']
+                missing_role_names = []
+                for needed_role_name in needed_roles_names:
                     try:
-                        role_name = config['role_names'][needed_role]
+                        role_name = config['role_names'][needed_role_name]
                     except KeyError:
-                        role_name = needed_role
-                    for found_role in self.guild.roles:
-                        if found_role.name.lower() == role_name:
-                            self.roles[needed_role] = found_role
-                            break
-                    else:
-                        missing_roles.append(needed_role)
+                        # If there is no role name assigned in the config, use a default
+                        role_name = needed_role_name
 
-                needed_channels = ['tag-announcements', 'report-tags', 'zombie-chat']
-                missing_channels = []
-                for needed_channel in needed_channels:
-                    try:
-                        channel_name = config['channel_names'][needed_channel]
-                    except KeyError:
-                        channel_name = needed_channel
-                    for found_channel in self.guild.channels:
-                        if found_channel.name.lower() == channel_name:
-                            self.channels[needed_channel] = found_channel
-                            break
+                    found_role = discord.utils.find(lambda c: c.name.lower() == role_name, self.guild.roles)
+                    if found_role is None:
+                        missing_role_names.append(needed_role_name)
                     else:
-                        missing_channels.append(needed_channel)
+                        self.roles[needed_role_name] = found_role
+
+                needed_channel_names = ['tag-announcements', 'report-tags', 'zombie-chat']
+                missing_channel_names = []
+                for needed_channel_name in needed_channel_names:
+                    try:
+                        channel_name = config['channel_names'][needed_channel_name]
+                    except KeyError:
+                        # If there is no channel name assigned in the config, use a default
+                        channel_name = needed_channel_name
+
+                    found_channel = discord.utils.find(lambda c: c.name.lower() == channel_name, self.guild.channels)
+                    if found_channel is None:
+                        missing_channel_names.append(needed_channel_name)
+                    else:
+                        self.channels[needed_channel_name] = found_channel
 
                 msg = ''
-                if missing_roles:
-                    msg += f'These required roles are missing on the server: {missing_roles}\n'
-                if missing_channels:
-                    msg += f'These required channels are missing on the server: {missing_channels}\n'
+                if missing_role_names:
+                    msg += f'These required roles are missing on the server: {missing_role_names}\n'
+                if missing_channel_names:
+                    msg += f'These required channels are missing on the server: {missing_channel_names}\n'
                 if msg:
                     raise StartupError(msg)
 
@@ -286,7 +288,7 @@ def main():
                          "The entire file should contain only this: TOKEN='replace_me_with_your_token'")
             return
         if not config.check_setup_prelaunch():
-            logger.error('The bot did not launch due to the above Errors.')
+            logger.error('The bot did not launch due to the above Errors found in configuration.')
             return
 
         bot = HVZBot()

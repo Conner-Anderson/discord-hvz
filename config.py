@@ -76,14 +76,6 @@ class HVZConfig:
 
 config = HVZConfig('config.yml')
 
-
-class ConfigError(Exception):
-    def __init__(self, message=None):
-        if message is not None:
-            super().__init__(message)
-
-
-
 @dataclass
 class ConfigChecker:
     # An object that will resolve into the config setting
