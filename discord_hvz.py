@@ -206,6 +206,12 @@ class HVZBot(discord.ext.commands.Bot):
                 await self.close()
                 time.sleep(1)
 
+        @self.event
+        async def on_error(event: str, *args, **kwargs):
+            # exception = sys.exc_info()[1]
+            logger.info(f'Args: {args}, kwargs: {kwargs}')
+            logger.exception(f'The event "{event}" had an exception, which is being ignored. \n These are the arguments passed to the event: \n Positional Arguments: {args} \n Keyword Arguments: {kwargs}')
+
         @self.listen()
         async def on_application_command_error(ctx, error):
             error = getattr(error, 'original', error)
