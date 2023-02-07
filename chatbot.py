@@ -376,7 +376,7 @@ class ChatBot:
         self.bot.db.add_row(self.script.table, response_map_processed)
 
 
-class ChatBotManager(commands.Cog):
+class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
     bot: HVZBot
     active_chatbots: Dict[int, ChatBot] = {}  # Maps member ids to ChatBots
     loaded_scripts: Dict[str, ScriptData] = {}
