@@ -70,17 +70,21 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
                 msg += 'Both member and ID supplied. Ignoring ID.\n'
 
         elif id:
+            try:
+                int(id)
+            except ValueError:
+                await ctx.respond(f'"{id}" is not a number. Example of a Discord member ID: 293465952895631360')
+                return
             member_id = id
-            member: discord.Member = bot.get_member(id)
         else:
             await ctx.respond('No member or ID provided: nothing deleted.')
             return
         try:
-            member_row = bot.db.get_member(member)
+            member_row = bot.db.get_member(member_id)
         except ValueError:
-            await ctx.respond('That member is not in the database, and so there is nothing to delete.')
+            await ctx.respond('That member is not in the database as a player, and so there is nothing to delete.')
             return
-        bot.db.delete_row('members', 'id', member_id)
+        bot.db.delete_row('members', 'id', str(member_id))
 
         if member:
             await member.remove_roles(bot.roles['human'])
@@ -88,7 +92,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             await member.remove_roles(bot.roles['player'])
             msg += f'<@{member_id}> deleted from the game. Roles revoked, expunged from the database.'
         else:
-            msg += f'{member_row.id} deleted from the game and expunged from the database.'
+            msg += f'{member_row.name} deleted from the game and expunged from the database.'
 
         msg += ' Any tags will still exist.'
 
