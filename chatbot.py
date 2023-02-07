@@ -15,7 +15,7 @@ from ruamel.yaml import YAML
 if TYPE_CHECKING:
     from discord_hvz import HVZBot
 
-from config import config, ConfigError
+from config import config, ConfigError, ConfigChecker
 from buttons import HVZButton
 
 import chatbotprocessors
@@ -120,12 +120,13 @@ class ScriptData:
     starting_processor: callable = None
     ending_processor: callable = None
     _postable_button: HVZButton = None
+    config_checker: ConfigChecker = None
 
     def __str__(self) -> str:
         return f'[Type: {self.kind}, Table: {self.table} ]'
 
     @classmethod
-    def build(cls, kind: str, script: Dict, chatbotmanager: ChatBotManager) -> ScriptData:
+    def build(cls, kind: str, script: Dict, chatbotmanager: ChatBotManager, config_checker: ConfigChecker = None) -> ScriptData:
         if script.get('questions') is None:
             raise ConfigError
         questions = []
@@ -185,7 +186,7 @@ class ScriptData:
             postable_bot=chatbotmanager.bot)
 
         try:
-            return ScriptData(kind=kind, questions=questions, _postable_button=postable_button, **script)
+            return ScriptData(kind=kind, questions=questions, _postable_button=postable_button, config_checker=config_checker, **script)
         except TypeError as e:
             e_text = repr(e)
             if 'missing' in e_text:
@@ -388,7 +389,15 @@ class ChatBotManager(commands.Cog):
         file.close()
 
         for kind, script in scripts_data.items():
-            self.loaded_scripts[kind] = (ScriptData.build(kind, script, chatbotmanager=self))
+
+            #TODO: Move this HvZ specific stuff out of scope
+            config_checker = None
+            if kind == 'registration':
+                config_checker = ConfigChecker('registration')
+            elif kind == 'tag_logging':
+                config_checker = ConfigChecker('tag_logging')
+
+            self.loaded_scripts[kind] = (ScriptData.build(kind, script, chatbotmanager=self, config_checker=config_checker))
 
         log.debug('ChatBotManager Initialized')
 
@@ -396,12 +405,18 @@ class ChatBotManager(commands.Cog):
             self,
             chatbot_kind: str,
             chat_member: discord.Member,
-            target_member: discord.Member = None
+            target_member: discord.Member = None,
+            override_config: bool = False
     ) -> None:
+
+        script = self.loaded_scripts[chatbot_kind]
+        if not script.config_checker.get_state():
+            raise ConfigError
+
         existing = self.active_chatbots.get(chat_member.id)
 
         new_chatbot = ChatBot(
-            self.loaded_scripts[chatbot_kind],
+            script,
             self.bot,
             chat_member,
             target_member
@@ -420,6 +435,8 @@ class ChatBotManager(commands.Cog):
             await self.start_chatbot(interaction.custom_id, interaction.user)
         except ValueError as e:
             msg = e
+        except ConfigError:
+            msg = f'The {interaction.custom_id} chatbot is not enabled on the server right now.'
         except discord.Forbidden:
             msg = 'Please check your settings for the server and turn on "Allow Direct Messages."'
         except Exception as e:
