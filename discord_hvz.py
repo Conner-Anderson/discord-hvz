@@ -8,7 +8,7 @@ import sys
 import time
 from datetime import datetime
 from os import getenv
-from typing import Dict, Union
+from typing import Dict, Union, Any, Type
 
 import discord
 import loguru
@@ -21,7 +21,7 @@ from sqlalchemy.exc import NoSuchColumnError
 from admin_commands import AdminCommandsCog
 from buttons import HVZButtonCog
 from chatbot import ChatBotManager
-from config import config, ConfigError
+from config import config, ConfigError, ConfigChecker
 from display import DisplayCog
 from item_tracker import ItemTrackerCog
 from hvzdb import HvzDb
@@ -78,6 +78,7 @@ class HVZBot(discord.ext.commands.Bot):
     roles: Dict[str, discord.Role]
     channels: Dict[str, discord.TextChannel]
     discord_handler: loguru.Logger
+    _cog_startup_data: Dict[str, Dict[str, Any]]
 
     def check_event(self, func):
         """
@@ -118,6 +119,16 @@ class HVZBot(discord.ext.commands.Bot):
             description='Discord HvZ bot!',
             intents=intents
         )
+
+        # cog_startup_data holds data that can be fetched by cogs during startup
+        self._cog_startup_data = {
+            'ChatBotManager': {
+                'config_checkers': {
+                    'registration': ConfigChecker('registration'),
+                    'tag_logging': ConfigChecker('tag_logging')
+                }
+            }
+        }
 
         @self.listen()
         async def on_connect():
@@ -248,6 +259,18 @@ class HVZBot(discord.ext.commands.Bot):
         msg += f'\nThere are now {new_human_count} humans and {new_zombie_count} zombies.'
 
         await self.channels['tag-announcements'].send(msg)
+
+    def get_cog_startup_data(self, cog: commands.Cog | Type[commands.Cog]) -> Dict:
+        # Fetches the startup_data dictionary from the bot when given a cog
+        try:
+            return self._cog_startup_data[cog.__class__.__name__]
+        except KeyError:
+            pass
+        try:
+            return self._cog_startup_data[cog.__name__]
+        except KeyError:
+            logger.warning(f'get_startup_data() called in an HVZBot, but no startup data found for this cog: {cog}')
+            return {}
 
 def main():
     logger.info(f'Launching Discord-HvZ version {VERSION}  ...')

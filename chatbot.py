@@ -381,8 +381,9 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
     active_chatbots: Dict[int, ChatBot] = {}  # Maps member ids to ChatBots
     loaded_scripts: Dict[str, ScriptData] = {}
 
-    def __init__(self, bot: HVZBot):
+    def __init__(self, bot: HVZBot, chatbot_config_checkers: Dict = None):
         self.bot = bot
+        startup_data = bot.get_cog_startup_data(self)
 
         file = open('scripts.yml', mode='r')
         scripts_data = yaml.load(file)
@@ -390,12 +391,10 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
 
         for kind, script in scripts_data.items():
 
-            #TODO: Move this HvZ specific stuff out of scope
-            config_checker = None
-            if kind == 'registration':
-                config_checker = ConfigChecker('registration')
-            elif kind == 'tag_logging':
-                config_checker = ConfigChecker('tag_logging')
+            try:
+                config_checker = startup_data['config_checkers'][kind]
+            except KeyError:
+                config_checker = None
 
             self.loaded_scripts[kind] = (ScriptData.build(kind, script, chatbotmanager=self, config_checker=config_checker))
 
