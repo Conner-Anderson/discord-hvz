@@ -78,6 +78,7 @@ class HVZBot(discord.ext.commands.Bot):
     channels: Dict[str, discord.TextChannel]
     discord_handler: loguru.Logger
     _cog_startup_data: Dict[str, Dict[str, Any]]
+    readied: bool
 
     def check_event(self, func):
         """
@@ -112,6 +113,7 @@ class HVZBot(discord.ext.commands.Bot):
         self.roles = {}
         self.channels = {}
         self.db = HvzDb()
+        self.readied = False
 
         intents = discord.Intents.all()
         super().__init__(
@@ -131,10 +133,18 @@ class HVZBot(discord.ext.commands.Bot):
 
         @self.listen()
         async def on_connect():
-            pass
+            logger.debug('Received the on_connect event')
+
+        @self.listen()
+        async def on_disconnect():
+            logger.debug('Received the on_disconnect event')
+
 
         @self.listen()  # Always using listen() because it allows multiple events to respond to one thing
         async def on_ready():
+            if self.readied:
+                log.info('The bot encountered the on_ready event again, which usually means it had to reconnect to Discord. Everything is probably fine.')
+            self.readied = True
             try:
                 try:
                     for guild in self.guilds:

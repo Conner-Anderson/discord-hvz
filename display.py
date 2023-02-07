@@ -301,11 +301,13 @@ class DisplayCog(discord.Cog):
     bot: 'HVZBot'
     panels: Dict[int, "HVZPanel"]
     roles_to_watch: List[discord.Role]
+    readied: bool
 
     def __init__(self, bot: "HVZBot"):
         self.bot = bot
         self.panels = {}
         self.roles_to_watch = []
+        self.readied = False
 
         bot.db.prepare_table('persistent_panels', columns={
             'channel_id': 'integer',
@@ -352,6 +354,9 @@ class DisplayCog(discord.Cog):
 
     @discord.Cog.listener()
     async def on_ready(self):
+        if self.readied:
+            return # Don't do this on_ready event more than once
+        self.readied = True
         # Load persistent panels from the database.
         rows = self.bot.db.get_table('persistent_panels')
         for row in rows:
