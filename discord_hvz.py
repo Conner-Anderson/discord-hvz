@@ -27,7 +27,7 @@ from item_tracker import ItemTrackerCog
 from hvzdb import HvzDb
 
 # The latest Discord HvZ release this code is, or is based on.
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 
 
 def dump(obj):
@@ -63,7 +63,6 @@ class InterceptHandler(logging.Handler):
             depth += 1
 
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
-
 
 
 class StartupError(Exception):
@@ -272,6 +271,7 @@ class HVZBot(discord.ext.commands.Bot):
             logger.warning(f'get_startup_data() called in an HVZBot, but no startup data found for this cog: {cog}')
             return {}
 
+
 def main():
     logger.info(f'Launching Discord-HvZ version {VERSION}  ...')
     if sys.platform == 'win32':
@@ -301,7 +301,8 @@ def main():
 
     logger.success('The bot has shut down. Press any key to close.')
     input()
-    #logger.info('The below error is normal.')
+    # logger.info('The below error is normal.')
+
 
 if __name__ == "__main__":
     main()
