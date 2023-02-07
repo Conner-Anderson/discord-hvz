@@ -410,7 +410,7 @@ class ChatBotManager(commands.Cog):
     ) -> None:
 
         script = self.loaded_scripts[chatbot_kind]
-        if not script.config_checker.get_state():
+        if not script.config_checker.get_state() and not override_config:
             raise ConfigError
 
         existing = self.active_chatbots.get(chat_member.id)

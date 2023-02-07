@@ -191,7 +191,7 @@ class AdminCommandsCog(commands.Cog):
             await ctx.respond('ChatBotManager not loaded. Command failed.')
             return
 
-        await chatbotmanager.start_chatbot('tag_logging', ctx.author, target_member=member)
+        await chatbotmanager.start_chatbot('tag_logging', ctx.author, target_member=member, override_config=True)
         await ctx.respond('Tag logging chatbot started in a DM', ephemeral=True)
 
     @tag_group.command(guild_ids=guild_id_list, name='delete')
