@@ -35,7 +35,7 @@ def setup(bot):  # this is called by Pycord to setup the cog
     bot.add_cog(ItemTrackerCog(bot))  # add the cog to the bot
 
 
-class ItemTrackerCog(commands.Cog):
+class ItemTrackerCog(commands.Cog, guild_ids=guild_id_list):
     bot: 'HVZBot'
 
     item_group = SlashCommandGroup('item', 'Commands for managing items', guild_ids=guild_id_list)
@@ -65,7 +65,7 @@ class ItemTrackerCog(commands.Cog):
             value
         )
 
-    @item_group.command(name='list', guild_ids=guild_id_list)
+    @item_group.command(name='list')
     async def item_list(
             self, ctx: discord.ApplicationContext,
             member: Option(discord.Member, description='Show only items for this player.', default=None)
@@ -99,7 +99,7 @@ class ItemTrackerCog(commands.Cog):
 
         await utilities.respond_paginated(ctx, msg)
 
-    @item_group.command(name='create', guild_ids=guild_id_list)
+    @item_group.command(name='create')
     async def item_create(
             self, ctx: discord.ApplicationContext,
             name: Option(str),
@@ -128,7 +128,7 @@ class ItemTrackerCog(commands.Cog):
             msg += '\nItem in storage.'
         await ctx.respond(msg)
 
-    @item_group.command(name='delete', guild_ids=guild_id_list)
+    @item_group.command(name='delete')
     async def item_delete(
             self, ctx: discord.ApplicationContext,
             id: Option(int, description='Item ID. Try `/item list`', )
@@ -152,7 +152,7 @@ class ItemTrackerCog(commands.Cog):
 
         await ctx.respond(msg)
 
-    @item_group.command(name='delete_all', guild_ids=guild_id_list)
+    @item_group.command(name='delete_all')
     async def item_delete_all(
             self, ctx: discord.ApplicationContext,
             are_you_sure: Option(bool, description='There is no undo.', )
@@ -171,7 +171,7 @@ class ItemTrackerCog(commands.Cog):
 
         await ctx.respond('Deleted all items.')
 
-    @item_group.command(name='transfer', guild_ids=guild_id_list)
+    @item_group.command(name='transfer')
     async def item_transfer(
             self, ctx,
             id: Option(int, description='Item ID. Try `/item list`', ),
@@ -201,7 +201,7 @@ class ItemTrackerCog(commands.Cog):
 
         await ctx.respond(f'Item "{item.name}" taken from {original_owner} and given to <@{target_player.id}>.')
 
-    @item_group.command(name='take', guild_ids=guild_id_list)
+    @item_group.command(name='take')
     async def item_take(
             self, ctx,
             id: Option(int, description='Item ID. Try `/item list`', ),
@@ -224,7 +224,7 @@ class ItemTrackerCog(commands.Cog):
 
         await ctx.respond(f'Item "{item.name}" taken from <@{item.owner}> and put in storage.')
 
-    @item_group.command(name='rename', guild_ids=guild_id_list)
+    @item_group.command(name='rename')
     async def item_rename(
             self, ctx,
             id: Option(int, description='Item ID. Try `/item list`', ),
