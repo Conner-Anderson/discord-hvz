@@ -306,7 +306,8 @@ def main():
     except KeyboardInterrupt:
         logger.info('Keyboard Interrupt!')
     except ConfigError as e:
-        logger.error(e)
+        logger.error(f'{e} \n Check the log file for detailed information.')
+        logger.opt(exception=True).debug(e)
     except Exception as e:
         logger.exception(e)
     else:

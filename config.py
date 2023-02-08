@@ -29,8 +29,12 @@ class HVZConfig:
         with open(filename) as fp:
             self._config = yaml.load(fp)
 
+        timezone_offset = self._config['timezone']
+        if timezone_offset is None:
+            timezone_offset = 0
+
         self.time_zone = timezone(
-            offset=timedelta(hours=int(self._config['timezone']))
+            offset=timedelta(hours=int(timezone_offset))
         )
 
     def commit(self):
@@ -38,11 +42,20 @@ class HVZConfig:
             yaml.dump(self._config, fp)
 
     def __getitem__(self, item):
-        return self._config[item]
+        try:
+            return self._config[item]
+        except KeyError as e:
+            raise ConfigError(f'Looked for the config option "{e}" in {self.filename} but didn\'t find it. Perhaps there is a typo in your configuration?') from e
 
     def __setitem__(self, key, value):
+        try:
+            self._config[key]
+        except ConfigError:
+            logger.warning(
+                f'Adding the new config option "{key}" with the value "{value}" to {self.filename}. Was this intended?')
         self._config[key] = value
         self.commit()
+
 
     def check_setup_prelaunch(self) -> bool:
 
@@ -54,14 +67,17 @@ class HVZConfig:
         warnings: List[str] = []
         errors: List[str] = []
         if config['server_id'] == 767126786617114635:
-            warnings.append("The 'server_id' setting in config.yml is still default. Change this to yours.")
-        elif config['server_id'] == None:
-            errors.append("The 'server_id' setting in config.yml is empty. Fill it with your ID.")
+            warnings.append(f"The 'server_id' setting in {self.filename} is still default. Change this to yours.")
+        elif config['server_id'] is None:
+            errors.append(f"The 'server_id' setting in {self.filename} is empty. Fill it with your ID.")
 
         if config['sheet_id'] == '1fLYdmc_sp-Rx25794zmPekp48I02lbctyqiLvaLDIwQ':
-            warnings.append("The 'sheet_id' setting in config.yml is still default. Change that of your target Google Sheet, or set 'google_sheet_export' to false.")
-        if config['sheet_id'] == None:
-            warnings.append("The 'sheet_id' setting in config.yml is empty. Fill it with that of your target Google Sheet, or set 'google_sheet_export' to false.")
+            warnings.append(f"The 'sheet_id' setting in {self.filename} is still default. Change that of your target Google Sheet, or set 'google_sheet_export' to false.")
+        if config['sheet_id'] is None:
+            warnings.append(f"The 'sheet_id' setting in {self.filename} is empty. Fill it with that of your target Google Sheet, or set 'google_sheet_export' to false.")
+
+        if config['timezone'] is None:
+            warnings.append(f"There is no timezone set in {self.filename}, so the bot will default to UTC.")
 
         if warnings:
             for warning in warnings:
