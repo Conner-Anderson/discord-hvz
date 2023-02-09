@@ -25,6 +25,7 @@ from config import config, ConfigError, ConfigChecker
 from display import DisplayCog
 from item_tracker import ItemTrackerCog
 from hvzdb import HvzDb
+#import setup_checker
 
 # The latest Discord HvZ release this code is, or is based on.
 VERSION = "0.2.1"
@@ -37,7 +38,7 @@ def dump(obj):
 
 
 load_dotenv()  # Load the Discord token from the .env file
-token = getenv("TOKEN")
+TOKEN = getenv("TOKEN")
 
 log = logger
 logger.remove()
@@ -146,52 +147,54 @@ class HVZBot(discord.ext.commands.Bot):
                 log.info('The bot encountered the on_ready event again, which usually means it had to reconnect to Discord. Everything is probably fine.')
             self.readied = True
             try:
-                try:
-                    for guild in self.guilds:
-                        if guild.id == config['server_id']:
-                            self.guild = guild
-                            break
-                except Exception as e:
-                    raise Exception(f'Cannot find a valid server. Check config.yml. Error --> {e}')
+
+                for guild in self.guilds:
+                    if guild.id == config['server_id']:
+                        self.guild = guild
+                        break
+                else:
+                    raise ConfigError(f'This bot is not on any server matching the "server_id" set in config.yml. Either the ID is set wrong, or the bot account has not joined the server.')
 
                 # Updates the cache with all members and channels and roles
                 await self.guild.fetch_members(limit=500).flatten()
                 await self.guild.fetch_channels()
                 await self.guild.fetch_roles()
 
-                needed_roles = ['zombie', 'human', 'player']
-                missing_roles = []
-                for needed_role in needed_roles:
+                needed_roles_names = ['zombie', 'human', 'player']
+                missing_role_names = []
+                for needed_role_name in needed_roles_names:
                     try:
-                        role_name = config['role_names'][needed_role]
+                        role_name = config['role_names'][needed_role_name]
                     except KeyError:
-                        role_name = needed_role
-                    for found_role in self.guild.roles:
-                        if found_role.name.lower() == role_name:
-                            self.roles[needed_role] = found_role
-                            break
-                    else:
-                        missing_roles.append(needed_role)
+                        # If there is no role name assigned in the config, use a default
+                        role_name = needed_role_name
 
-                needed_channels = ['tag-announcements', 'report-tags', 'zombie-chat']
-                missing_channels = []
-                for needed_channel in needed_channels:
-                    try:
-                        channel_name = config['channel_names'][needed_channel]
-                    except KeyError:
-                        channel_name = needed_channel
-                    for found_channel in self.guild.channels:
-                        if found_channel.name.lower() == channel_name:
-                            self.channels[needed_channel] = found_channel
-                            break
+                    found_role = discord.utils.find(lambda c: c.name.lower() == role_name, self.guild.roles)
+                    if found_role is None:
+                        missing_role_names.append(needed_role_name)
                     else:
-                        missing_channels.append(needed_channel)
+                        self.roles[needed_role_name] = found_role
+
+                needed_channel_names = ['tag-announcements', 'report-tags', 'zombie-chat']
+                missing_channel_names = []
+                for needed_channel_name in needed_channel_names:
+                    try:
+                        channel_name = config['channel_names'][needed_channel_name]
+                    except KeyError:
+                        # If there is no channel name assigned in the config, use a default
+                        channel_name = needed_channel_name
+
+                    found_channel = discord.utils.find(lambda c: c.name.lower() == channel_name, self.guild.channels)
+                    if found_channel is None:
+                        missing_channel_names.append(needed_channel_name)
+                    else:
+                        self.channels[needed_channel_name] = found_channel
 
                 msg = ''
-                if missing_roles:
-                    msg += f'These required roles are missing on the server: {missing_roles}\n'
-                if missing_channels:
-                    msg += f'These required channels are missing on the server: {missing_channels}\n'
+                if missing_role_names:
+                    msg += f'These required roles are missing on the server: {missing_role_names}\n'
+                if missing_channel_names:
+                    msg += f'These required channels are missing on the server: {missing_channel_names}\n'
                 if msg:
                     raise StartupError(msg)
 
@@ -202,7 +205,8 @@ class HVZBot(discord.ext.commands.Bot):
                 await self.close()
                 time.sleep(1)
             except Exception as e:
-                log.exception(f'Bot startup failed with this error: \n{e}')
+                log.error('Bot startup failed.')
+                log.exception(e)
                 await self.close()
                 time.sleep(1)
 
@@ -289,10 +293,19 @@ class HVZBot(discord.ext.commands.Bot):
 
 
 def main():
-    logger.info(f'Launching Discord-HvZ version {VERSION}  ...')
-    if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     try:
+        logger.info(f'Launching Discord-HvZ version {VERSION}  ...')
+        if sys.platform == 'win32':
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        if not TOKEN:
+            logger.error("You need your Discord bot token to be in a file called '.env' "
+                         "Find this on your Application's general information page on your Discord Developer Console. "
+                         "The entire file should contain only this: TOKEN='replace_me_with_your_token'")
+            return
+        if not config.check_setup_prelaunch():
+            logger.error('The bot did not launch due to the above Errors found in configuration.')
+            return
+
         bot = HVZBot()
 
         bot.load_extension('buttons')
@@ -301,24 +314,23 @@ def main():
         bot.load_extension('display')
         bot.load_extension('item_tracker')
 
-        bot.run(token)
+        bot.run(TOKEN)
 
-    except ConfigError as e:
-        logger.error(e)
-
+    except discord.errors.LoginFailure as e:
+        logger.error(f'Discord failed to log in: {e}')
     except KeyboardInterrupt:
         logger.info('Keyboard Interrupt!')
-
+    except ConfigError as e:
+        logger.error(f'{e} \n Check the log file for detailed information.')
+        logger.opt(exception=True).debug(e)
     except Exception as e:
-        if str(e) == 'Event loop is closed':
-            logger.success('Bot shutdown safely. The below error is normal.')
-        else:
-            logger.exception(e)
-
-    logger.success('The bot has shut down. Press any key to close.')
-    input()
-    # logger.info('The below error is normal.')
-
+        logger.exception(e)
+    else:
+        logger.success('The bot has shut down normally.')
+    finally:
+        logger.info('Press Enter to close.')
+        input()
 
 if __name__ == "__main__":
     main()
+
