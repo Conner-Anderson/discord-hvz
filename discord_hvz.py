@@ -79,6 +79,7 @@ class HVZBot(discord.ext.commands.Bot):
     channels: Dict[str, discord.TextChannel]
     discord_handler: loguru.Logger
     _cog_startup_data: Dict[str, Dict[str, Any]]
+    readied: bool
 
     def check_event(self, func):
         """
@@ -113,6 +114,7 @@ class HVZBot(discord.ext.commands.Bot):
         self.roles = {}
         self.channels = {}
         self.db = HvzDb()
+        self.readied = False
 
         intents = discord.Intents.all()
         super().__init__(
@@ -132,10 +134,18 @@ class HVZBot(discord.ext.commands.Bot):
 
         @self.listen()
         async def on_connect():
-            pass
+            logger.debug('Received the on_connect event')
+
+        @self.listen()
+        async def on_disconnect():
+            logger.debug('Received the on_disconnect event')
+
 
         @self.listen()  # Always using listen() because it allows multiple events to respond to one thing
         async def on_ready():
+            if self.readied:
+                log.info('The bot encountered the on_ready event again, which usually means it had to reconnect to Discord. Everything is probably fine.')
+            self.readied = True
             try:
 
                 for guild in self.guilds:
@@ -200,6 +210,11 @@ class HVZBot(discord.ext.commands.Bot):
                 await self.close()
                 time.sleep(1)
 
+        @self.event
+        async def on_error(event: str, *args, **kwargs):
+            # exception = sys.exc_info()[1]
+            logger.info(f'Args: {args}, kwargs: {kwargs}')
+            logger.exception(f'The event "{event}" had an exception, which is being ignored. \n These are the arguments passed to the event: \n Positional Arguments: {args} \n Keyword Arguments: {kwargs}')
 
         @self.listen()
         async def on_application_command_error(ctx, error):

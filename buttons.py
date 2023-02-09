@@ -159,6 +159,8 @@ class HVZButtonCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
+        if self.readied:
+            return # Don't repeat this on_ready event
         self.readied = True
         button_options = []
         view = discord.ui.View(timeout=None)  # A view to hold persistent buttons
