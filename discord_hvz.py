@@ -18,6 +18,8 @@ from dotenv import load_dotenv
 from loguru import logger
 from sqlalchemy.exc import NoSuchColumnError
 
+from hvz_enums import GameRole, GameChannel
+
 from admin_commands import AdminCommandsCog
 from buttons import HVZButtonCog
 from chatbot import ChatBotManager
@@ -75,8 +77,8 @@ class StartupError(Exception):
 class HVZBot(discord.ext.commands.Bot):
     guild: Guild | None
     db: HvzDb
-    roles: Dict[str, discord.Role]
-    channels: Dict[str, discord.TextChannel]
+    roles: Dict[GameRole, discord.Role]
+    channels: Dict[GameChannel, discord.TextChannel]
     discord_handler: loguru.Logger
     _cog_startup_data: Dict[str, Dict[str, Any]]
     readied: bool
@@ -160,35 +162,44 @@ class HVZBot(discord.ext.commands.Bot):
                 await self.guild.fetch_channels()
                 await self.guild.fetch_roles()
 
-                needed_roles_names = ['zombie', 'human', 'player']
+
+                needed_roles = {
+                    GameRole.ZOMBIE: 'zombie',
+                    GameRole.HUMAN: 'human',
+                    GameRole.PLAYER: 'player'
+                }
                 missing_role_names = []
-                for needed_role_name in needed_roles_names:
+                for role_enum, config_setting in needed_roles.items():
                     try:
-                        role_name = config['role_names'][needed_role_name]
+                        role_name = config['role_names'][config_setting]
                     except KeyError:
                         # If there is no role name assigned in the config, use a default
-                        role_name = needed_role_name
+                        role_name = config_setting
 
-                    found_role = discord.utils.find(lambda c: c.name.lower() == role_name, self.guild.roles)
+                    found_role = discord.utils.find(lambda r: r.name.lower() == role_name, self.guild.roles)
                     if found_role is None:
-                        missing_role_names.append(needed_role_name)
+                        missing_role_names.append(config_setting)
                     else:
-                        self.roles[needed_role_name] = found_role
+                        self.roles[role_enum] = found_role
 
-                needed_channel_names = ['tag-announcements', 'report-tags', 'zombie-chat']
+                needed_channels = {
+                    GameChannel.TAG_ANNOUNCEMENT: 'tag-announcements',
+                    GameChannel.TAG_REPORT: 'report-tags',
+                    GameChannel.ZOMBIE: 'zombie-chat'
+                }
                 missing_channel_names = []
-                for needed_channel_name in needed_channel_names:
+                for channel_enum, config_setting in needed_channels.items():
                     try:
-                        channel_name = config['channel_names'][needed_channel_name]
+                        channel_name = config['channel_names'][config_setting]
                     except KeyError:
                         # If there is no channel name assigned in the config, use a default
-                        channel_name = needed_channel_name
+                        channel_name = config_setting
 
                     found_channel = discord.utils.find(lambda c: c.name.lower() == channel_name, self.guild.channels)
                     if found_channel is None:
-                        missing_channel_names.append(needed_channel_name)
+                        missing_channel_names.append(config_setting)
                     else:
-                        self.channels[needed_channel_name] = found_channel
+                        self.channels[channel_enum] = found_channel
 
                 msg = ''
                 if missing_role_names:
@@ -277,7 +288,7 @@ class HVZBot(discord.ext.commands.Bot):
 
         msg += f'\nThere are now {new_human_count} humans and {new_zombie_count} zombies.'
 
-        await self.channels['tag-announcements'].send(msg)
+        await self.channels[GameChannel.TAG_ANNOUNCEMENT].send(msg)
 
     def get_cog_startup_data(self, cog: commands.Cog | Type[commands.Cog]) -> Dict:
         # Fetches the startup_data dictionary from the bot when given a cog

@@ -11,6 +11,7 @@ from loguru import logger
 import utilities
 import utilities as util
 from config import config
+from hvz_enums import GameChannel, GameRole
 
 if TYPE_CHECKING:
     from discord_hvz import HVZBot
@@ -460,8 +461,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         await ctx.respond(f'Changed <@{member_row.id}>\'s OZ status to {setting}')
 
         member = bot.guild.get_member(int(member_row.id))
-        t_channel = bot.channels['report-tags']
-        c_channel = bot.channels['zombie-chat']
+        t_channel = bot.channels[GameChannel.TAG_REPORT]
+        c_channel = bot.channels[GameChannel.ZOMBIE]
         try:
             if setting:
                 await t_channel.set_permissions(member, read_messages=True)
