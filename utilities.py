@@ -53,7 +53,7 @@ def member_from_string(member_string, db, ctx=None):
 
 def generate_tag_tree(db: HvzDb, bot: HVZBot) -> str:
     # oz_table = db.get_rows('members', 'oz', True) Old, easy way of getting OZs.
-    oz_table = _get_ozs(db)
+    oz_table = _get_ozs(bot, db)
     # └
     return _tag_tree_loop(db, bot, oz_table, 0)
 
@@ -133,7 +133,7 @@ async def respond_paginated(context: discord.ApplicationContext, message: str, m
     await paginator.respond(context.interaction, **kwargs)
 
 
-def _get_ozs(db: HvzDb) -> List[sqlalchemy.engine.Row]:
+def _get_ozs(bot: "HVZBot", db: HvzDb) -> List[sqlalchemy.engine.Row]:
     """
     This function identifies OZs without relying on the OZ tag.
     That means any strange manual editing shenanigans regarding OZs shouldn't break the tag tree system
@@ -145,7 +145,10 @@ def _get_ozs(db: HvzDb) -> List[sqlalchemy.engine.Row]:
     oz_member_rows = []
 
     for tag in tags:
-        first_pass.add(tag.tagger_id)
+        first_pass.add(int(tag.tagger_id))
+
+    for zombie_member in bot.roles['zombie'].members:
+        first_pass.add(zombie_member.id)
 
     for tagger_id in first_pass:
         try:
