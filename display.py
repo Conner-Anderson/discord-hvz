@@ -50,7 +50,8 @@ def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
             return total.sum()
 
         def total_zombies(x):
-            total = ((tags_df.tag_time < x.tag_time) & (tags_df.revoked_tag == False))
+            # Note: The database is giving the revoked_tag column as object types, thus converting to in to compare
+            total = (tags_df.tag_time < x.tag_time) & (tags_df.revoked_tag.astype('int32') == 0)
             return total.sum()
 
         oz_count = members_df['oz'].sum()
