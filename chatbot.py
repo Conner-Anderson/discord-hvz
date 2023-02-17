@@ -410,7 +410,7 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
 
         script = self.loaded_scripts[chatbot_kind]
         if not script.config_checker.get_state() and not override_config:
-            raise ConfigError
+            raise ConfigError(f'The chatbot {chatbot_kind} is disabled in the bot\'s configuration. ')
 
         existing = self.active_chatbots.get(chat_member.id)
 
