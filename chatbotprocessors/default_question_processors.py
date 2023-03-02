@@ -8,7 +8,6 @@ from config import config
 from loguru import logger
 
 from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from discord_hvz import HVZBot
     from hvzdb import HvzDb
@@ -19,9 +18,9 @@ This files contains 'processors' which are functions called by a chatbot convers
 Processors are only called if they are put in a "processor" field for a question in scripts.yml
 Example: processor: generate_tag_code
 
-You can write your own processors! You can technically put them here, but it is preferred that you make a file for 
-them called "custom_question_processors.py" in the same folder. That way your custom processors won't be overwritten 
-when you update Discord-HvZ. 
+You can write your own processors! You can technically put them here, but it is preferred that you make a file for them
+called "custom_question_processors.py" in the same folder. That way your custom processors won't be overwritten when you update
+Discord-HvZ.
 
 The below processors run critical parts of the bot and should not be edited without careful consideration.
 You should use them as examples though.
@@ -46,14 +45,11 @@ Example: raise ValueError('You have entered a bad value. Please try again.')
 
 """
 
-
 def name(input_text: str, bot: HVZBot):
     return input_text
 
-
 def generate_tag_code(input_text: str, bot: HVZBot) -> str:
     return make_tag_code(bot.db)
-
 
 def tag_code_to_member_id(input_text: str, bot: HVZBot) -> str:
     try:
@@ -66,19 +62,9 @@ def tag_code_to_member_id(input_text: str, bot: HVZBot) -> str:
     if tagged_member is None:
         raise ValueError(f'"{tagged_member_row.name}" is no longer on the Discord server. Contact them, then an Admin.')
     if bot.roles['zombie'] in tagged_member.roles:
-        try:
-            tag_row = bot.db.get_tag(tagged_member.id, column='tagged_id', filter_revoked=True)
-        except ValueError:
-            logger.warning(
-                f'Someone just entered the tag code of someone with the zombie role. Since that player was not tagged '
-                f'in a tag log before, this tag is allowed. Perhaps check to see if this is alright.')
-        else:
-            raise ValueError(
-                f'The player you\'re tagging is already a zombie! {tag_row.tagger_name} (<@{tag_row.tagger_id}>) '
-                f'tagged them.')
+        raise ValueError('The person you\'re tagging is already a zombie!')
 
     return tagged_member.id
-
 
 def tag_time(input_text: str, bot: HVZBot) -> datetime:
     given_tag_time: str = input_text
@@ -92,3 +78,4 @@ def tag_time(input_text: str, bot: HVZBot) -> datetime:
         raise ValueError('The tag time you stated is in the future. Try again.')
 
     return tag_datetime
+
