@@ -15,19 +15,9 @@ For *lots* more information, go to the documentation site:
 
 ## [Documentation](https://conner-anderson.github.io/discord-hvz-docs/)
 
-## Version 0.2.0 Released!
+## Version 0.2.1 Released
 
-This is the second official release and includes *major* changes from the previous alpha release.  
-While this is no longer called an "alpha" release, any version number below 1.0.0 may have breaking changes.  
-Read the release information for details on how to update.
-
-#### Important Changes:
- - Changed the commands to Slash Commands
- - Implemented more robust customization
- - Rewrote the fan-favorite feature of the tag tree and added an auto-generating graph that tracks player numbers
- - Created multiple install methods
- - Wrote an extensive documentation site
- - Updated and improved many things under the hood
+This is the third official release and includes moderate changes based on real game testing at LeTourneau University. See the changelog in [Releases](https://github.com/Conner-Anderson/discord-hvz/releases).
 
 
 
