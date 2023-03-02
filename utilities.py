@@ -141,22 +141,26 @@ def _get_ozs(bot: "HVZBot", db: HvzDb) -> List[sqlalchemy.engine.Row]:
     :return:
     """
     tags = db.get_table('tags')
-    first_pass = set()
+    set_of_all_zombies = set()
     oz_member_rows = []
 
+    # Adds anyone who has made a tag. Since it is a Set, there will be no duplicates
     for tag in tags:
-        first_pass.add(int(tag.tagger_id))
+        set_of_all_zombies.add(int(tag.tagger_id))
 
+    # Adds anyone with the zombie role. The only new ids added should be from OZs who have made no tags.
     for zombie_member in bot.roles['zombie'].members:
-        first_pass.add(zombie_member.id)
+        set_of_all_zombies.add(zombie_member.id)
 
-    for tagger_id in first_pass:
+    for tagger_id in set_of_all_zombies:
         try:
+            # If a zombie has been tagged, do nothing.
             db.get_rows('tags', 'tagged_id', tagger_id)
             continue
         except ValueError:
             pass
         try:
+            # If a zombie has not been tagged, add them to the OZ list
             oz_member_rows.append(db.get_member(tagger_id))
         except ValueError:
             logger.warning(f'While making the tag tree, member in tags table not found in the members table.')
