@@ -378,10 +378,10 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             await ctx.author.send('Sorry, something went wrong with that command. Derp.')
             log.exception(e)
 
-    @tag_group.command(name='tree')
+    @slash_command(name='tag_tree')
     async def tag_tree(self, ctx: context.ApplicationContext):
         """
-        Sends a message with a family tree of the zombies in the game.
+        Responds with a family tree of the zombies in the game.
 
         """
         bot = self.bot
@@ -392,6 +392,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         tree = '**THE ZOMBIE FAMILY TREE\n**' + tree
 
         await utilities.respond_paginated(ctx, tree)
+
 
 
     @slash_command(name='shutdown', description='Shuts down the bot.')

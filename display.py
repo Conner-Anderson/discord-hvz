@@ -298,7 +298,7 @@ class HVZPanel:
             self.bot.remove_listener(self.refresh, event_name)
 
 
-class DisplayCog(discord.Cog):
+class DisplayCog(discord.Cog, guild_ids=guild_id_list):
     bot: 'HVZBot'
     panels: Dict[int, "HVZPanel"]
     roles_to_watch: List[discord.Role]
@@ -330,7 +330,7 @@ class DisplayCog(discord.Cog):
         except ValueError:
             pass
 
-    @slash_command(guild_ids=guild_id_list, description='Post a message with various live-updating game statistics.')
+    @slash_command(description='Post a message with various live-updating game statistics.')
     async def post_panel(
             self,
             ctx: discord.ApplicationContext,
@@ -352,6 +352,17 @@ class DisplayCog(discord.Cog):
         await ctx.response.defer(ephemeral=True)
         await panel.send(ctx.channel, selections, live=not static)
         await ctx.respond('Embed posted', ephemeral=True)
+
+    @slash_command(description='Post a message with a graph of zombie and human populations over time.' )
+    async def game_plot(
+            self,
+            ctx: discord.ApplicationContext,
+            static: Option(bool, required=False, default=False, description='The plot will never update if static.')
+    ):
+        panel = HVZPanel(self)
+        await ctx.response.defer(ephemeral=True)
+        await panel.send(ctx.channel, [GamePlotElement], live=not static)
+        await ctx.respond('Game Plot posted', ephemeral=True)
 
     @discord.Cog.listener()
     async def on_ready(self):
