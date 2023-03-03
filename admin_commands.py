@@ -36,7 +36,7 @@ def setup(bot):  # this is called by Pycord to setup the cog
     bot.add_cog(AdminCommandsCog(bot))  # add the cog to the bot
 
 
-class AdminCommandsCog(commands.Cog):
+class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
 
     def __init__(self, bot: "HVZBot"):
         self.bot = bot
@@ -44,7 +44,7 @@ class AdminCommandsCog(commands.Cog):
     member_group = SlashCommandGroup("member", "Commands for dealing with members.", guild_ids=guild_id_list)
     tag_group = SlashCommandGroup("tag", "Commands for dealing with tags.", guild_ids=guild_id_list)
 
-    @member_group.command(guild_ids=guild_id_list, name='delete')
+    @member_group.command(name='delete')
     async def member_delete(
             self,
             ctx,
@@ -70,17 +70,21 @@ class AdminCommandsCog(commands.Cog):
                 msg += 'Both member and ID supplied. Ignoring ID.\n'
 
         elif id:
+            try:
+                int(id)
+            except ValueError:
+                await ctx.respond(f'"{id}" is not a number. Example of a Discord member ID: 293465952895631360')
+                return
             member_id = id
-            member: discord.Member = bot.get_member(id)
         else:
             await ctx.respond('No member or ID provided: nothing deleted.')
             return
         try:
-            member_row = bot.db.get_member(member)
+            member_row = bot.db.get_member(member_id)
         except ValueError:
-            await ctx.respond('That member is not in the database, and so there is nothing to delete.')
+            await ctx.respond('That member is not in the database as a player, and so there is nothing to delete.')
             return
-        bot.db.delete_row('members', 'id', member_id)
+        bot.db.delete_row('members', 'id', str(member_id))
 
         if member:
             await member.remove_roles(bot.roles['human'])
@@ -88,13 +92,13 @@ class AdminCommandsCog(commands.Cog):
             await member.remove_roles(bot.roles['player'])
             msg += f'<@{member_id}> deleted from the game. Roles revoked, expunged from the database.'
         else:
-            msg += f'{member_row.id} deleted from the game and expunged from the database.'
+            msg += f'{member_row.name} deleted from the game and expunged from the database.'
 
         msg += ' Any tags will still exist.'
 
         await ctx.respond(msg)
 
-    @member_group.command(guild_ids=guild_id_list, name='edit')
+    @member_group.command(name='edit')
     async def member_edit(
             self,
             ctx,
@@ -126,7 +130,7 @@ class AdminCommandsCog(commands.Cog):
             f'The value of {attribute} for <@{member_row.id}> was changed from \"{original_value}\"" to \"{value}\"')
         # bot.sheets_interface.export_to_sheet('members')
 
-    @member_group.command(guild_ids=guild_id_list, name='list')
+    @member_group.command(name='list')
     async def member_list(self, ctx):
         """
         Lists all members. The Google Sheet is probably better.
@@ -145,7 +149,7 @@ class AdminCommandsCog(commands.Cog):
 
         await utilities.respond_paginated(ctx, message)
 
-    @member_group.command(guild_ids=guild_id_list, name='register')
+    @member_group.command(name='register')
     async def member_register(
             self,
             ctx,
@@ -171,10 +175,10 @@ class AdminCommandsCog(commands.Cog):
             await ctx.respond('ChatBotManager not loaded. Command failed.')
             return
 
-        await chatbotmanager.start_chatbot('registration', ctx.author, target_member=member)
+        await chatbotmanager.start_chatbot('registration', ctx.author, target_member=member, override_config=True)
         await ctx.respond('Registration chatbot started in a DM', ephemeral=True)
 
-    @tag_group.command(guild_ids=guild_id_list, name='create')
+    @tag_group.command(name='create')
     async def tag_create(self, ctx, member: discord.Member):
         """
         Starts a tag log chatbot on behalf of another member.
@@ -191,10 +195,10 @@ class AdminCommandsCog(commands.Cog):
             await ctx.respond('ChatBotManager not loaded. Command failed.')
             return
 
-        await chatbotmanager.start_chatbot('tag_logging', ctx.author, target_member=member)
+        await chatbotmanager.start_chatbot('tag_logging', ctx.author, target_member=member, override_config=True)
         await ctx.respond('Tag logging chatbot started in a DM', ephemeral=True)
 
-    @tag_group.command(guild_ids=guild_id_list, name='delete')
+    @tag_group.command(name='delete')
     async def tag_delete(
             self,
             ctx,
@@ -229,7 +233,7 @@ class AdminCommandsCog(commands.Cog):
         msg = f'Tag {tag_id} deleted. ' + msg
         await ctx.respond(msg)
 
-    @tag_group.command(guild_ids=guild_id_list, name='edit')
+    @tag_group.command(name='edit')
     async def tag_edit(
             self,
             ctx,
@@ -253,7 +257,7 @@ class AdminCommandsCog(commands.Cog):
         await ctx.respond(
             f'The value of {attribute} for tag {tag_row.tag_id} was changed from \"{original_value}\"" to \"{value}\"')
 
-    @tag_group.command(guild_ids=guild_id_list, name='revoke')
+    @tag_group.command(name='revoke')
     async def tag_revoke(
             self,
             ctx,
@@ -291,7 +295,7 @@ class AdminCommandsCog(commands.Cog):
         msg = f'Tag {tag_id} revoked. ' + msg
         await ctx.respond(msg)
 
-    @tag_group.command(guild_ids=guild_id_list, name='restore')
+    @tag_group.command(name='restore')
     async def tag_restore(
             self,
             ctx,
@@ -322,7 +326,7 @@ class AdminCommandsCog(commands.Cog):
         msg = f'Tag {tag_id} restored. ' + msg
         await ctx.respond(msg)
 
-    @slash_command(guild_ids=guild_id_list, name='config')
+    @slash_command(name='config')
     async def config_command(
             self,
             ctx,
@@ -357,7 +361,7 @@ class AdminCommandsCog(commands.Cog):
         config[setting] = choice
         await ctx.respond(f'Set \"{setting}\" to \"{choice}\"')
 
-    @slash_command(guild_ids=guild_id_list)
+    @slash_command()
     async def code(self, ctx):
         """
         Gives you your tag code in a private reply. Keep it secret, keep it safe.
@@ -374,10 +378,10 @@ class AdminCommandsCog(commands.Cog):
             await ctx.author.send('Sorry, something went wrong with that command. Derp.')
             log.exception(e)
 
-    @tag_group.command(guild_ids=guild_id_list, name='tree')
+    @slash_command(name='tag_tree')
     async def tag_tree(self, ctx: context.ApplicationContext):
         """
-        Sends a message with a family tree of the zombies in the game.
+        Responds with a family tree of the zombies in the game.
 
         """
         bot = self.bot
@@ -390,7 +394,8 @@ class AdminCommandsCog(commands.Cog):
         await utilities.respond_paginated(ctx, tree)
 
 
-    @slash_command(name='shutdown', guild_ids=guild_id_list, description='Shuts down the bot.')
+
+    @slash_command(name='shutdown', description='Shuts down the bot.')
     async def shutdown(
             self,
             ctx,
@@ -422,7 +427,7 @@ class AdminCommandsCog(commands.Cog):
         await bot.close()
         time.sleep(1)
 
-    @slash_command(guild_ids=guild_id_list, name='oz')
+    @slash_command(name='oz')
     async def oz(
             self,
             ctx,

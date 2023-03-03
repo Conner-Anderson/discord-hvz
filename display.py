@@ -50,7 +50,8 @@ def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
             return total.sum()
 
         def total_zombies(x):
-            total = ((tags_df.tag_time < x.tag_time) & (tags_df.revoked_tag == False))
+            # Note: The database is giving the revoked_tag column as object types, thus converting to in to compare
+            total = (tags_df.tag_time < x.tag_time) & (tags_df.revoked_tag.astype('int32') == 0)
             return total.sum()
 
         oz_count = members_df['oz'].sum()
@@ -297,15 +298,17 @@ class HVZPanel:
             self.bot.remove_listener(self.refresh, event_name)
 
 
-class DisplayCog(discord.Cog):
+class DisplayCog(discord.Cog, guild_ids=guild_id_list):
     bot: 'HVZBot'
     panels: Dict[int, "HVZPanel"]
     roles_to_watch: List[discord.Role]
+    readied: bool
 
     def __init__(self, bot: "HVZBot"):
         self.bot = bot
         self.panels = {}
         self.roles_to_watch = []
+        self.readied = False
 
         bot.db.prepare_table('persistent_panels', columns={
             'channel_id': 'integer',
@@ -327,7 +330,7 @@ class DisplayCog(discord.Cog):
         except ValueError:
             pass
 
-    @slash_command(guild_ids=guild_id_list, description='Post a message with various live-updating game statistics.')
+    @slash_command(description='Post a message with various live-updating game statistics.')
     async def post_panel(
             self,
             ctx: discord.ApplicationContext,
@@ -350,8 +353,22 @@ class DisplayCog(discord.Cog):
         await panel.send(ctx.channel, selections, live=not static)
         await ctx.respond('Embed posted', ephemeral=True)
 
+    @slash_command(description='Post a message with a graph of zombie and human populations over time.' )
+    async def game_plot(
+            self,
+            ctx: discord.ApplicationContext,
+            static: Option(bool, required=False, default=False, description='The plot will never update if static.')
+    ):
+        panel = HVZPanel(self)
+        await ctx.response.defer(ephemeral=True)
+        await panel.send(ctx.channel, [GamePlotElement], live=not static)
+        await ctx.respond('Game Plot posted', ephemeral=True)
+
     @discord.Cog.listener()
     async def on_ready(self):
+        if self.readied:
+            return # Don't do this on_ready event more than once
+        self.readied = True
         # Load persistent panels from the database.
         rows = self.bot.db.get_table('persistent_panels')
         for row in rows:

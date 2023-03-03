@@ -33,6 +33,7 @@ SAMPLE_RANGE_NAME = 'Output!A2:B'
 
 
 class SheetsInterface:
+    db: HvzDb
 
     def __init__(self, db: HvzDb):
         self.setup(db)
@@ -97,11 +98,16 @@ class SheetsInterface:
         self.check_creds()
 
         table: List[sqlalchemy.engine.Row] = self.db.get_table(table_name)
+        database_columns = self.db.get_column_names(table_name)
 
-        column_order_raw: Dict[str, str] = config['database_tables'][table_name]
-        column_order = []
-        for key in column_order_raw:
+        column_order: List[str] = []
+        for key in config['database_tables'][table_name]:
             column_order.append(key.casefold())
+
+        # Add columns that are in the database, but don't have their order declared in the config to the end.
+        for column in database_columns:
+            if column not in column_order:
+                column_order.append(column)
 
         # Let's turn the list of Rows into a list of lists. Google wants that.
 
@@ -115,18 +121,26 @@ class SheetsInterface:
 
                 values[y].append(cell)
 
+
         values.insert(0, column_order)
         sheet_name = config['sheet_names'][table_name]
 
-        # TODO: Make the range the Sheet writes to dynamic
+        # Build a string that represents the range to overwrite for Sheets. Example: 'Members'!A:L
+        range = f"'{sheet_name}'"
+        if len(values) == 0:
+            column_count = len(column_order)
+        else:
+            column_count = len(values[0])
+        range += f'!A:{get_column_letter(column_count)}'
 
-        # Erases entire sheet below row 1!
-        self.spreadsheets.values().clear(spreadsheetId=SPREADSHEET_ID, range=f'\'{sheet_name}\'!A1:L').execute()
+
+        # Erases all columns up to the number of columns that could be written.
+        self.spreadsheets.values().clear(spreadsheetId=SPREADSHEET_ID, range=range).execute()
 
         body = {'values': values}
 
         try:
-            result = self.spreadsheets.values().update(spreadsheetId=SPREADSHEET_ID, range=f'\'{sheet_name}\'!A1:L',
+            result = self.spreadsheets.values().update(spreadsheetId=SPREADSHEET_ID, range=range,
                                                        valueInputOption='USER_ENTERED', body=body).execute()
         except Exception as e:
             log.exception('There was an exception with the Google API request! Here it is: %s' % e)
@@ -165,10 +179,33 @@ class SheetsInterface:
                     pass
     '''
 
-    # Formats a number as a bijective base N string. For converting to A1 notation. Might use later.
-    def bijective(self, n, base):
-        chars = ''
-        while n != 0:
-            chars = chr((n - 1) % base + 97) + chars
-            n = (n - 1) / base
-        return chars
+
+
+def get_column_letter(col_idx: int):
+    """Convert a column number into a column letter (3 -> 'C')
+
+    Right shift the column col_idx by 26 to find column letters in reverse
+    order.  These numbers are 1-based, and can be converted to ASCII
+    ordinals by adding 64.
+
+    """
+    # these indices correspond to A -> ZZZ and include all allowed
+    # columns
+    if not 1 <= col_idx <= 18278:
+        raise ValueError("Invalid column index {0}".format(col_idx))
+    letters = []
+    while col_idx > 0:
+        col_idx, remainder = divmod(col_idx, 26)
+        # check for exact division and borrow if needed
+        if remainder == 0:
+            remainder = 26
+            col_idx -= 1
+        letters.append(chr(remainder+64))
+    return ''.join(reversed(letters))
+
+
+
+if __name__ == '__main__':
+    #Test code
+    response = get_column_letter(1)
+    print(response)

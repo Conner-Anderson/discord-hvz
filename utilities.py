@@ -53,7 +53,7 @@ def member_from_string(member_string, db, ctx=None):
 
 def generate_tag_tree(db: HvzDb, bot: HVZBot) -> str:
     # oz_table = db.get_rows('members', 'oz', True) Old, easy way of getting OZs.
-    oz_table = _get_ozs(db)
+    oz_table = _get_ozs(bot, db)
     # └
     return _tag_tree_loop(db, bot, oz_table, 0)
 
@@ -133,7 +133,7 @@ async def respond_paginated(context: discord.ApplicationContext, message: str, m
     await paginator.respond(context.interaction, **kwargs)
 
 
-def _get_ozs(db: HvzDb) -> List[sqlalchemy.engine.Row]:
+def _get_ozs(bot: "HVZBot", db: HvzDb) -> List[sqlalchemy.engine.Row]:
     """
     This function identifies OZs without relying on the OZ tag.
     That means any strange manual editing shenanigans regarding OZs shouldn't break the tag tree system
@@ -141,19 +141,26 @@ def _get_ozs(db: HvzDb) -> List[sqlalchemy.engine.Row]:
     :return:
     """
     tags = db.get_table('tags')
-    first_pass = set()
+    set_of_all_zombies = set()
     oz_member_rows = []
 
+    # Adds anyone who has made a tag. Since it is a Set, there will be no duplicates
     for tag in tags:
-        first_pass.add(tag.tagger_id)
+        set_of_all_zombies.add(int(tag.tagger_id))
 
-    for tagger_id in first_pass:
+    # Adds anyone with the zombie role. The only new ids added should be from OZs who have made no tags.
+    for zombie_member in bot.roles['zombie'].members:
+        set_of_all_zombies.add(zombie_member.id)
+
+    for tagger_id in set_of_all_zombies:
         try:
+            # If a zombie has been tagged, do nothing.
             db.get_rows('tags', 'tagged_id', tagger_id)
             continue
         except ValueError:
             pass
         try:
+            # If a zombie has not been tagged, add them to the OZ list
             oz_member_rows.append(db.get_member(tagger_id))
         except ValueError:
             logger.warning(f'While making the tag tree, member in tags table not found in the members table.')

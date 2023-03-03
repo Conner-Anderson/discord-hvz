@@ -22,14 +22,16 @@ script_processors.update(fetch_functions(default_script_processors))
 try:
     import custom_question_processors
 except ImportError:
-    logger.debug('custom_question_processors.py not found')
+    #logger.debug('custom_question_processors.py not found')
+    pass
 else:
     question_processors.update(fetch_functions(custom_question_processors))
 
 try:
     import custom_script_processors
 except ImportError:
-    logger.debug('custom_script_processors.py not found')
+    #logger.debug('custom_script_processors.py not found')
+    pass
 else:
     script_processors.update(fetch_functions(custom_script_processors))
 

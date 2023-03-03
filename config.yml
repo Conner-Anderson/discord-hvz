@@ -11,9 +11,10 @@ server_id: 767126786617114635
 
 sheet_id: 1fLYdmc_sp-Rx25794zmPekp48I02lbctyqiLvaLDIwQ
 
-# The timezone offset from UTC that the bot should record and report times in.
-# -7 is US West Coast, -5 is US Central, -4 is US East Coast, Central Europe is +2
-timezone: -5
+# The timezone the GAME is being played in. Surround in "quotes."
+# It is best to set this to your location. Find the IANA database name for your location here: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+# Alternatively, this can be an offset from UTC such as "-5". WARNING: This will not automatically account for seasonal time changes.
+timezone: 'America/Chicago'
 
 # Is registration enabled?
 registration: true
