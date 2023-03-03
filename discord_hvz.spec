@@ -3,12 +3,17 @@
 
 block_cipher = None
 
+import os
+import pkgutil
+
+dateutil_path = os.path.dirname(pkgutil.get_loader("dateutil").path)
+
 
 a = Analysis(
     ['discord_hvz.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[(dateutil_path, 'dateutil')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

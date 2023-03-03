@@ -112,7 +112,8 @@ try:
     config = HVZConfig('config.yml')
 except ConfigError as e:
     logger.error(e)
-    raise e
+    logger.info('Press Enter to close.')
+    input()
 
 
 @dataclass
