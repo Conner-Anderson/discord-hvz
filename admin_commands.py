@@ -198,6 +198,44 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         await chatbotmanager.start_chatbot('tag_logging', ctx.author, target_member=member, override_config=True)
         await ctx.respond('Tag logging chatbot started in a DM', ephemeral=True)
 
+
+    @tag_group.command(name='quick')
+    async def tag_quick(self, ctx: context.ApplicationContext, code: str):
+        """
+        A quick version of tag logging.
+
+        member_string must be an @mentioned member in the channel, an ID, a Discord_Name,
+        a Nickname, or a Name.
+        A tag logging chatbot will be started with the sender of this command,
+        but the discord user actually making the tag will be the one specified.
+        Does not check the faction membership of the tagger or if tag logging is on.
+        """
+        bot = self.bot
+        chatbotmanager: Union[ChatBotManager, None] = bot.get_cog('ChatBotManager')
+        if not chatbotmanager:
+            await ctx.respond('ChatBotManager not loaded. Command failed.')
+            return
+
+        # Modal needs to contain the tag question with a callback function to process it
+        modal = discord.ui.Modal(title="Quick Tag")
+        modal.add_item(
+            discord.ui.InputText(
+                style = discord.InputTextStyle.short,
+                label = "Test question",
+            )
+        )
+
+        async def callback_func(interaction: discord.Interaction):
+            response: "discord.InteractionResponse" = interaction.response
+            logger.info(f"Did the callback")
+            await response.send_message("Did it!", ephemeral=True)
+
+
+        modal.callback = callback_func
+
+        await ctx.response.send_modal(modal)
+
+
     @tag_group.command(name='delete')
     async def tag_delete(
             self,
