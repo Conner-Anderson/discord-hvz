@@ -20,6 +20,11 @@ from buttons import HVZButton
 
 import chatbotprocessors
 
+def dump(obj):
+    """Prints the passed object in a very detailed form for debugging"""
+    for attr in dir(obj):
+        print("obj.%s = %r" % (attr, getattr(obj, attr)))
+
 log = logger
 yaml = YAML(typ='safe')
 
@@ -48,6 +53,8 @@ class QuestionData:
     rejection_response: str = None
     button_options: List[HVZButton] = None
     processor: callable = None
+    modal_default: str = None
+    modal_long: bool = False
 
     coupled_attributes = [
         ('valid_regex', 'rejection_response'),
@@ -65,18 +72,21 @@ class QuestionData:
 
         if question_data.get('button_options'):
             buttons = []
-            log.debug(question_data['button_options'])
-            for label, color in question_data['button_options'].items():
-                buttons.append(
-                    HVZButton(
-                        chatbotmanager.receive_interaction,
-                        custom_id=label,
-                        label=label,
-                        color=color,
-                        unique=True
+            #log.debug(question_data['button_options'])
+            if question_data.get('modal'): # TODO: Move this check elsewhere. This doesn't work because I can't access script data from here
+                logger.warning(f'A question has the attribute "button_options" but is in a script with "modal" set as True. Ignoring buttons: modals can\'t have them.')
+            else:
+                for label, color in question_data['button_options'].items():
+                    buttons.append(
+                        HVZButton(
+                            chatbotmanager.receive_interaction,
+                            custom_id=label,
+                            label=label,
+                            color=color,
+                            unique=True
+                        )
                     )
-                )
-                # log.info(buttons[-1].custom_id)
+                    # log.info(buttons[-1].custom_id)
             question_data['button_options'] = buttons
 
         processor = question_data.get('processor')
@@ -85,6 +95,9 @@ class QuestionData:
                 question_data['processor'] = chatbotprocessors.question_processors[processor]
             except KeyError:
                 raise ConfigError(f'Processor "{processor}" does not match any function.')
+
+        if question_data.get('modal_default') == ('' or 'None' or 'none'):
+            question_data['modal_default'] = None
 
         try:
             return QuestionData(**question_data)
@@ -104,6 +117,17 @@ class QuestionData:
             else:
                 raise e
 
+    def get_input_text(self) -> discord.ui.InputText:
+        if self.modal_long:
+            style = discord.InputTextStyle.long
+        else:
+            style = discord.InputTextStyle.short
+        return discord.ui.InputText(
+            style=style,
+            label=self.query,
+            value=self.modal_default
+        )
+
 
 @dataclass(frozen=True)
 class ScriptData:
@@ -117,6 +141,7 @@ class ScriptData:
     special_buttons: Dict[str, HVZButton]
     beginning: str = ''
     ending: str = ''
+    modal: bool = False
     starting_processor: callable = None
     ending_processor: callable = None
     _postable_button: HVZButton = None
@@ -179,7 +204,7 @@ class ScriptData:
             button_label = kind
 
         postable_button = HVZButton(
-            function=chatbotmanager.start_chatbot_from_interaction,
+            function=chatbotmanager.start_chatbot,
             custom_id=kind,
             label=button_label,
             color=button_color,
@@ -217,6 +242,26 @@ class ScriptData:
             response = responses[i].raw_response
             output += f"**{q.display_name}**: {response}\n"
         return output
+
+    def get_modal(self) -> discord.ui.Modal:
+        # TODO: Add better handling for the 45 character label limit and the 5 question limit
+        # TODO: Need to inherit from discord.ui.Modal so the callback is a method that can get responses from self.children[#].value
+        modal = discord.ui.Modal(title=self.kind)
+        for question in self.questions:
+            try:
+                modal.add_item(
+                    question.get_input_text()
+                )
+            except ValueError as e:
+                logger.warning(f'There was an error building a modal for a chatbot. Script name: {self.kind} Error: {e}')
+                break
+
+        async def callback_func(interaction: discord.Interaction):
+            logger.info(f"Did the callback")
+            await interaction.response.send_message("Did it!", ephemeral=True)
+
+        modal.callback = callback_func
+        return modal
 
 
 class ChatbotState(Enum):
@@ -357,6 +402,15 @@ class ChatBot:
         await self.ask_question()
         return False
 
+    async def send_modal(self, interaction: discord.Interaction, existing_chatbot: ChatBot = None):
+        if existing_chatbot is not None:
+            msg = ''
+            msg += f'Cancelled the previous {existing_chatbot.script.kind} conversation.\n'
+
+
+        await interaction.response.send_modal(self.script.get_modal())
+
+
     async def save(self):
         response_map: dict[str, Any] = {}
 
@@ -402,49 +456,64 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
 
     async def start_chatbot(
             self,
-            chatbot_kind: str,
-            chat_member: discord.Member,
+            interaction: discord.Interaction,
+            chatbot_kind: str = None,
             target_member: discord.Member = None,
             override_config: bool = False
     ) -> None:
-
-        script = self.loaded_scripts[chatbot_kind]
-        if not script.config_checker.get_state() and not override_config:
-            raise ConfigError(f'The chatbot {chatbot_kind} is disabled in the bot\'s configuration. ')
-
-        existing = self.active_chatbots.get(chat_member.id)
-
-        new_chatbot = ChatBot(
-            script,
-            self.bot,
-            chat_member,
-            target_member
-
-        )
-
-        await new_chatbot.ask_question(existing)
-
-        self.active_chatbots[chat_member.id] = new_chatbot
-
-        logger.info(f'Chatbot "{chatbot_kind}" started with {chat_member.name} (Nickname: {chat_member.nick})')
-
-    async def start_chatbot_from_interaction(self, interaction: discord.Interaction):
-        msg = ''
+        # chatbot_kind only needed if the custom_id of the interaction isn't a valid script type
+        response_msg = ''
+        modal = False
         try:
-            await self.start_chatbot(interaction.custom_id, interaction.user)
-        except ValueError as e:
-            msg = e
-        except ConfigError:
-            msg = f'The {interaction.custom_id} chatbot is not enabled on the server right now.'
+            try:
+                script = self.loaded_scripts[interaction.custom_id]
+            except KeyError:
+                script = self.loaded_scripts[chatbot_kind]
+
+            script = self.loaded_scripts.get(chatbot_kind)
+            if not script:
+                script = self.loaded_scripts.get(interaction.custom_id)
+                chatbot_kind = interaction.custom_id
+                if not script:
+                    raise Exception('start_chatbot called but no valid chatbot kind could be found.')
+
+            modal = script.modal
+
+            member = interaction.user
+
+            if not script.config_checker.get_state() and not override_config:
+                raise ConfigError(f'The chatbot {chatbot_kind} is disabled in the bot\'s configuration. ')
+
+            existing = self.active_chatbots.get(member.id)
+
+            new_chatbot = ChatBot(
+                script,
+                self.bot,
+                interaction.user,
+                target_member
+            )
+
+            if modal:
+                await new_chatbot.send_modal(interaction, existing)
+            else:
+                await new_chatbot.ask_question(existing)
+
+            self.active_chatbots[member.id] = new_chatbot
+
+            logger.info(f'Chatbot "{chatbot_kind}" started with {member.name} (Nickname: {member.nick})')
+
+        except (ValueError, ConfigError) as e:
+            response_msg = e
         except discord.Forbidden:
-            msg = 'Please check your settings for the server and turn on "Allow Direct Messages."'
+            response_msg = 'Please check your settings for the server and turn on "Allow Direct Messages."'
         except Exception as e:
-            msg = f'The chatbot failed unexpectedly. Here is the error you can give to an admin: "{e}"'
+            response_msg = f'The chatbot failed unexpectedly. Here is the error you can give to an admin: "{e}"'
             log.exception(e)
         else:
-            msg = 'Check your private messages.'
+            response_msg = 'Check your private messages.'
         finally:
-            await interaction.response.send_message(msg, ephemeral=True)
+            if not modal:
+                await interaction.response.send_message(response_msg, ephemeral=True)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):

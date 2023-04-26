@@ -54,6 +54,7 @@ registration:
 
 tag_logging:
   table: tags
+  modal: true
   beginning: Let's log a tag. Type 'cancel' at any time to stop this conversation.
   ending: Tag logged! Make sure your newly-brainless friend feels welcome in the hoard.
   starting_processor: tag_logging_start
@@ -68,8 +69,9 @@ tag_logging:
     processor: tag_code_to_member_id
   - column: tag_time
     display_name: Tag Time
-    query: About what time did the tag happen? Use the format 3:04pm. If it was yesterday, add "yesterday" to the end.
+    query: "About when did the tag happen? Format: 3:04pm"
     valid_regex: '(?i)\d{1,2}:[0-5]?[0-9]\s?(am|pm)\s?(yesterday)?'
     rejection_response: Please use a format like 12:26pm or 7:00 am
+    modal_default: The current time
     processor: tag_time
 
