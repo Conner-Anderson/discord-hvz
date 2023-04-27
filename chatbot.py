@@ -9,7 +9,6 @@ import discord
 import regex
 from discord.ext import commands
 from loguru import logger
-# import yaml
 from ruamel.yaml import YAML
 
 if TYPE_CHECKING:
@@ -42,6 +41,59 @@ class ResponseError(ValueError):
 class Response:
     raw_response: str
     processed_response: Any
+
+class ChatbotModal(discord.ui.Modal):
+    chatbot: ChatBot
+    def __init__(self, chatbot: ChatBot, *args, **kwargs, ) -> None:
+        self.chatbot = chatbot
+        super().__init__(*args, **kwargs)
+
+    async def callback(self, interaction: discord.Interaction):
+        logger.info("Starting modal callback")
+
+        raw_responses = [x.value.strip() for x in self.children]
+        errors = []
+        any_error = False
+
+        for i, question in enumerate(self.chatbot.script.questions):
+            self.chatbot.responses[i] = Response(raw_responses[i], raw_responses[i])
+            if question.valid_regex:
+                match = regex.fullmatch(r'{}'.format(question.valid_regex), raw_responses[i])
+                if match is None:
+                    errors.append(question.rejection_response)
+                    any_error = True
+                    continue
+
+            if question.processor:
+                try:
+                    self.chatbot.responses[i].processed_response = question.processor(input_text = raw_responses[i], bot=self.chatbot.bot)
+                except ValueError as e:
+                    errors.append(str(e))
+                    any_error = True
+                    continue
+
+            errors.append(None)
+
+        if any_error:
+            error_msg = '**Your response had some errors:**'
+            for i, error in enumerate(errors):
+                if not error:
+                    continue
+                query = self.chatbot.script.questions[i].query
+                error_msg += f'\n\n{query}\n`{raw_responses[i]}`\n*{error}*'
+            await interaction.response.send_message(error_msg, ephemeral=True)
+        else:
+
+            try:
+                await self.chatbot.save()
+            except ResponseError as e:
+                msg = str(e)
+            else:
+                msg = self.chatbot.script.ending
+                logger.info(
+                    f'Chatbot "{self.chatbot.script.kind}" with {self.chatbot.chat_member.name} (Nickname: {self.chatbot.chat_member.nick}) completed successfully.'
+                )
+            await interaction.response.send_message(msg, ephemeral=True)
 
 
 @dataclass(frozen=True)
@@ -243,10 +295,10 @@ class ScriptData:
             output += f"**{q.display_name}**: {response}\n"
         return output
 
-    def get_modal(self) -> discord.ui.Modal:
+    def get_modal(self, chatbot: ChatBot) -> discord.ui.Modal:
         # TODO: Add better handling for the 45 character label limit and the 5 question limit
-        # TODO: Need to inherit from discord.ui.Modal so the callback is a method that can get responses from self.children[#].value
-        modal = discord.ui.Modal(title=self.kind)
+
+        modal = ChatbotModal(title=self.kind, chatbot=chatbot)
         for question in self.questions:
             try:
                 modal.add_item(
@@ -256,11 +308,6 @@ class ScriptData:
                 logger.warning(f'There was an error building a modal for a chatbot. Script name: {self.kind} Error: {e}')
                 break
 
-        async def callback_func(interaction: discord.Interaction):
-            logger.info(f"Did the callback")
-            await interaction.response.send_message("Did it!", ephemeral=True)
-
-        modal.callback = callback_func
         return modal
 
 
@@ -408,7 +455,7 @@ class ChatBot:
             msg += f'Cancelled the previous {existing_chatbot.script.kind} conversation.\n'
 
 
-        await interaction.response.send_modal(self.script.get_modal())
+        await interaction.response.send_modal(self.script.get_modal(self))
 
 
     async def save(self):

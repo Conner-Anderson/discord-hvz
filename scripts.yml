@@ -64,7 +64,7 @@ tag_logging:
     display_name: Tag Code
     query: What is the tag code of the human you tagged?
     valid_regex: '[a-zA-Z\d]{6}'
-    rejection_response: 'The tag code is 6 characters of numbers and capital
+    rejection_response: 'Invalid tag code. The tag code is 6 characters of numbers and capital
       letters. None of these: 0 O Q I 1 D V U 5 S 2 Z'
     processor: tag_code_to_member_id
   - column: tag_time
