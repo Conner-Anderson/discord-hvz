@@ -72,6 +72,6 @@ tag_logging:
     query: "About when did the tag happen? Format: 3:04pm"
     valid_regex: '(?i)\d{1,2}:[0-5]?[0-9]\s?(am|pm)\s?(yesterday)?'
     rejection_response: Please use a format like 12:26pm or 7:00 am
-    modal_default: The current time
+    modal_default: Current_Time
     processor: tag_time
 

@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Dict, Any
 from typing import TYPE_CHECKING
+from datetime import datetime, timedelta
 
 import discord
 import regex
@@ -178,6 +179,11 @@ class QuestionData:
     def get_input_text(self, prefilled_value = None) -> discord.ui.InputText:
         style = discord.InputTextStyle.long if self.modal_long else discord.InputTextStyle.short
         prefilled_value = prefilled_value or self.modal_default
+
+        # TODO: Find a more robust and flexible way to have keyword values
+        if prefilled_value == 'Current_Time':
+            now = datetime.now(tz=config.time_zone) - timedelta(minutes=1)
+            prefilled_value = now.strftime('%I:%M %p')
         return discord.ui.InputText(
             style=style,
             label=self.query,
