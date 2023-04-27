@@ -533,6 +533,7 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
         # chatbot_kind only needed if the custom_id of the interaction isn't a valid script type
         response_msg = ''
         modal = False
+        error = False
         try:
             script = self.loaded_scripts.get(interaction.custom_id) or self.loaded_scripts.get(chatbot_kind)
             if not script:
@@ -565,20 +566,24 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
 
             self.active_chatbots[member.id] = new_chatbot
 
-            logger.info(f'Chatbot "{chatbot_kind}" started with {member.name} (Nickname: {member.nick})')
+            logger.info(f'Chatbot "{script.kind}" started with {member.name} (Nickname: {member.nick})')
 
         except (ValueError, ConfigError) as e:
             response_msg = e
+            error = True
         except discord.Forbidden:
             response_msg = 'Please check your settings for the server and turn on "Allow Direct Messages."'
+            error = True
         except Exception as e:
             response_msg = f'The chatbot failed unexpectedly. Here is the error you can give to an admin: "{e}"'
             log.exception(e)
+            error = True
         else:
             response_msg = 'Check your private messages.'
         finally:
-            if not modal:
+            if error or not modal:
                 await interaction.response.send_message(response_msg, ephemeral=True)
+
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
