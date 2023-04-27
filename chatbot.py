@@ -97,7 +97,7 @@ class ChatbotModal(discord.ui.Modal):
                 logger.info(
                     f'Chatbot "{self.chatbot.script.kind}" with {self.chatbot.chat_member.name} (Nickname: {self.chatbot.chat_member.nick}) completed successfully.'
                 )
-                
+
                 self.chatbot.chatbot_manager.active_chatbots.pop(interaction.user.id)
             await interaction.response.send_message(msg, ephemeral=True)
 
@@ -175,15 +175,13 @@ class QuestionData:
             else:
                 raise e
 
-    def get_input_text(self) -> discord.ui.InputText:
-        if self.modal_long:
-            style = discord.InputTextStyle.long
-        else:
-            style = discord.InputTextStyle.short
+    def get_input_text(self, prefilled_value = None) -> discord.ui.InputText:
+        style = discord.InputTextStyle.long if self.modal_long else discord.InputTextStyle.short
+        prefilled_value = prefilled_value or self.modal_default
         return discord.ui.InputText(
             style=style,
             label=self.query,
-            value=self.modal_default
+            value=prefilled_value
         )
 
 
@@ -305,10 +303,13 @@ class ScriptData:
         # TODO: Add better handling for the 45 character label limit and the 5 question limit
 
         modal = ChatbotModal(title=self.kind, chatbot=chatbot)
-        for question in self.questions:
+
+        for i, question in enumerate(self.questions):
+            prefilled_value = chatbot.responses.get(i)
+            if prefilled_value: prefilled_value = prefilled_value.raw_response
             try:
                 modal.add_item(
-                    question.get_input_text()
+                    question.get_input_text(prefilled_value)
                 )
             except ValueError as e:
                 logger.warning(f'There was an error building a modal for a chatbot. Script name: {self.kind} Error: {e}')
