@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import List, Dict, Any
 from typing import TYPE_CHECKING
-from datetime import datetime, timedelta
 
 import discord
 import regex
@@ -19,11 +19,6 @@ from config import config, ConfigError, ConfigChecker
 from buttons import HVZButton
 
 import chatbotprocessors
-
-def dump(obj):
-    """Prints the passed object in a very detailed form for debugging"""
-    for attr in dir(obj):
-        print("obj.%s = %r" % (attr, getattr(obj, attr)))
 
 log = logger
 yaml = YAML(typ='safe')
@@ -43,8 +38,10 @@ class Response:
     raw_response: str
     processed_response: Any
 
+
 class ChatbotModal(discord.ui.Modal):
     chatbot: ChatBot
+
     def __init__(self, chatbot: ChatBot, *args, **kwargs, ) -> None:
         self.chatbot = chatbot
         super().__init__(*args, **kwargs)
@@ -68,7 +65,8 @@ class ChatbotModal(discord.ui.Modal):
 
             if question.processor:
                 try:
-                    self.chatbot.responses[i].processed_response = question.processor(input_text = raw_responses[i], bot=self.chatbot.bot)
+                    self.chatbot.responses[i].processed_response = question.processor(input_text=raw_responses[i],
+                                                                                      bot=self.chatbot.bot)
                 except ValueError as e:
                     errors.append(str(e))
                     any_error = True
@@ -131,9 +129,11 @@ class QuestionData:
 
         if question_data.get('button_options'):
             buttons = []
-            #log.debug(question_data['button_options'])
-            if question_data.get('modal'): # TODO: Move this check elsewhere. This doesn't work because I can't access script data from here
-                logger.warning(f'A question has the attribute "button_options" but is in a script with "modal" set as True. Ignoring buttons: modals can\'t have them.')
+            # log.debug(question_data['button_options'])
+            if question_data.get(
+                    'modal'):  # TODO: Move this check elsewhere. This doesn't work because I can't access script data from here
+                logger.warning(
+                    f'A question has the attribute "button_options" but is in a script with "modal" set as True. Ignoring buttons: modals can\'t have them.')
             else:
                 for label, color in question_data['button_options'].items():
                     buttons.append(
@@ -176,7 +176,7 @@ class QuestionData:
             else:
                 raise e
 
-    def get_input_text(self, prefilled_value = None) -> discord.ui.InputText:
+    def get_input_text(self, prefilled_value=None) -> discord.ui.InputText:
         style = discord.InputTextStyle.long if self.modal_long else discord.InputTextStyle.short
         prefilled_value = prefilled_value or self.modal_default
 
@@ -213,7 +213,8 @@ class ScriptData:
         return f'[Type: {self.kind}, Table: {self.table} ]'
 
     @classmethod
-    def build(cls, kind: str, script: Dict, chatbotmanager: ChatBotManager, config_checker: ConfigChecker = None) -> ScriptData:
+    def build(cls, kind: str, script: Dict, chatbotmanager: ChatBotManager,
+              config_checker: ConfigChecker = None) -> ScriptData:
         if script.get('questions') is None:
             raise ConfigError
         questions = []
@@ -273,7 +274,8 @@ class ScriptData:
             postable_bot=chatbotmanager.bot)
 
         try:
-            return ScriptData(kind=kind, questions=questions, _postable_button=postable_button, config_checker=config_checker, **script)
+            return ScriptData(kind=kind, questions=questions, _postable_button=postable_button,
+                              config_checker=config_checker, **script)
         except TypeError as e:
             e_text = repr(e)
             if 'missing' in e_text:
@@ -318,7 +320,8 @@ class ScriptData:
                     question.get_input_text(prefilled_value)
                 )
             except ValueError as e:
-                logger.warning(f'There was an error building a modal for a chatbot. Script name: {self.kind} Error: {e}')
+                logger.warning(
+                    f'There was an error building a modal for a chatbot. Script name: {self.kind} Error: {e}')
                 break
 
         return modal
@@ -450,7 +453,8 @@ class ChatBot:
             elif choice == 'modify':
                 self.state = ChatbotState.MODIFYING_SELECTION
             else:
-                await self.chat_member.send('That is an invalid response. Please use the buttons to select, or type "cancel"')
+                await self.chat_member.send(
+                    'That is an invalid response. Please use the buttons to select, or type "cancel"')
                 return False
 
         elif self.state is ChatbotState.MODIFYING_SELECTION:
@@ -461,7 +465,8 @@ class ChatBot:
                     self.state = ChatbotState.MODIFYING
                     break
             else:
-                await self.chat_member.send('That is an invalid response. Please use the buttons to select, or type "cancel"')
+                await self.chat_member.send(
+                    'That is an invalid response. Please use the buttons to select, or type "cancel"')
                 return False
 
         await self.ask_question()
@@ -472,9 +477,7 @@ class ChatBot:
             msg = ''
             msg += f'Cancelled the previous {existing_chatbot.script.kind} conversation.\n'
 
-
         await interaction.response.send_modal(self.script.get_modal(self))
-
 
     async def save(self):
         response_map: dict[str, Any] = {}
@@ -515,7 +518,8 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             except KeyError:
                 config_checker = None
 
-            self.loaded_scripts[kind] = (ScriptData.build(kind, script, chatbotmanager=self, config_checker=config_checker))
+            self.loaded_scripts[kind] = (
+                ScriptData.build(kind, script, chatbotmanager=self, config_checker=config_checker))
 
         log.debug('ChatBotManager Initialized')
 
@@ -530,12 +534,7 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
         response_msg = ''
         modal = False
         try:
-            try:
-                script = self.loaded_scripts[interaction.custom_id]
-            except KeyError:
-                script = self.loaded_scripts[chatbot_kind]
-
-            script = self.loaded_scripts.get(chatbot_kind)
+            script = self.loaded_scripts.get(interaction.custom_id) or self.loaded_scripts.get(chatbot_kind)
             if not script:
                 script = self.loaded_scripts.get(interaction.custom_id)
                 chatbot_kind = interaction.custom_id
@@ -609,7 +608,7 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
                 await self.receive_response(user_id, response_text, interaction=interaction)
             finally:
 
-                # The below locates the button and edits the original message's view to have only it. Disables that button.
+                # The below locates the button and edits the original message's view to have only it. Disables it.
                 old_button = None
                 for v in self.bot.persistent_views:
                     for b in v.children:
