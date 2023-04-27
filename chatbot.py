@@ -49,6 +49,7 @@ class ChatbotModal(discord.ui.Modal):
         super().__init__(*args, **kwargs)
 
     async def callback(self, interaction: discord.Interaction):
+        # Method is called when a user submits the modal
         logger.info("Starting modal callback")
 
         raw_responses = [x.value.strip() for x in self.children]
@@ -81,7 +82,10 @@ class ChatbotModal(discord.ui.Modal):
                     continue
                 query = self.chatbot.script.questions[i].query
                 error_msg += f'\n\n{query}\n`{raw_responses[i]}`\n*{error}*'
-            await interaction.response.send_message(error_msg, ephemeral=True)
+
+            view = discord.ui.View(timeout=None)
+            view.add_item(self.chatbot.script.special_buttons['modify'])
+            await interaction.response.send_message(error_msg, ephemeral=True, view=view)
         else:
 
             try:
@@ -93,6 +97,8 @@ class ChatbotModal(discord.ui.Modal):
                 logger.info(
                     f'Chatbot "{self.chatbot.script.kind}" with {self.chatbot.chat_member.name} (Nickname: {self.chatbot.chat_member.nick}) completed successfully.'
                 )
+                
+                self.chatbot.chatbot_manager.active_chatbots.pop(interaction.user.id)
             await interaction.response.send_message(msg, ephemeral=True)
 
 
@@ -324,6 +330,7 @@ class ChatBot:
     script: ScriptData
     bot: HVZBot
     chat_member: discord.Member
+    chatbot_manager: ChatBotManager
     target_member: discord.Member = None,
     processing: bool = field(default=False, init=False)
     next_question: int = field(init=False, default=0)
@@ -377,10 +384,14 @@ class ChatBot:
 
         await self.chat_member.send(msg, view=view)
 
-    async def receive(self, message: str) -> bool:
+    async def receive(self, message: str, interaction: discord.Interaction = None) -> bool:
 
         message = message.strip()
         processed_response = message
+
+        if self.script.modal and message == 'modify' and interaction:
+            await self.send_modal(interaction)
+            return False
 
         if message.casefold() == 'cancel':
             await self.chat_member.send(f'Chat "{self.script.kind}" cancelled.')
@@ -537,7 +548,8 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
                 script,
                 self.bot,
                 interaction.user,
-                target_member
+                self,
+                target_member,
             )
 
             if modal:
@@ -577,16 +589,17 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
         :param interaction:
         :return:
         """
-        if interaction.channel.type == discord.ChannelType.private:
+        if interaction.type != discord.InteractionType.component:
+            log.warning('receive_interaction got something other than a component')
+            return
+        if interaction.channel.type in (discord.ChannelType.private, discord.ChannelType.text):
             user_id = interaction.user.id
-            if interaction.type != discord.InteractionType.component:
-                log.warning('receive_interaction got something other than a component')
-                return
+
             custom_id = interaction.data['custom_id']
             response_text = self.slice_custom_id(custom_id)
 
             try:
-                await self.receive_response(user_id, response_text)
+                await self.receive_response(user_id, response_text, interaction=interaction)
             finally:
 
                 # The below locates the button and edits the original message's view to have only it. Disables that button.
@@ -609,7 +622,10 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
                     await interaction.response.edit_message(view=new_view)
                     new_view.stop()
 
-    async def receive_response(self, author_id: int, response_text: str):
+        elif interaction.channel.type == discord.ChannelType.text:
+            pass
+
+    async def receive_response(self, author_id: int, response_text: str, interaction: discord.Interaction = None):
         log.debug(f'author_id: {author_id} response_text: {response_text}')
         chatbot = self.active_chatbots.get(author_id)
 
@@ -617,7 +633,7 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             return
         try:
             chatbot.processing = True
-            completed = await chatbot.receive(response_text)
+            completed = await chatbot.receive(response_text, interaction=interaction)
         except Exception as e:
             await chatbot.chat_member.send(
                 f'The chatbot had a critical error. You will need to retry from the beginning.')
