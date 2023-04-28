@@ -118,7 +118,7 @@ class QuestionData:
     ]  # Attributes where if one appears, the other must also
 
     @classmethod
-    def build(cls, question_data: Dict, chatbotmanager: ChatBotManager) -> QuestionData:
+    def build(cls, question_data: Dict, chatbotmanager: ChatBotManager, modal = False) -> QuestionData:
         for pair in cls.coupled_attributes:  # Throw error if both of a pair of coupled attributes don't exist
             for i in range(0, 2):
                 this_attr = pair[i]
@@ -130,8 +130,7 @@ class QuestionData:
         if question_data.get('button_options'):
             buttons = []
             # log.debug(question_data['button_options'])
-            if question_data.get(
-                    'modal'):  # TODO: Move this check elsewhere. This doesn't work because I can't access script data from here
+            if modal:
                 logger.warning(
                     f'A question has the attribute "button_options" but is in a script with "modal" set as True. Ignoring buttons: modals can\'t have them.')
             else:
@@ -159,7 +158,11 @@ class QuestionData:
             question_data['modal_default'] = None
 
         try:
-            return QuestionData(**question_data)
+            question = QuestionData(**question_data)
+            if modal and len(question.query) > 45:
+                raise ConfigError(
+                    f'A modal chatbot script question may have no more than 45 characters. Query: "{question.query}"')
+            return question
         except TypeError as e:
             e_text = repr(e)
             column = question_data.get('column')
@@ -221,7 +224,12 @@ class ScriptData:
         review_selection_buttons = []
         special_buttons = {}
         for q in script.pop('questions'):
-            question = QuestionData.build(q, chatbotmanager)
+            if script.get('modal') and len(questions) >= 5:
+                logger.warning(f'The script for the chatbot "{kind}" is both "modal" and has more than 5 questions. Ignoring further questions.')
+                break
+
+            question = QuestionData.build(q, chatbotmanager, script.get('modal'))
+
             questions.append(question)
             review_selection_buttons.append(HVZButton(
                 chatbotmanager.receive_interaction,
@@ -308,7 +316,6 @@ class ScriptData:
         return output
 
     def get_modal(self, chatbot: ChatBot) -> discord.ui.Modal:
-        # TODO: Add better handling for the 45 character label limit and the 5 question limit
 
         modal = ChatbotModal(title=self.kind, chatbot=chatbot)
 
@@ -473,9 +480,6 @@ class ChatBot:
         return False
 
     async def send_modal(self, interaction: discord.Interaction, existing_chatbot: ChatBot = None):
-        if existing_chatbot is not None:
-            msg = ''
-            msg += f'Cancelled the previous {existing_chatbot.script.kind} conversation.\n'
 
         await interaction.response.send_modal(self.script.get_modal(self))
 
@@ -518,8 +522,10 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             except KeyError:
                 config_checker = None
 
+
             self.loaded_scripts[kind] = (
                 ScriptData.build(kind, script, chatbotmanager=self, config_checker=config_checker))
+
 
         log.debug('ChatBotManager Initialized')
 
@@ -584,7 +590,6 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             if error or not modal:
                 await interaction.response.send_message(response_msg, ephemeral=True)
 
-
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.author.bot:  # Not required? Maybe.
@@ -632,9 +637,6 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
 
                     await interaction.response.edit_message(view=new_view)
                     new_view.stop()
-
-        elif interaction.channel.type == discord.ChannelType.text:
-            pass
 
     async def receive_response(self, author_id: int, response_text: str, interaction: discord.Interaction = None):
         log.debug(f'author_id: {author_id} response_text: {response_text}')
