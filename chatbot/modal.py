@@ -1,6 +1,11 @@
+from __future__ import annotations
 import discord
 import regex
-from chatbot import ChatBot, ResponseError, Response
+from .chatbot_utilities import *
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from chatbot import ChatBot
 
 from loguru import logger
 

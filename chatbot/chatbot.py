@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
@@ -19,7 +21,8 @@ from config import config, ConfigError, ConfigChecker
 from buttons import HVZButton
 
 import chatbotprocessors
-from modal import ChatbotModal
+from .modal import ChatbotModal
+from .chatbot_utilities import *
 
 log = logger
 yaml = YAML(typ='safe')
@@ -28,16 +31,7 @@ yaml = YAML(typ='safe')
 guild_id_list = [config['server_id']]
 
 
-class ResponseError(ValueError):
-    def __init__(self, message=None):
-        if message is not None:
-            super().__init__(message)
 
-
-@dataclass
-class Response:
-    raw_response: str
-    processed_response: Any
 
 
 @dataclass(frozen=True)
@@ -449,8 +443,8 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
     def __init__(self, bot: HVZBot, chatbot_config_checkers: Dict = None):
         self.bot = bot
         startup_data = bot.get_cog_startup_data(self)
-
-        file = open('../scripts.yml', mode='r')
+        path = Path(__file__).parent.parent / "scripts.yml"
+        file = open(path, mode='r')
         scripts_data = yaml.load(file)
         file.close()
 
