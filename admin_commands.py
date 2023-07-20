@@ -152,7 +152,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
     @member_group.command(name='register')
     async def member_register(
             self,
-            ctx,
+            ctx: discord.ApplicationContext,
             member: Option(discord.Member, 'The Discord user to register as a member of the game.')
     ):
         """
@@ -175,7 +175,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             await ctx.respond('ChatBotManager not loaded. Command failed.')
             return
 
-        await chatbotmanager.start_chatbot('registration', ctx.author, ctx, target_member=member, override_config=True)
+        await chatbotmanager.start_chatbot(ctx.interaction, "registration", member, override_config=True)
         await ctx.respond('Registration chatbot started in a DM', ephemeral=True)
 
     @tag_group.command(name='create')
@@ -195,7 +195,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             await ctx.respond('ChatBotManager not loaded. Command failed.')
             return
 
-        await chatbotmanager.start_chatbot('tag_logging', ctx.author, ctx, target_member=member, override_config=True)
+        await chatbotmanager.start_chatbot(ctx.interaction, "tag_logging", member, override_config=True)
         await ctx.respond('Tag logging chatbot started in a DM', ephemeral=True)
 
 
