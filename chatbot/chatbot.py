@@ -459,6 +459,13 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             self.loaded_scripts[kind] = (
                 ScriptData.build(kind, script, chatbotmanager=self, config_checker=config_checker))
 
+        #TODO: Make the bot adapt to new critical chatbot names
+        if not self.loaded_scripts.get("registration"):
+            logger.warning(
+                f'There is no script in scripts.yml named "registration", so the /member register command will not function.')
+        if not self.loaded_scripts.get("tag_logging"):
+            logger.warning(
+                f'There is no script in scripts.yml named "tag_logging", so the /tag create command will not function.')
 
         log.debug('ChatBotManager Initialized')
 
@@ -477,9 +484,9 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             script = self.loaded_scripts.get(interaction.custom_id) or self.loaded_scripts.get(chatbot_kind)
             if not script:
                 script = self.loaded_scripts.get(interaction.custom_id)
-                chatbot_kind = interaction.custom_id
                 if not script:
-                    raise Exception('start_chatbot called but no valid chatbot kind could be found.')
+                    raise ConfigError(f'There is no chatbot called "{chatbot_kind}", so this command doesn\'t work.')
+                chatbot_kind = interaction.custom_id
 
             modal = script.modal
 
