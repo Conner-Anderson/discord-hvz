@@ -68,7 +68,7 @@ class QuestionData:
                         f'If a question has attribute {this_attr}, it must also have {other_attr}. Check scripts.yml')
 
         # Set "none-like" values to actually be None
-        for key, value in question_data:
+        for key, value in question_data.items():
             if value == ('' or 'None' or 'none'): question_data[key] = None
 
         # Replace the "button_options" list with a list of actual HVZButton objects
@@ -160,8 +160,14 @@ class ScriptData:
     @classmethod
     def build(cls, kind: str, script: Dict, chatbotmanager: ChatBotManager,
               config_checker: ConfigChecker = None) -> ScriptData:
+
+        # Set "none-like" values to actually be None
+        for key, value in script.items():
+            if value == ('' or 'None' or 'none'): script[key] = None
+
         if script.get('questions') is None:
-            raise ConfigError
+            raise ConfigError(f'Found a script in scripts.yml called "{kind}, but it has no questions."')
+
         questions = []
         review_selection_buttons = []
         special_buttons = {}
@@ -195,11 +201,8 @@ class ScriptData:
             color='blurple',
             unique=True
         )
-        # Add the additional arguments to the script
-        script.update({'special_buttons': special_buttons, 'review_selection_buttons': review_selection_buttons})
 
-        possible_processors = ['starting_processor', 'ending_processor']
-        for p in possible_processors:
+        for p in ['starting_processor', 'ending_processor']:
             name = script.get(p)
             if not name:
                 continue
@@ -208,24 +211,22 @@ class ScriptData:
             except KeyError:
                 raise ConfigError(f'Processor "{name}" does not match any function.')
 
-        # Assemble a button that can be posted with the /post command.
-        button_color = script.pop('postable_button_color', None)
-        if not button_color:
-            button_color = 'green'
-        button_label = script.pop('postable_button_label', None)
-        if not button_label:
-            button_label = kind
-
+        # Assemble a button that can be posted with the /post command
         postable_button = HVZButton(
             function=chatbotmanager.start_chatbot,
             custom_id=kind,
-            label=button_label,
-            color=button_color,
+            label=script.pop('postable_button_label', kind),
+            color=script.pop('postable_button_color', 'green'),
             postable_bot=chatbotmanager.bot)
 
         try:
-            return ScriptData(kind=kind, questions=questions, _postable_button=postable_button,
-                              config_checker=config_checker, **script)
+            return ScriptData(kind=kind,
+                              questions=questions,
+                              _postable_button=postable_button,
+                              config_checker=config_checker,
+                              special_buttons=special_buttons,
+                              review_selection_buttons=review_selection_buttons,
+                              **script)
         except TypeError as e:
             e_text = repr(e)
             if 'missing' in e_text:
@@ -239,8 +240,7 @@ class ScriptData:
             else:
                 raise e
 
-    @property
-    def length(self):
+    def __len__(self) -> int:
         return len(self.questions)
 
     def get_question(self, question_number: int):
@@ -303,12 +303,13 @@ class ChatBot:
     def __str__(self) -> str:
         return f'<@{self.chat_member.id}>, Script: {str(self.script)}'
 
-    async def ask_question(self, existing_chatbot: ChatBot = None):
+    async def ask_question(self, existing_chatbot: ChatBot = None, interaction: discord.Interaction = None):
         logger.debug(f'Asking question: next_question is {self.next_question}. State: {self.state.name}')
         msg = ''
         view = None
         if self.state is ChatbotState.BEGINNING:
             if self.script.starting_processor:
+                # Should return None to continue, and raise an Error if there's a problem.
                 await self.script.starting_processor(self.target_member, self.bot)
             if existing_chatbot is not None:
                 msg += f'Cancelled the previous {existing_chatbot.script.kind} conversation.\n'
@@ -341,7 +342,10 @@ class ChatBot:
                 view.add_item(button)
             msg = 'Select answer to modify:'
 
-        await self.chat_member.send(msg, view=view)
+        if self.script.modal:
+            await self.send_modal(interaction)
+        else:
+            await self.chat_member.send(msg, view=view)
 
     async def receive(self, message: str, interaction: discord.Interaction = None) -> bool:
 
@@ -380,7 +384,7 @@ class ChatBot:
             self.responses[self.next_question] = Response(message, processed_response)
             self.next_question += 1
 
-            if (self.next_question > self.script.length - 1) or (self.state is ChatbotState.MODIFYING):
+            if (self.next_question > len(self.script) - 1) or (self.state is ChatbotState.MODIFYING):
                 self.state = ChatbotState.REVIEWING
 
 
@@ -421,6 +425,7 @@ class ChatBot:
         await self.ask_question()
         return False
 
+    '''Responds to an interaction with the chatbot's modal version.'''
     async def send_modal(self, interaction: discord.Interaction, existing_chatbot: ChatBot = None):
 
         await interaction.response.send_modal(self.script.get_modal(self))
@@ -497,8 +502,6 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
                     raise ConfigError(f'There is no chatbot called "{chatbot_kind}", so this command doesn\'t work.')
                 chatbot_kind = interaction.custom_id
 
-            modal = script.modal
-
             member = interaction.user
 
             if not script.config_checker.get_state() and not override_config:
@@ -514,10 +517,10 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
                 target_member,
             )
 
-            if modal:
-                await new_chatbot.send_modal(interaction, existing)
-            else:
-                await new_chatbot.ask_question(existing)
+            #if script.modal:
+                #await new_chatbot.send_modal(interaction, existing)
+
+            await new_chatbot.ask_question(existing, interaction=interaction)
 
             self.active_chatbots[member.id] = new_chatbot
 
@@ -536,17 +539,21 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
         else:
             response_msg = 'Check your private messages.'
         finally:
-            if error or not modal:
+            # Assume that if there was an error, the interaction was not responded to.
+            # Assume that if there was no error and the interaction has been responded to, there is nothing to send.
+            if error or not interaction.response.is_done():
                 await interaction.response.send_message(response_msg, ephemeral=True)
 
+    '''
+    A listener function that will receive direct messages from users
+    '''
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        if message.author.bot:  # Not required? Maybe.
+        if message.channel.type != discord.ChannelType.private or message.author.bot:
             return
-        if message.channel.type == discord.ChannelType.private:
-            author_id = message.author.id
-            response_text = str(message.clean_content)
-            await self.receive_response(author_id, response_text)
+        author_id = message.author.id
+        response_text = str(message.clean_content)
+        await self.receive_response(author_id, response_text)
 
     async def receive_interaction(self, interaction: discord.Interaction):
         """
@@ -587,6 +594,9 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
                     await interaction.response.edit_message(view=new_view)
                     new_view.stop()
 
+    '''
+    Receives all responses to a chatbot: direct messages, buttons, modals, etc.
+    '''
     async def receive_response(self, author_id: int, response_text: str, interaction: discord.Interaction = None):
         log.debug(f'author_id: {author_id} response_text: {response_text}')
         chatbot = self.active_chatbots.get(author_id)
@@ -608,6 +618,11 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
         else:
             chatbot.processing = False
 
+    '''
+    A custom id is a string tied to a Discord element such as a button or modal that identifies that particular one
+    to the bot. To make them unique, the bot may add a colon followed by a unique number.
+    This function removes the colon and unique number. If there is none, it returns the original text.
+    '''
     def slice_custom_id(self, text: str):
         return text[:text.find(':')]
 
@@ -617,8 +632,8 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             output_list.append(str(chatbot))
         return output_list
 
+    '''Sends a shutdown message to all members in a chatbot'''
     async def shutdown(self):
-        # Sends a shutdown message to all members in a chatbot
         for i, chatbot in self.active_chatbots.items():
             await chatbot.chat_member.send(
                 'Unfortunately, the bot has shut down. You will need to restart this chatbot when it comes back online.'
