@@ -52,6 +52,13 @@ class QuestionData:
 
     @classmethod
     def build(cls, question_data: Dict, chatbotmanager: ChatBotManager, modal = False) -> QuestionData:
+        '''
+        Constructs a QuestionData, which is a static data structure to store a question as defined
+        in scripts.yaml.
+        The names of the dataclass parameters directly map to names in the yaml file.
+        These names are processed, then passed to build the class. A missing or incorrect name returns an error.
+        Most of this method validates bad configurations and builds certain fields from existing ones
+        '''
         for pair in cls.coupled_attributes:  # Throw error if both of a pair of coupled attributes don't exist
             for i in range(0, 2):
                 this_attr = pair[i]
@@ -60,6 +67,11 @@ class QuestionData:
                     raise ConfigError(
                         f'If a question has attribute {this_attr}, it must also have {other_attr}. Check scripts.yml')
 
+        # Set "none-like" values to actually be None
+        for key, value in question_data:
+            if value == ('' or 'None' or 'none'): question_data[key] = None
+
+        # Replace the "button_options" list with a list of actual HVZButton objects
         if question_data.get('button_options'):
             buttons = []
             # log.debug(question_data['button_options'])
@@ -86,9 +98,6 @@ class QuestionData:
                 question_data['processor'] = chatbotprocessors.question_processors[processor]
             except KeyError:
                 raise ConfigError(f'Processor "{processor}" does not match any function.')
-
-        if question_data.get('modal_default') == ('' or 'None' or 'none'):
-            question_data['modal_default'] = None
 
         try:
             question = QuestionData(**question_data)
