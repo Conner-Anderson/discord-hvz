@@ -4,7 +4,6 @@ from pathlib import Path
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from enum import Enum
 from typing import List, Dict, Any
 from typing import TYPE_CHECKING
 
@@ -29,10 +28,6 @@ yaml = YAML(typ='safe')
 
 # Used for creating commands
 guild_id_list = [config['server_id']]
-
-
-
-
 
 @dataclass(frozen=True)
 class QuestionData:
@@ -201,6 +196,13 @@ class ScriptData:
             color='blurple',
             unique=True
         )
+        special_buttons['cancel'] = HVZButton(
+            chatbotmanager.receive_interaction,
+            custom_id='cancel',
+            label='Cancel',
+            color='gray',
+            unique=True
+        )
 
         for p in ['starting_processor', 'ending_processor']:
             name = script.get(p)
@@ -243,12 +245,7 @@ class ScriptData:
     def __len__(self) -> int:
         return len(self.questions)
 
-    def get_question(self, question_number: int):
-        return self.questions[question_number]
-
-    def get_query(self, question_number: int):
-        return self.questions[question_number].query
-
+    '''Return a string which is a user-readable list of questions and responses'''
     def get_review_string(self, responses: dict[int, Response]) -> str:
         # Return a string list of questions and responses
         output = ''
@@ -276,12 +273,7 @@ class ScriptData:
         return modal
 
 
-class ChatbotState(Enum):
-    BEGINNING = 1
-    QUESTIONING = 2
-    REVIEWING = 3
-    MODIFYING_SELECTION = 4
-    MODIFYING = 5
+
 
 
 @dataclass
@@ -347,6 +339,7 @@ class ChatBot:
         else:
             await self.chat_member.send(msg, view=view)
 
+    '''Receives user responses into the chatbot. Returns True if the chatbot is complete.'''
     async def receive(self, message: str, interaction: discord.Interaction = None) -> bool:
 
         message = message.strip()
@@ -354,6 +347,7 @@ class ChatBot:
 
         if self.script.modal and message == 'modify' and interaction:
             await self.send_modal(interaction)
+            self.state = ChatbotState.MODIFYING
             return False
 
         if message.casefold() == 'cancel':

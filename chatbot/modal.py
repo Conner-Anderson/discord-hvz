@@ -24,6 +24,8 @@ class ChatbotModal(discord.ui.Modal):
         errors = []
         any_error = False
 
+        self.chatbot.state = ChatbotState.REVIEWING
+
         for i, question in enumerate(self.chatbot.script.questions):
             self.chatbot.responses[i] = Response(raw_responses[i], raw_responses[i])
             if question.valid_regex:
@@ -54,9 +56,11 @@ class ChatbotModal(discord.ui.Modal):
 
             view = discord.ui.View(timeout=None)
             view.add_item(self.chatbot.script.special_buttons['modify'])
+            view.add_item(self.chatbot.script.special_buttons['cancel'])
+            # TODO: Ephemeral messages can't have persistent views. Thus these buttons can't be modifed
+            # You can edit the message only through the original interaction.response. Can I save it?
             await interaction.response.send_message(error_msg, ephemeral=True, view=view)
         else:
-
             try:
                 await self.chatbot.save()
             except ResponseError as e:
