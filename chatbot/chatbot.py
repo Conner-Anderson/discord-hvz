@@ -121,7 +121,7 @@ class QuestionData:
         prefilled_value = prefilled_value or self.modal_default
 
         # TODO: Find a more robust and flexible way to have keyword values
-        if prefilled_value == 'Current_Time':
+        if isinstance(prefilled_value, str) and prefilled_value.strip().lower() == ('current_time' or 'current time'):
             now = datetime.now(tz=config.time_zone) - timedelta(minutes=1)
             prefilled_value = now.strftime('%I:%M %p')
         return discord.ui.InputText(
