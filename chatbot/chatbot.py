@@ -97,8 +97,8 @@ class QuestionData:
         try:
             question = QuestionData(**question_data)
             if modal and len(question.query) > 45:
-                raise ConfigError(
-                    f'A modal chatbot script question may have no more than 45 characters. Query: "{question.query}"')
+                logger.warning(
+                    f'A modal chatbot question query may have no more than 45 characters. Question will be trimmed. Query: "{question.query}"')
             return question
         except TypeError as e:
             e_text = repr(e)
@@ -126,7 +126,7 @@ class QuestionData:
             prefilled_value = now.strftime('%I:%M %p')
         return discord.ui.InputText(
             style=style,
-            label=self.query,
+            label=self.query[:45],
             value=prefilled_value
         )
 
