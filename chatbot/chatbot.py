@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import List, Dict, Any
 from typing import TYPE_CHECKING
 
@@ -29,6 +28,7 @@ yaml = YAML(typ='safe')
 # Used for creating commands
 guild_id_list = [config['server_id']]
 
+
 @dataclass(frozen=True)
 class QuestionData:
     column: str
@@ -46,7 +46,7 @@ class QuestionData:
     ]  # Attributes where if one appears, the other must also
 
     @classmethod
-    def build(cls, question_data: Dict, chatbotmanager: ChatBotManager, modal = False) -> QuestionData:
+    def build(cls, question_data: Dict, chatbotmanager: ChatBotManager, modal=False) -> QuestionData:
         '''
         Constructs a QuestionData, which is a static data structure to store a question as defined
         in scripts.yaml.
@@ -168,7 +168,8 @@ class ScriptData:
         special_buttons = {}
         for q in script.pop('questions'):
             if script.get('modal') and len(questions) >= 5:
-                logger.warning(f'The script for the chatbot "{kind}" is both "modal" and has more than 5 questions. Ignoring further questions.')
+                logger.warning(
+                    f'The script for the chatbot "{kind}" is both "modal" and has more than 5 questions. Ignoring further questions.')
                 break
 
             question = QuestionData.build(q, chatbotmanager, script.get('modal'))
@@ -246,6 +247,7 @@ class ScriptData:
         return len(self.questions)
 
     '''Return a string which is a user-readable list of questions and responses'''
+
     def get_review_string(self, responses: dict[int, Response]) -> str:
         # Return a string list of questions and responses
         output = ''
@@ -254,7 +256,7 @@ class ScriptData:
             output += f"**{q.display_name}**: {response}\n"
         return output
 
-    def get_modal(self, chatbot: ChatBot, interaction: discord.Interaction, disable_buttons = False) -> ChatbotModal:
+    def get_modal(self, chatbot: ChatBot, interaction: discord.Interaction, disable_buttons=False) -> ChatbotModal:
 
         modal = ChatbotModal(
             title=self.kind,
@@ -276,9 +278,6 @@ class ScriptData:
                 break
 
         return modal
-
-
-
 
 
 @dataclass
@@ -351,6 +350,7 @@ class ChatBot:
             await self.chat_member.send(msg, view=view)
 
     '''Receives user responses into the chatbot. Returns True if the chatbot is complete.'''
+
     async def receive(self, message: str, interaction: discord.Interaction = None) -> bool:
 
         message = message.strip()
@@ -435,7 +435,9 @@ class ChatBot:
         return False
 
     '''Responds to an interaction with the chatbot's modal version.'''
-    async def send_modal(self, interaction: discord.Interaction, existing_chatbot: ChatBot = None, disable_buttons = False):
+
+    async def send_modal(self, interaction: discord.Interaction, existing_chatbot: ChatBot = None,
+                         disable_buttons=False):
 
         await interaction.response.send_modal(self.script.get_modal(self, interaction, disable_buttons))
 
@@ -478,11 +480,10 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             except KeyError:
                 config_checker = None
 
-
             self.loaded_scripts[kind] = (
                 ScriptData.build(kind, script, chatbotmanager=self, config_checker=config_checker))
 
-        #TODO: Make the bot adapt to new critical chatbot names
+        # TODO: Make the bot adapt to new critical chatbot names
         if not self.loaded_scripts.get("registration"):
             logger.warning(
                 f'There is no script in scripts.yml named "registration", so the /member register command will not function.')
@@ -526,8 +527,8 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
                 target_member,
             )
 
-            #if script.modal:
-                #await new_chatbot.send_modal(interaction, existing)
+            # if script.modal:
+            # await new_chatbot.send_modal(interaction, existing)
 
             await new_chatbot.ask_question(existing, interaction=interaction)
 
@@ -556,10 +557,10 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
     def remove_chatbot(self, chatbot: int | ChatBot):
         self.active_chatbots.pop(int(chatbot))
 
-
     '''
     A listener function that will receive direct messages from users
     '''
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.channel.type != discord.ChannelType.private or message.author.bot:
@@ -594,6 +595,7 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
     '''
     Receives all responses to a chatbot: direct messages, buttons, modals, etc.
     '''
+
     async def receive_response(self, author_id: int, response_text: str, interaction: discord.Interaction = None):
         log.debug(f'author_id: {author_id} response_text: {response_text}')
         chatbot = self.active_chatbots.get(author_id)
@@ -620,6 +622,7 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
     to the bot. To make them unique, the bot may add a colon followed by a unique number.
     This function removes the colon and unique number. If there is none, it returns the original text.
     '''
+
     def slice_custom_id(self, text: str):
         return text[:text.find(':')]
 
@@ -630,6 +633,7 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
         return output_list
 
     '''Sends a shutdown message to all members in a chatbot'''
+
     async def shutdown(self):
         for i, chatbot in self.active_chatbots.items():
             await chatbot.chat_member.send(

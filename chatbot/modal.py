@@ -1,21 +1,25 @@
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import discord
 import regex
+
 from .chatbot_utilities import Response, ResponseError, ChatbotState, disable_previous_buttons
-from typing import TYPE_CHECKING
-from buttons import HVZButton
 
 if TYPE_CHECKING:
     from chatbot import ChatBot
 
 from loguru import logger
 
+
 class ChatbotModal(discord.ui.Modal):
     chatbot: ChatBot
     original_interaction: discord.Interaction
     disable_buttons: bool
 
-    def __init__(self, chatbot: ChatBot, interaction: discord.Interaction, disable_buttons = False, *args, **kwargs, ) -> None:
+    def __init__(self, chatbot: ChatBot, interaction: discord.Interaction, disable_buttons=False, *args,
+                 **kwargs, ) -> None:
         self.chatbot = chatbot
         self.original_interaction = interaction
         self.disable_buttons = disable_buttons
@@ -26,8 +30,8 @@ class ChatbotModal(discord.ui.Modal):
         self.chatbot.remove()
         await self.original_interaction.followup.send("Chatbot timed out.", ephemeral=True)
 
-
     '''Method is called when a user submits the modal'''
+
     async def callback(self, interaction: discord.Interaction):
 
         raw_responses = [x.value.strip() for x in self.children]
