@@ -138,6 +138,7 @@ class ScriptData:
     """
     kind: str
     table: str
+    modal_title: str
     questions: List[QuestionData]
     review_selection_buttons: List[HVZButton]
     special_buttons: Dict[str, HVZButton]
@@ -162,6 +163,9 @@ class ScriptData:
 
         if script.get('questions') is None:
             raise ConfigError(f'Found a script in scripts.yml called "{kind}, but it has no questions."')
+
+        if not script.get('modal_title'):
+            script['modal_title'] = kind
 
         questions = []
         review_selection_buttons = []
@@ -259,7 +263,7 @@ class ScriptData:
     def get_modal(self, chatbot: ChatBot, interaction: discord.Interaction, disable_buttons=False) -> ChatbotModal:
 
         modal = ChatbotModal(
-            title=self.kind,
+            title=self.modal_title[:45],
             chatbot=chatbot,
             interaction=interaction,
             disable_buttons=disable_buttons
