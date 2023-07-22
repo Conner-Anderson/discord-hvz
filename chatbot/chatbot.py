@@ -141,8 +141,8 @@ class ScriptData:
     questions: List[QuestionData]
     review_selection_buttons: List[HVZButton]
     special_buttons: Dict[str, HVZButton]
-    beginning: str = ''
-    ending: str = ''
+    beginning: str = "Starting chatbot. Reply with 'cancel' at any time to stop."
+    ending: str = "Chatbot complete!"
     modal: bool = False
     starting_processor: callable = None
     ending_processor: callable = None
