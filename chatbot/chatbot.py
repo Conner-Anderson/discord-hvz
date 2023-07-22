@@ -254,9 +254,14 @@ class ScriptData:
             output += f"**{q.display_name}**: {response}\n"
         return output
 
-    def get_modal(self, chatbot: ChatBot) -> ChatbotModal:
+    def get_modal(self, chatbot: ChatBot, interaction: discord.Interaction, disable_buttons = False) -> ChatbotModal:
 
-        modal = ChatbotModal(title=self.kind, chatbot=chatbot)
+        modal = ChatbotModal(
+            title=self.kind,
+            chatbot=chatbot,
+            interaction=interaction,
+            disable_buttons=disable_buttons
+        )
 
         for i, question in enumerate(self.questions):
             prefilled_value = chatbot.responses.get(i)
@@ -294,6 +299,12 @@ class ChatBot:
 
     def __str__(self) -> str:
         return f'<@{self.chat_member.id}>, Script: {str(self.script)}'
+
+    def __int__(self) -> int:
+        return self.chat_member.id
+
+    def remove(self) -> None:
+        self.chatbot_manager.remove_chatbot(self)
 
     async def ask_question(self, existing_chatbot: ChatBot = None, interaction: discord.Interaction = None):
         logger.debug(f'Asking question: next_question is {self.next_question}. State: {self.state.name}')
@@ -346,12 +357,16 @@ class ChatBot:
         processed_response = message
 
         if self.script.modal and message == 'modify' and interaction:
-            await self.send_modal(interaction)
+            await self.send_modal(interaction, disable_buttons=True)
             self.state = ChatbotState.MODIFYING
             return False
 
         if message.casefold() == 'cancel':
-            await self.chat_member.send(f'Chat "{self.script.kind}" cancelled.')
+            msg = f'Chat "{self.script.kind}" cancelled.'
+            if interaction:
+                await interaction.response.send_message(msg, ephemeral=True)
+            else:
+                await self.chat_member.send(msg)
             logger.info(
                 f'Chatbot "{self.script.kind}" cancelled by {self.chat_member.name} (Nickname: {self.chat_member.nick})')
             return True
@@ -420,9 +435,9 @@ class ChatBot:
         return False
 
     '''Responds to an interaction with the chatbot's modal version.'''
-    async def send_modal(self, interaction: discord.Interaction, existing_chatbot: ChatBot = None):
+    async def send_modal(self, interaction: discord.Interaction, existing_chatbot: ChatBot = None, disable_buttons = False):
 
-        await interaction.response.send_modal(self.script.get_modal(self))
+        await interaction.response.send_modal(self.script.get_modal(self, interaction, disable_buttons))
 
     async def save(self):
         response_map: dict[str, Any] = {}
@@ -537,6 +552,10 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             # Assume that if there was no error and the interaction has been responded to, there is nothing to send.
             if error or not interaction.response.is_done():
                 await interaction.response.send_message(response_msg, ephemeral=True)
+
+    def remove_chatbot(self, chatbot: int | ChatBot):
+        self.active_chatbots.pop(int(chatbot))
+
 
     '''
     A listener function that will receive direct messages from users

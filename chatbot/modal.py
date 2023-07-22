@@ -3,6 +3,7 @@ import discord
 import regex
 from .chatbot_utilities import *
 from typing import TYPE_CHECKING
+from buttons import HVZButton
 
 if TYPE_CHECKING:
     from chatbot import ChatBot
@@ -11,14 +12,23 @@ from loguru import logger
 
 class ChatbotModal(discord.ui.Modal):
     chatbot: ChatBot
+    original_interaction: discord.Interaction
+    disable_buttons: bool
 
-    def __init__(self, chatbot: ChatBot, *args, **kwargs, ) -> None:
+    def __init__(self, chatbot: ChatBot, interaction: discord.Interaction, disable_buttons = False, *args, **kwargs, ) -> None:
         self.chatbot = chatbot
-        super().__init__(*args, **kwargs)
+        self.original_interaction = interaction
+        self.disable_buttons = disable_buttons
+        super().__init__(*args, timeout=800.0, **kwargs)
 
+    async def on_timeout(self) -> None:
+        logger.info("Modal timed out for chatbot.")
+        self.chatbot.remove()
+        await self.original_interaction.followup.send("Chatbot timed out.", ephemeral=True)
+
+
+    '''Method is called when a user submits the modal'''
     async def callback(self, interaction: discord.Interaction):
-        # Method is called when a user submits the modal
-        logger.info("Starting modal callback")
 
         raw_responses = [x.value.strip() for x in self.children]
         errors = []
@@ -70,6 +80,47 @@ class ChatbotModal(discord.ui.Modal):
                 logger.info(
                     f'Chatbot "{self.chatbot.script.kind}" with {self.chatbot.chat_member.name} (Nickname: {self.chatbot.chat_member.nick}) completed successfully.'
                 )
+            finally:
+                self.chatbot.remove()
 
-                self.chatbot.chatbot_manager.active_chatbots.pop(interaction.user.id)
             await interaction.response.send_message(msg, ephemeral=True)
+
+        if self.disable_buttons:
+            try:
+                await self.disable_previous_buttons()
+            except Exception as e:
+                logger.exception(e)
+
+    async def disable_previous_buttons(self) -> None:
+        components = self.original_interaction.message.components
+
+        if len(components) < 1:
+            return
+
+        custom_id = self.original_interaction.data['custom_id']
+
+        old_button = None
+        for comp in components:
+            if comp.type == discord.enums.ComponentType.button and comp.custom_id == custom_id:
+                old_button = comp
+                break
+            if comp.type != discord.enums.ComponentType.action_row:
+                continue
+            for child in comp.children:
+                if child.type == discord.enums.ComponentType.button and child.custom_id == custom_id:
+                    old_button = child
+                    break
+        if not old_button:
+            return
+        new_view = discord.ui.View(timeout=None)
+
+        new_button = HVZButton(
+            lambda: None,
+            custom_id,
+            label=old_button.label,
+            style=old_button.style,
+            disabled=True
+        )
+        new_view.add_item(new_button)
+
+        await self.original_interaction.followup.edit_message(self.original_interaction.message.id, view=new_view)
