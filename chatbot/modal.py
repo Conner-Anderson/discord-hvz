@@ -1,7 +1,7 @@
 from __future__ import annotations
 import discord
 import regex
-from .chatbot_utilities import *
+from .chatbot_utilities import Response, ResponseError, ChatbotState, disable_previous_buttons
 from typing import TYPE_CHECKING
 from buttons import HVZButton
 
@@ -87,40 +87,6 @@ class ChatbotModal(discord.ui.Modal):
 
         if self.disable_buttons:
             try:
-                await self.disable_previous_buttons()
+                await disable_previous_buttons(self.original_interaction)
             except Exception as e:
                 logger.exception(e)
-
-    async def disable_previous_buttons(self) -> None:
-        components = self.original_interaction.message.components
-
-        if len(components) < 1:
-            return
-
-        custom_id = self.original_interaction.data['custom_id']
-
-        old_button = None
-        for comp in components:
-            if comp.type == discord.enums.ComponentType.button and comp.custom_id == custom_id:
-                old_button = comp
-                break
-            if comp.type != discord.enums.ComponentType.action_row:
-                continue
-            for child in comp.children:
-                if child.type == discord.enums.ComponentType.button and child.custom_id == custom_id:
-                    old_button = child
-                    break
-        if not old_button:
-            return
-        new_view = discord.ui.View(timeout=None)
-
-        new_button = HVZButton(
-            lambda: None,
-            custom_id,
-            label=old_button.label,
-            style=old_button.style,
-            disabled=True
-        )
-        new_view.add_item(new_button)
-
-        await self.original_interaction.followup.edit_message(self.original_interaction.message.id, view=new_view)

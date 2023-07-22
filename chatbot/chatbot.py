@@ -21,7 +21,7 @@ from buttons import HVZButton
 
 import chatbotprocessors
 from .modal import ChatbotModal
-from .chatbot_utilities import *
+from .chatbot_utilities import Response, ResponseError, ChatbotState, disable_previous_buttons
 
 log = logger
 yaml = YAML(typ='safe')
@@ -586,26 +586,10 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             try:
                 await self.receive_response(user_id, response_text, interaction=interaction)
             finally:
-
-                # The below locates the button and edits the original message's view to have only it. Disables it.
-                old_button = None
-                for v in self.bot.persistent_views:
-                    for b in v.children:
-                        if isinstance(b, discord.ui.Button) and b.custom_id == custom_id:
-                            old_button = b
-                            break
-                if old_button is not None:
-                    new_view = discord.ui.View(timeout=None)
-                    new_view.add_item(HVZButton(
-                        self.receive_interaction,
-                        custom_id,
-                        label=old_button.label,
-                        style=old_button.style,
-                        disabled=True
-                    ))
-
-                    await interaction.response.edit_message(view=new_view)
-                    new_view.stop()
+                try:
+                    await disable_previous_buttons(interaction)
+                except Exception as e:
+                    logger.exception(e)
 
     '''
     Receives all responses to a chatbot: direct messages, buttons, modals, etc.
