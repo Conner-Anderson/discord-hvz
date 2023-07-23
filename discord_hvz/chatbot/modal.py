@@ -8,7 +8,7 @@ import regex
 from .chatbot_utilities import Response, ResponseError, ChatbotState, disable_previous_buttons
 
 if TYPE_CHECKING:
-    from chatbot import ChatBot
+    from discord_hvz.chatbot import ChatBot
 
 from loguru import logger
 

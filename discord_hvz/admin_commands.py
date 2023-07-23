@@ -8,12 +8,11 @@ from discord.commands import context
 from discord.ext import commands
 from loguru import logger
 
-import utilities
-import utilities as util
-from config import config
+from .utilities import generate_tag_tree
+from .config import config
 
 if TYPE_CHECKING:
-    from discord_hvz import HVZBot
+    from main import HVZBot
     from chatbot import ChatBotManager
 
 log = logger
@@ -387,7 +386,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         """
         bot = self.bot
         await ctx.response.defer()
-        tree = util.generate_tag_tree(bot.db, bot)
+        tree = generate_tag_tree(bot.db, bot)
         if tree == '':
             tree = 'There are no tags yet! Try again when there are.'
         tree = '**THE ZOMBIE FAMILY TREE\n**' + tree

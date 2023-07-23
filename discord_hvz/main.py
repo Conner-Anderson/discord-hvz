@@ -18,13 +18,13 @@ from dotenv import load_dotenv
 from loguru import logger
 from sqlalchemy.exc import NoSuchColumnError
 
-from admin_commands import AdminCommandsCog
-from buttons import HVZButtonCog
-from chatbot import ChatBotManager
-from config import config, ConfigError, ConfigChecker
-from display import DisplayCog
-from item_tracker import ItemTrackerCog
-from hvzdb import HvzDb
+#from admin_commands import AdminCommandsCog
+#from buttons import HVZButtonCog
+#from chatbot import ChatBotManager
+from .config import config, ConfigError, ConfigChecker
+#from display import DisplayCog
+#from item_tracker import ItemTrackerCog
+from .database import HvzDb
 #import setup_checker
 
 # The latest Discord HvZ release this code is, or is based on.
@@ -308,11 +308,11 @@ def main():
 
         bot = HVZBot()
 
-        bot.load_extension('buttons')
-        bot.load_extension('chatbot')
-        bot.load_extension('admin_commands')
-        bot.load_extension('display')
-        bot.load_extension('item_tracker')
+        bot.load_extension('.buttons', package = 'discord_hvz')
+        bot.load_extension('.chatbot', package = 'discord_hvz')
+        bot.load_extension('.admin_commands', package = 'discord_hvz')
+        bot.load_extension('.display', package = 'discord_hvz')
+        bot.load_extension('.item_tracker', package = 'discord_hvz')
 
         bot.run(TOKEN)
 

@@ -9,8 +9,8 @@ import discord
 from discord.ext import pages
 
 if TYPE_CHECKING:
-    from hvzdb import HvzDb
-    from discord_hvz import HVZBot
+    from database import HvzDb
+    from main import HVZBot
     import sqlalchemy
 
 from loguru import logger
@@ -255,7 +255,7 @@ def dump(obj):
 
 
 if __name__ == '__main__':
-    from hvzdb import HvzDb
+    from database import HvzDb
 
     db = HvzDb()
     result = divide_string(generate_tag_tree(db), 200)

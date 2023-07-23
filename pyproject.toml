@@ -7,7 +7,6 @@ license = "MIT"
 
 [tool.poetry.scripts]
 discord_hvz = "discord_hvz:main"
-main = "discord_hvz:main"
 
 
 [tool.poetry.dependencies]

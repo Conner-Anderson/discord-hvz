@@ -1,15 +1,14 @@
 from __future__ import annotations
-from typing import Dict, List, Any
+from typing import Dict, Any
 from datetime import datetime
-from utilities import make_tag_code
+from discord_hvz.utilities import make_tag_code
 from loguru import logger
-from config import config
+from discord_hvz.config import config
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     # This avoids circular imports while still allowing type checking for these items
-    from discord_hvz import HVZBot
-    from hvzdb import HvzDb
+    from discord_hvz.main import HVZBot
     import discord
 
 # A starting function returns None. An ending function must return a dict[str, Any] (a dictionary that maps database
