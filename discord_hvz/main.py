@@ -29,7 +29,7 @@ from discord_hvz.database import HvzDb
 #import setup_checker
 
 # The latest Discord HvZ release this code is, or is based on.
-VERSION = "0.2.2"
+VERSION = "0.3.0"
 
 
 def dump(obj):
