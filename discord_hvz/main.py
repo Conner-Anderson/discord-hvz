@@ -8,6 +8,7 @@ import sys
 import time
 from datetime import datetime
 from os import getenv
+from pathlib import Path
 from typing import Dict, Union, Any, Type
 
 import discord
@@ -43,8 +44,8 @@ TOKEN = getenv("TOKEN")
 log = logger
 logger.remove()
 logger.add(sys.stderr, level="INFO")
-
-logger.add('logs/discord-hvz_{time}.log', rotation='1 week', level='DEBUG', mode='a')
+log_path = Path().cwd().parent / 'logs/discord-hvz_{time}.log'
+logger.add(log_path, rotation='1 week', level='DEBUG', mode='a')
 
 discord_handler = logging.getLogger('discord')
 
