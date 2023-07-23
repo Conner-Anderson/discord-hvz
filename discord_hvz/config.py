@@ -16,6 +16,8 @@ yaml.preserve_quotes = True
 # file = open('config.yml', mode='r')
 # config = yaml.safe_load(file)
 
+DEFAULT_DB_PATH = Path.cwd().parent / 'game_database.db'
+
 class ConfigError(Exception):
     def __init__(self, message=None):
         if message is not None:
@@ -26,13 +28,14 @@ class HVZConfig:
     _config: dict
     filepath: Path
     time_zone: datetime.tzinfo
+    db_path: Path
 
     def __init__(self, filepath: Path):
         self.filepath = filepath
         with open(filepath) as fp:
             self._config = yaml.load(fp)
 
-        timezone_setting = self._config['timezone']
+        timezone_setting = self['timezone']
         if timezone_setting is None:
             timezone_setting = 0
 
@@ -53,6 +56,10 @@ class HVZConfig:
                 offset=timedelta(hours=int(timezone_offset))
             )
 
+        self.db_path = self.find_database_path(self['database_path'])
+
+        #logger.info(f'db_path: {self.db_path}  Exists: {self.db_path.exists()}   is_dir: {self.db_path.is_dir()}   suffix: {self.db_path.suffix}')
+
     def commit(self):
         with open(self.filepath, mode='w') as fp:
             yaml.dump(self._config, fp)
@@ -62,7 +69,7 @@ class HVZConfig:
             return self._config[item]
         except KeyError as e:
             raise ConfigError(
-                f'Looked for the config option "{e}" in {self.filepath} but didn\'t find it. Perhaps there is a typo in your configuration?') from e
+                f'Looked for the config option {e} in {self.filepath.name} but didn\'t find it. Perhaps there is a typo in your configuration?') from e
 
     def __setitem__(self, key, value):
         try:
@@ -72,6 +79,31 @@ class HVZConfig:
                 f'Adding the new config option "{key}" with the value "{value}" to {self.filepath}. Was this intended?')
         self._config[key] = value
         self.commit()
+
+    def find_database_path(self, configured_path: str) -> Path:
+        top_dir = Path.cwd().parent
+        db_path = top_dir / configured_path
+        #logger.info(f"Checking {db_path}")
+        if db_path.is_dir():
+            #logger.info(f"Found folder: {db_path}")
+            return db_path / DEFAULT_DB_PATH.name
+        if not db_path.suffix == ".db":
+            if not db_path.suffix:
+                raise ConfigError(
+                    f"'database_path' in {self.filepath.name} is a folder that doesn't exist. \n"
+                    f"Either create the folder to have the bot generate a database file with the default name, "
+                    f"or specify the file name, such as 'game_database.db' \n"
+                    f"Given path: '{configured_path}' which points to {db_path}"
+                )
+            raise ConfigError(
+                f"'database_path' in {self.filepath.name} is either set to a file that doesn't end in '.db' \n"
+                f"or a folder that doesn't exist. Given path: '{configured_path}' which points to {db_path}"
+            )
+        if db_path.exists():
+            return db_path
+
+        return DEFAULT_DB_PATH
+            #raise ConfigError(f'Could not find the database file')
 
     def check_setup_prelaunch(self) -> bool:
 
@@ -83,19 +115,19 @@ class HVZConfig:
         warnings: List[str] = []
         errors: List[str] = []
         if config['server_id'] == 767126786617114635:
-            warnings.append(f"The 'server_id' setting in {self.filepath} is still default. Change this to yours.")
+            warnings.append(f"The 'server_id' setting in {self.filepath.name} is still default. Change this to yours.")
         elif config['server_id'] is None:
-            errors.append(f"The 'server_id' setting in {self.filepath} is empty. Fill it with your ID.")
+            errors.append(f"The 'server_id' setting in {self.filepath.name} is empty. Fill it with your ID.")
 
         if config['sheet_id'] == '1fLYdmc_sp-Rx25794zmPekp48I02lbctyqiLvaLDIwQ':
             warnings.append(
-                f"The 'sheet_id' setting in {self.filepath} is still default. Change that of your target Google Sheet, or set 'google_sheet_export' to false.")
+                f"The 'sheet_id' setting in {self.filepath.name} is still default. Change that of your target Google Sheet, or set 'google_sheet_export' to false.")
         if config['sheet_id'] is None:
             warnings.append(
-                f"The 'sheet_id' setting in {self.filepath} is empty. Fill it with that of your target Google Sheet, or set 'google_sheet_export' to false.")
+                f"The 'sheet_id' setting in {self.filepath.name} is empty. Fill it with that of your target Google Sheet, or set 'google_sheet_export' to false.")
 
         if config['timezone'] is None:
-            warnings.append(f"There is no timezone set in {self.filepath}, so the bot will default to UTC.")
+            warnings.append(f"There is no timezone set in {self.filepath.name}, so the bot will default to UTC.")
 
         if warnings:
             for warning in warnings:
@@ -124,3 +156,4 @@ class ConfigChecker:
 
     def get_state(self):
         return config[self.config_key]
+

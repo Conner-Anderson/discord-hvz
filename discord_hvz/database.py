@@ -17,6 +17,8 @@ from sqlalchemy.exc import NoSuchTableError
 from discord_hvz.sheets import SheetsInterface
 from discord_hvz.config import config
 
+# TODO: Make database name more human-friendly by default, and have it configurable
+
 if TYPE_CHECKING:
     pass
 
@@ -34,7 +36,7 @@ class HvzDb:
     metadata_obj: MetaData = field(init=False, default_factory=MetaData)
     tables: Dict[str, Table] = field(init=False, default_factory=dict)
     sheet_interface: SheetsInterface = field(init=False, default=None)
-    filepath: Path = Path(__file__).parent.parent / 'hvzdb.db'
+    filepath: Path = config.db_path
     database_config: Dict[str, Dict[str, str]] = field(init=False, default_factory=dict)
 
     # Table names that cannot be created in the config. Reserved for cogs / modules
@@ -68,6 +70,12 @@ class HvzDb:
         # TODO: Need to make sure the required tables are always created. Might be config-depended now...
         self.database_config: Dict[str, Dict[str, str]] = copy.deepcopy(config['database_tables'])
         self.engine = create_engine(f"sqlite+pysqlite:///{str(self.filepath)}", future=True)
+
+        if not self.filepath.exists():
+            logger.warning(
+                f"No database found at the path specified by 'database_path' in {config.filepath.name}. It will be created at {self.filepath} \n"
+                "Now creating the needed tables..."
+            )
 
         for table_name, column_dict in self.database_config.items():
             try:
