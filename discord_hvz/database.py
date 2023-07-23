@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import copy
+from pathlib import Path
 from dataclasses import dataclass, field
-from typing import List, Union, Dict, Tuple, TYPE_CHECKING, ClassVar
+from typing import List, Union, Dict, TYPE_CHECKING, ClassVar
 
 import discord
 import sqlalchemy
@@ -13,8 +14,10 @@ from sqlalchemy import select, delete, update
 from sqlalchemy.engine import Row
 from sqlalchemy.exc import NoSuchTableError
 
-import sheets
-from config import config
+from discord_hvz.sheets import SheetsInterface
+from discord_hvz.config import config
+
+# TODO: Make database name more human-friendly by default, and have it configurable
 
 if TYPE_CHECKING:
     pass
@@ -32,8 +35,8 @@ class HvzDb:
     engine: sqlalchemy.engine.Engine = field(init=False)
     metadata_obj: MetaData = field(init=False, default_factory=MetaData)
     tables: Dict[str, Table] = field(init=False, default_factory=dict)
-    sheet_interface: sheets.SheetsInterface = field(init=False, default=None)
-    filename: str = 'hvzdb.db'
+    sheet_interface: SheetsInterface = field(init=False, default=None)
+    filepath: Path = config.db_path
     database_config: Dict[str, Dict[str, str]] = field(init=False, default_factory=dict)
 
     # Table names that cannot be created in the config. Reserved for cogs / modules
@@ -66,7 +69,13 @@ class HvzDb:
     def __post_init__(self):
         # TODO: Need to make sure the required tables are always created. Might be config-depended now...
         self.database_config: Dict[str, Dict[str, str]] = copy.deepcopy(config['database_tables'])
-        self.engine = create_engine(f"sqlite+pysqlite:///{self.filename}", future=True)
+        self.engine = create_engine(f"sqlite+pysqlite:///{str(self.filepath)}", future=True)
+
+        if not self.filepath.exists():
+            logger.warning(
+                f"No database found at the path specified by 'database_path' in {config.filepath.name}. It will be created at {self.filepath} \n"
+                "Now creating the needed tables..."
+            )
 
         for table_name, column_dict in self.database_config.items():
             try:
@@ -97,7 +106,7 @@ class HvzDb:
         self.metadata_obj.create_all(self.engine)
 
         if config['google_sheet_export'] == True:
-            self.sheet_interface = sheets.SheetsInterface(self)
+            self.sheet_interface = SheetsInterface(self)
 
     def prepare_table(self, table_name: str, columns: Dict[str, Union[str, type]]) -> None:
         """

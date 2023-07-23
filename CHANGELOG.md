@@ -2,7 +2,7 @@
 
 All noteable changes to this project will be documented in this file.
 
-### 0.2.2 Minor Release
+### 0.3.0 Minor Version Release
 
 #### Features
 
@@ -16,13 +16,21 @@ See the updated chatbot documentation for details.
 
 #### Minor Changes
 
+- The location and name of the database file can now be specified in config.yml
 - Updated the underlying libraries to stay up-to-date with Discord API changes
 - Improved general error handling regarding the chatbot
 - Under-the-hood reorganization for easier to navigate code
 
 #### Breaking Changes
 
-### 0.2.1 Minor Release
+<font color="yellow"> No breaking changes, but there are notes: </font> 
+
+- Since the database file location and name can be specified in `config.yml`, old configs will be missing the `database_path` field.  
+The bot will still load `hvzdb.db` files from the original location, but this is depreciated.  
+You may wish to copy the notes and field from the new `config.yml`
+- Since the core code has been reorganized, there is a new installation method. See the [documentation](https://conner-anderson.github.io/discord-hvz-docs/0.3.0/installation/#updating).
+
+### 0.2.1 Patch Release
 
 #### Features
 

@@ -1,8 +1,8 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 from enum import Enum
 import discord
-from buttons import HVZButton
+from discord_hvz.buttons import HVZButton
 
 
 class ResponseError(ValueError):

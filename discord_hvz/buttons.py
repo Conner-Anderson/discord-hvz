@@ -10,10 +10,10 @@ from discord.commands import Option
 from discord.ext import commands
 from loguru import logger
 
-from config import config
+from .config import config
 
 if typing.TYPE_CHECKING:
-    from discord_hvz import HVZBot
+    from main import HVZBot
 
 log = logger
 

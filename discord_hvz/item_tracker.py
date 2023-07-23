@@ -8,12 +8,12 @@ from discord.commands import SlashCommandGroup, Option
 from discord.ext import commands
 from sqlalchemy.engine import Row
 
-import utilities
+from .utilities import respond_paginated
 
 if TYPE_CHECKING:
-    from discord_hvz import HVZBot
+    from main import HVZBot
 
-from config import config
+from .config import config
 
 # Used for creating commands
 guild_id_list = [config['server_id']]
@@ -97,7 +97,7 @@ class ItemTrackerCog(commands.Cog, guild_ids=guild_id_list):
                 owner = f'<@{item.owner}>'
             msg += f"\n{item.id}  {item.name} {owner} "
 
-        await utilities.respond_paginated(ctx, msg)
+        await respond_paginated(ctx, msg)
 
     @item_group.command(name='create')
     async def item_create(

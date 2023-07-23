@@ -1,5 +1,5 @@
-import os
 import sys
+from pathlib import Path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -14,25 +14,27 @@ import sqlalchemy
 from discord.commands import slash_command, Option
 from loguru import logger
 
-import utilities
-from config import config
+from .utilities import pool_function, have_lists_changed
+from .config import config
 
 if TYPE_CHECKING:
-    from hvzdb import HvzDb
-    from discord_hvz import HVZBot
+    from database import HvzDb
+    from main import HVZBot
 
 guild_id_list = [config['server_id']]
 LAST_GAME_PLOT_HASH = None
 
-def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
+def create_game_plot(db: 'HvzDb', filepath=None) -> discord.File:
     global LAST_GAME_PLOT_HASH
-    image_path = "plots/fig1.jpeg"
-    if not os.path.exists("plots"):
-        os.mkdir("plots")
+    image_folder = Path(__file__).parent / "plots"
+    if not image_folder.exists():
+        image_folder.mkdir()
+    image_path = image_folder / "latest_gameplot.jpeg"
 
-    if not filename:
-        filename = db.filename
-    engine = sqlalchemy.create_engine(f"sqlite+pysqlite:///{filename}")
+    if not filepath:
+        filepath: str = str(db.filepath)
+    # TODO: Access the database in a more sustainable way
+    engine = sqlalchemy.create_engine(f"sqlite+pysqlite:///{str(filepath)}")
     tags_df = pd.read_sql_table('tags', con=engine, columns=['tag_time', 'revoked_tag'])
     new_hash = pandas.util.hash_pandas_object(tags_df).sum()
 
@@ -42,7 +44,7 @@ def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
         LAST_GAME_PLOT_HASH = new_hash
 
 
-    elif LAST_GAME_PLOT_HASH != new_hash or not os.path.exists(image_path):
+    elif LAST_GAME_PLOT_HASH != new_hash or not image_path.exists():
         members_df = pd.read_sql_table('members', con=engine, columns=['registration_time', 'oz'])
 
         def total_players(x):
@@ -233,7 +235,7 @@ class HVZPanel:
                     self.elements.append(element())
 
     async def refresh(self):
-        utilities.pool_function(self._refresh, 6.0)
+        pool_function(self._refresh, 6.0)
 
     async def _refresh(self):
         embed, file = self.create_embed()
@@ -381,7 +383,7 @@ class DisplayCog(discord.Cog, guild_ids=guild_id_list):
     async def on_member_update(self, before: discord.Member, after: discord.Member):
         for name, role in self.bot.roles.items():
             self.roles_to_watch.append(role)
-        changed = utilities.have_lists_changed(before.roles, after.roles, self.roles_to_watch)
+        changed = have_lists_changed(before.roles, after.roles, self.roles_to_watch)
         if not changed:
             return
         self.bot.dispatch('role_change')
@@ -406,6 +408,4 @@ Tags today: On tag or role change
 New players today: On registration
 
 """
-if __name__ == '__main__':
-    create_game_plot('thing', filename='hvzdb.db')
-    create_game_plot('thing', filename='hvzdb.db')
+
