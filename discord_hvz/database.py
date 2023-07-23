@@ -14,8 +14,8 @@ from sqlalchemy import select, delete, update
 from sqlalchemy.engine import Row
 from sqlalchemy.exc import NoSuchTableError
 
-from .sheets import SheetsInterface
-from .config import config
+from discord_hvz.sheets import SheetsInterface
+from discord_hvz.config import config
 
 if TYPE_CHECKING:
     pass

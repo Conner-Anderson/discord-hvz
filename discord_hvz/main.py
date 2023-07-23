@@ -21,10 +21,10 @@ from sqlalchemy.exc import NoSuchColumnError
 #from admin_commands import AdminCommandsCog
 #from buttons import HVZButtonCog
 #from chatbot import ChatBotManager
-from .config import config, ConfigError, ConfigChecker
+from discord_hvz.config import config, ConfigError, ConfigChecker
 #from display import DisplayCog
 #from item_tracker import ItemTrackerCog
-from .database import HvzDb
+from discord_hvz.database import HvzDb
 #import setup_checker
 
 # The latest Discord HvZ release this code is, or is based on.
