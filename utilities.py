@@ -248,6 +248,12 @@ def have_lists_changed(list1: List, list2: List, items: List) -> bool:
     return False
 
 
+def dump(obj):
+    """Prints the passed object in a very detailed form for debugging"""
+    for attr in dir(obj):
+        print("obj.%s = %r" % (attr, getattr(obj, attr)))
+
+
 if __name__ == '__main__':
     from hvzdb import HvzDb
 

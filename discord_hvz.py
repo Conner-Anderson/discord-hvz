@@ -28,7 +28,7 @@ from hvzdb import HvzDb
 #import setup_checker
 
 # The latest Discord HvZ release this code is, or is based on.
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 
 
 def dump(obj):

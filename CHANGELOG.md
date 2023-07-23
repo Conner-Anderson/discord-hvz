@@ -2,6 +2,26 @@
 
 All noteable changes to this project will be documented in this file.
 
+### 0.2.2 Minor Release
+
+#### Features
+
+- Added modal chatbots. These are chatbots that appear as pop-up windows within Discord with a list of questions and fill-in dialogues. 
+Their requirements are more restrictive, but they are quicker to use: especially on mobile.
+See the updated chatbot documentation for details.
+- The default tag_logging chatbot script is now modal.
+
+#### Bug Fixes
+- Fixed error when no `beginning` or `ending` field is provided in a chatbot script. Now uses default text.
+
+#### Minor Changes
+
+- Updated the underlying libraries to stay up-to-date with Discord API changes
+- Improved general error handling regarding the chatbot
+- Under-the-hood reorganization for easier to navigate code
+
+#### Breaking Changes
+
 ### 0.2.1 Minor Release
 
 #### Features
