@@ -55,8 +55,23 @@ class HVZConfig:
             self.time_zone = timezone(
                 offset=timedelta(hours=int(timezone_offset))
             )
+        # Backward-compatibility code for pre-v0.3.0 versions
+        try:
+            db_path = self['database_path']
+        except ConfigError as e:
+            deprec_path = Path.cwd().parent / "hvzdb.db"
+            if deprec_path.exists():
+                logger.warning(
+                    f"There is no config option 'database_path' in {self.filepath.name} "
+                    f"but {deprec_path} exists. Using it. \n"
+                    f"This functionality is depreciated and will be removed after version 0.3. "
+                    f"You should instead specify a database path in {self.filepath.name}"
+                )
+                db_path = deprec_path
+            else:
+                raise e from e
 
-        self.db_path = self.find_database_path(self['database_path'])
+        self.db_path = self.find_database_path(db_path)
 
         #logger.info(f'db_path: {self.db_path}  Exists: {self.db_path.exists()}   is_dir: {self.db_path.is_dir()}   suffix: {self.db_path.suffix}')
 
