@@ -8,15 +8,12 @@ from discord.commands import context
 from discord.ext import commands
 from loguru import logger
 
-from .utilities import generate_tag_tree
+from .utilities import generate_tag_tree, respond_paginated
 from .config import config
 
 if TYPE_CHECKING:
     from main import HVZBot
     from chatbot import ChatBotManager
-
-log = logger
-
 
 def dump(obj):
     """Prints the passed object in a very detailed form for debugging"""
@@ -120,7 +117,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             member_row = bot.db.get_member(member)
         except ValueError as e:
             await ctx.respond('This user is not in the database. They probably aren\'t registered.')
-            log.warning(e)
+            logger.warning(e)
             return
 
         original_value = member_row[attribute]
@@ -146,7 +143,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             sub_string = f'<@!{member.id}>\t{member.name}\t{member.email}\n'
             message += sub_string
 
-        await utilities.respond_paginated(ctx, message)
+        await respond_paginated(ctx, message)
 
     @member_group.command(name='register')
     async def member_register(
@@ -376,7 +373,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             await ctx.respond('You aren\'t registered for the game.', ephemeral=True)
         except Exception as e:
             await ctx.author.send('Sorry, something went wrong with that command. Derp.')
-            log.exception(e)
+            logger.exception(e)
 
     @slash_command(name='tag_tree')
     async def tag_tree(self, ctx: context.ApplicationContext):
@@ -391,7 +388,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             tree = 'There are no tags yet! Try again when there are.'
         tree = '**THE ZOMBIE FAMILY TREE\n**' + tree
 
-        await utilities.respond_paginated(ctx, tree)
+        await respond_paginated(ctx, tree)
 
 
 
@@ -423,7 +420,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
                     return
 
         await ctx.respond('Shutting Down')
-        log.critical('Shutting Down\n. . .\n\n')
+        logger.critical('Shutting Down\n. . .\n\n')
         await bot.close()
         time.sleep(1)
 
@@ -449,7 +446,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             member_row = bot.db.get_member(member)
         except ValueError as e:
             await ctx.respond('This user is not in the database. They probably aren\'t registered.')
-            log.warning(e)
+            logger.warning(e)
             return
 
         if setting is None:
@@ -472,4 +469,4 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
                 await c_channel.set_permissions(member, overwrite=None)
         except Exception as e:
             await ctx.respond('Could not change permissions in the channels. Please give the bot permission to.')
-            log.warning(e)
+            logger.warning(e)

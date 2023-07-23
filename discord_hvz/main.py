@@ -310,7 +310,7 @@ def main():
 
         bot.load_extension('.buttons', package = 'discord_hvz')
         bot.load_extension('.chatbot', package = 'discord_hvz')
-        bot.load_extension('.admin_commands', package = 'discord_hvz')
+        bot.load_extension('.commands', package = 'discord_hvz')
         bot.load_extension('.display', package = 'discord_hvz')
         bot.load_extension('.item_tracker', package = 'discord_hvz')
 

@@ -1,5 +1,5 @@
-import os
 import sys
+from pathlib import Path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -24,15 +24,17 @@ if TYPE_CHECKING:
 guild_id_list = [config['server_id']]
 LAST_GAME_PLOT_HASH = None
 
-def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
+def create_game_plot(db: 'HvzDb', filepath=None) -> discord.File:
     global LAST_GAME_PLOT_HASH
-    image_path = "../plots/fig1.jpeg"
-    if not os.path.exists("../plots"):
-        os.mkdir("../plots")
+    image_folder = Path(__file__).parent / "plots"
+    if not image_folder.exists():
+        image_folder.mkdir()
+    image_path = image_folder / "latest_gameplot.jpeg"
 
-    if not filename:
-        filename: str = str(db.filepath)
-    engine = sqlalchemy.create_engine(f"sqlite+pysqlite:///{filename}")
+    if not filepath:
+        filepath: str = str(db.filepath)
+    # TODO: Access the database in a more sustainable way
+    engine = sqlalchemy.create_engine(f"sqlite+pysqlite:///{str(filepath)}")
     tags_df = pd.read_sql_table('tags', con=engine, columns=['tag_time', 'revoked_tag'])
     new_hash = pandas.util.hash_pandas_object(tags_df).sum()
 
@@ -42,7 +44,7 @@ def create_game_plot(db: 'HvzDb', filename=None) -> discord.File:
         LAST_GAME_PLOT_HASH = new_hash
 
 
-    elif LAST_GAME_PLOT_HASH != new_hash or not os.path.exists(image_path):
+    elif LAST_GAME_PLOT_HASH != new_hash or not image_path.exists():
         members_df = pd.read_sql_table('members', con=engine, columns=['registration_time', 'oz'])
 
         def total_players(x):
