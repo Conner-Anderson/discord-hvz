@@ -26,7 +26,7 @@ LAST_GAME_PLOT_HASH = None
 
 def create_game_plot(db: 'HvzDb', filepath=None) -> discord.File:
     global LAST_GAME_PLOT_HASH
-    image_folder = Path(__file__).parent / "plots"
+    image_folder = config.path_root / "plots"
     if not image_folder.exists():
         image_folder.mkdir()
     image_path = image_folder / "latest_gameplot.jpeg"

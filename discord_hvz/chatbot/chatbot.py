@@ -476,7 +476,7 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
     def __init__(self, bot: HVZBot, chatbot_config_checkers: Dict = None):
         self.bot = bot
         startup_data = bot.get_cog_startup_data(self)
-        path = Path(__file__).parent.parent.parent / "scripts.yml"
+        path = config.path_root / "scripts.yml"
         file = open(path, mode='r')
         scripts_data = yaml.load(file)
         file.close()

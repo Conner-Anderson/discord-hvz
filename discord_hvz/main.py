@@ -19,14 +19,15 @@ from dotenv import load_dotenv
 from loguru import logger
 from sqlalchemy.exc import NoSuchColumnError
 
-#from admin_commands import AdminCommandsCog
-#from buttons import HVZButtonCog
-#from chatbot import ChatBotManager
+# "Unused" imports required for pyinstaller
+from discord_hvz.commands import AdminCommandsCog
+from discord_hvz.buttons import HVZButtonCog
+from discord_hvz.chatbot import ChatBotManager
+from discord_hvz.display import DisplayCog
+from discord_hvz.item_tracker import ItemTrackerCog
+
 from discord_hvz.config import config, ConfigError, ConfigChecker
-#from display import DisplayCog
-#from item_tracker import ItemTrackerCog
 from discord_hvz.database import HvzDb
-#import setup_checker
 
 # The latest Discord HvZ release this code is, or is based on.
 VERSION = "0.3.0"
@@ -44,7 +45,7 @@ TOKEN = getenv("TOKEN")
 log = logger
 logger.remove()
 logger.add(sys.stderr, level="INFO")
-log_path = Path().cwd().parent / 'logs/discord-hvz_{time}.log'
+log_path = config.path_root / 'logs/discord-hvz_{time}.log'
 logger.add(log_path, rotation='1 week', level='DEBUG', mode='a')
 
 discord_handler = logging.getLogger('discord')

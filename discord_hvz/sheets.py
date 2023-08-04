@@ -27,8 +27,8 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 SAMPLE_RANGE_NAME = 'Output!A2:B'
 
-CREDENTIALS_PATH = Path(__file__).parent.parent / 'credentials.json'
-TOKEN_PATH = Path(__file__).parent.parent / 'token.json'
+CREDENTIALS_PATH = config.path_root / 'credentials.json'
+TOKEN_PATH = config.path_root / 'token.json'
 
 
 class SheetsInterface:

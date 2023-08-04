@@ -10,7 +10,7 @@ dateutil_path = os.path.dirname(pkgutil.get_loader("dateutil").path)
 
 
 a = Analysis(
-    ['discord_hvz.py'],
+    ['discord_hvz/main.py'],
     pathex=[],
     binaries=[],
     datas=[(dateutil_path, 'dateutil')],

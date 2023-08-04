@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import sys
 from typing import Dict, List
 from ruamel.yaml import YAML
 from datetime import datetime, timedelta, timezone
@@ -16,7 +18,7 @@ yaml.preserve_quotes = True
 # file = open('config.yml', mode='r')
 # config = yaml.safe_load(file)
 
-DEFAULT_DB_PATH = Path.cwd().parent / 'game_database.db'
+DEFAULT_DB_PATH = Path('game_database.db')
 
 class ConfigError(Exception):
     def __init__(self, message=None):
@@ -26,13 +28,15 @@ class ConfigError(Exception):
 
 class HVZConfig:
     _config: dict
+    path_root: Path
     filepath: Path
     time_zone: datetime.tzinfo
     db_path: Path
 
-    def __init__(self, filepath: Path):
-        self.filepath = filepath
-        with open(filepath) as fp:
+    def __init__(self, path_root: Path, config_path: Path):
+        self.path_root = path_root
+        self.filepath = config_path
+        with open(config_path) as fp:
             self._config = yaml.load(fp)
 
         timezone_setting = self['timezone']
@@ -59,7 +63,7 @@ class HVZConfig:
         try:
             db_path = self['database_path']
         except ConfigError as e:
-            deprec_path = Path.cwd().parent / "hvzdb.db"
+            deprec_path = self.path_root / "hvzdb.db"
             if deprec_path.exists():
                 logger.warning(
                     f"There is no config option 'database_path' in {self.filepath.name} "
@@ -96,7 +100,7 @@ class HVZConfig:
         self.commit()
 
     def find_database_path(self, configured_path: str) -> Path:
-        top_dir = Path.cwd().parent
+        top_dir = self.path_root
         db_path = top_dir / configured_path
         #logger.info(f"Checking {db_path}")
         if db_path.is_dir():
@@ -117,7 +121,7 @@ class HVZConfig:
         if db_path.exists():
             return db_path
 
-        return DEFAULT_DB_PATH
+        return self.path_root / DEFAULT_DB_PATH
             #raise ConfigError(f'Could not find the database file')
 
     def check_setup_prelaunch(self) -> bool:
@@ -157,7 +161,13 @@ class HVZConfig:
 
 
 try:
-    config = HVZConfig(Path(__file__).parent.parent / "config.yml")
+    path_root = None
+    if getattr(sys, 'frozen', False):
+        path_root = Path(sys.executable).parent
+    else:
+        path_root = Path().cwd()
+    logger.info(f"PATH_ROOT: {path_root}")
+    config = HVZConfig(path_root, path_root / "config.yml")
 except ConfigError as e:
     logger.error(e)
     logger.info('Press Enter to close.')
