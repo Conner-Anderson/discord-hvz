@@ -25,8 +25,6 @@ logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
-# ID of Google Sheet: can be taken from the sheet address. Google account must have permission
-SPREADSHEET_ID = config['sheet_id']
 SAMPLE_RANGE_NAME = 'Output!A2:B'
 
 CREDENTIALS_PATH = Path(__file__).parent.parent / 'credentials.json'
@@ -35,10 +33,12 @@ TOKEN_PATH = Path(__file__).parent.parent / 'token.json'
 
 class SheetsInterface:
     db: HvzDb
+    sheet_id: str
 
     def __init__(self, db: HvzDb):
         self.setup(db)
         self.waiting_tables: Dict[str, asyncio.Task] = {}
+        self.sheet_id = config['sheet_id']
 
     def setup(self, db):
 
@@ -136,12 +136,12 @@ class SheetsInterface:
 
 
         # Erases all columns up to the number of columns that could be written.
-        self.spreadsheets.values().clear(spreadsheetId=SPREADSHEET_ID, range=range).execute()
+        self.spreadsheets.values().clear(spreadsheetId=self.sheet_id, range=range).execute()
 
         body = {'values': values}
 
         try:
-            result = self.spreadsheets.values().update(spreadsheetId=SPREADSHEET_ID, range=range,
+            result = self.spreadsheets.values().update(spreadsheetId=self.sheet_id, range=range,
                                                        valueInputOption='USER_ENTERED', body=body).execute()
         except Exception as e:
             logger.exception('There was an exception with the Google API request! Here it is: %s' % e)
@@ -153,7 +153,7 @@ class SheetsInterface:
     # Returns 0 if the reading fails
     def read_sheet(self, sheet_name, range):
         try:
-            result = self.spreadsheets.values().get(spreadsheetId=SPREADSHEET_ID,
+            result = self.spreadsheets.values().get(spreadsheetId=self.sheet_id,
                                                     range='\'%s\'!%s' % (sheet_name, range)).execute()
         except Exception as e:
             s = str(e).split('Details: ')
