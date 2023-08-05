@@ -7,7 +7,7 @@
 ![MIT](https://img.shields.io/github/license/conner-anderson/discord-hvz)
 # Discord-HvZ
 
-A Discord bot written in Python designed to help run a Humans vs. Zombies game. Information about HvZ: https://humansvszombies.org/  
+A Discord bot written in Python designed to help run a Humans vs. Zombies game. Information about HvZ: https://en.wikipedia.org/wiki/Humans_vs._Zombies  
 This is *not* a typical Discord bot that runs on many servers at once: you run it for your own server.  
 In theory, this gives you extra control.
 
@@ -15,9 +15,10 @@ For *lots* more information, go to the documentation site:
 
 ## [Documentation](https://conner-anderson.github.io/discord-hvz-docs/)
 
-## Version 0.2.1 Released
+## Version 0.3.0 Released
 
-This is the third official release and includes moderate changes based on real game testing at LeTourneau University. See the changelog in [Releases](https://github.com/Conner-Anderson/discord-hvz/releases).
+This is the third official release and includes moderate changes based on real game testing at LeTourneau University. See the changelog in [Releases](https://github.com/Conner-Anderson/discord-hvz/releases).  
+Note: This version has not yet been tested in a real game. This will be done this fall (2023).
 
 
 

@@ -8,16 +8,12 @@ from discord.commands import context
 from discord.ext import commands
 from loguru import logger
 
-import utilities
-import utilities as util
-from config import config
+from .utilities import generate_tag_tree, respond_paginated
+from .config import config
 
 if TYPE_CHECKING:
-    from discord_hvz import HVZBot
+    from main import HVZBot
     from chatbot import ChatBotManager
-
-log = logger
-
 
 def dump(obj):
     """Prints the passed object in a very detailed form for debugging"""
@@ -121,7 +117,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             member_row = bot.db.get_member(member)
         except ValueError as e:
             await ctx.respond('This user is not in the database. They probably aren\'t registered.')
-            log.warning(e)
+            logger.warning(e)
             return
 
         original_value = member_row[attribute]
@@ -147,12 +143,12 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             sub_string = f'<@!{member.id}>\t{member.name}\t{member.email}\n'
             message += sub_string
 
-        await utilities.respond_paginated(ctx, message)
+        await respond_paginated(ctx, message)
 
     @member_group.command(name='register')
     async def member_register(
             self,
-            ctx,
+            ctx: discord.ApplicationContext,
             member: Option(discord.Member, 'The Discord user to register as a member of the game.')
     ):
         """
@@ -175,7 +171,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             await ctx.respond('ChatBotManager not loaded. Command failed.')
             return
 
-        await chatbotmanager.start_chatbot('registration', ctx.author, target_member=member, override_config=True)
+        await chatbotmanager.start_chatbot(ctx.interaction, "registration", member, override_config=True)
         await ctx.respond('Registration chatbot started in a DM', ephemeral=True)
 
     @tag_group.command(name='create')
@@ -195,8 +191,9 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             await ctx.respond('ChatBotManager not loaded. Command failed.')
             return
 
-        await chatbotmanager.start_chatbot('tag_logging', ctx.author, target_member=member, override_config=True)
+        await chatbotmanager.start_chatbot(ctx.interaction, "tag_logging", member, override_config=True)
         await ctx.respond('Tag logging chatbot started in a DM', ephemeral=True)
+
 
     @tag_group.command(name='delete')
     async def tag_delete(
@@ -376,7 +373,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             await ctx.respond('You aren\'t registered for the game.', ephemeral=True)
         except Exception as e:
             await ctx.author.send('Sorry, something went wrong with that command. Derp.')
-            log.exception(e)
+            logger.exception(e)
 
     @slash_command(name='tag_tree')
     async def tag_tree(self, ctx: context.ApplicationContext):
@@ -386,12 +383,12 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         """
         bot = self.bot
         await ctx.response.defer()
-        tree = util.generate_tag_tree(bot.db, bot)
+        tree = generate_tag_tree(bot.db, bot)
         if tree == '':
             tree = 'There are no tags yet! Try again when there are.'
         tree = '**THE ZOMBIE FAMILY TREE\n**' + tree
 
-        await utilities.respond_paginated(ctx, tree)
+        await respond_paginated(ctx, tree)
 
 
 
@@ -423,7 +420,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
                     return
 
         await ctx.respond('Shutting Down')
-        log.critical('Shutting Down\n. . .\n\n')
+        logger.critical('Shutting Down\n. . .\n\n')
         await bot.close()
         time.sleep(1)
 
@@ -449,7 +446,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             member_row = bot.db.get_member(member)
         except ValueError as e:
             await ctx.respond('This user is not in the database. They probably aren\'t registered.')
-            log.warning(e)
+            logger.warning(e)
             return
 
         if setting is None:
@@ -472,4 +469,4 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
                 await c_channel.set_permissions(member, overwrite=None)
         except Exception as e:
             await ctx.respond('Could not change permissions in the channels. Please give the bot permission to.')
-            log.warning(e)
+            logger.warning(e)

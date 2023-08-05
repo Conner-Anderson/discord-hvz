@@ -1,16 +1,14 @@
 from __future__ import annotations
-from typing import Dict, List
-from utilities import make_tag_code
+from discord_hvz.utilities import make_tag_code
 from datetime import datetime, timedelta
 from dateutil import parser
-from config import config
+from discord_hvz.config import config
 
 from loguru import logger
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from discord_hvz import HVZBot
-    from hvzdb import HvzDb
+    from discord_hvz.main import HVZBot
     import sqlalchemy
 
 """

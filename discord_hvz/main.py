@@ -8,6 +8,7 @@ import sys
 import time
 from datetime import datetime
 from os import getenv
+from pathlib import Path
 from typing import Dict, Union, Any, Type
 
 import discord
@@ -18,17 +19,18 @@ from dotenv import load_dotenv
 from loguru import logger
 from sqlalchemy.exc import NoSuchColumnError
 
-from admin_commands import AdminCommandsCog
-from buttons import HVZButtonCog
-from chatbot import ChatBotManager
-from config import config, ConfigError, ConfigChecker
-from display import DisplayCog
-from item_tracker import ItemTrackerCog
-from hvzdb import HvzDb
-#import setup_checker
+# "Unused" imports required for pyinstaller
+from discord_hvz.commands import AdminCommandsCog
+from discord_hvz.buttons import HVZButtonCog
+from discord_hvz.chatbot import ChatBotManager
+from discord_hvz.display import DisplayCog
+from discord_hvz.item_tracker import ItemTrackerCog
+
+from discord_hvz.config import config, ConfigError, ConfigChecker
+from discord_hvz.database import HvzDb
 
 # The latest Discord HvZ release this code is, or is based on.
-VERSION = "0.2.1"
+VERSION = "0.3.0"
 
 
 def dump(obj):
@@ -43,8 +45,8 @@ TOKEN = getenv("TOKEN")
 log = logger
 logger.remove()
 logger.add(sys.stderr, level="INFO")
-
-logger.add('logs/discord-hvz_{time}.log', rotation='1 week', level='DEBUG', mode='a')
+log_path = config.path_root / 'logs/discord-hvz_{time}.log'
+logger.add(log_path, rotation='1 week', level='DEBUG', mode='a')
 
 discord_handler = logging.getLogger('discord')
 
@@ -308,11 +310,11 @@ def main():
 
         bot = HVZBot()
 
-        bot.load_extension('buttons')
-        bot.load_extension('chatbot')
-        bot.load_extension('admin_commands')
-        bot.load_extension('display')
-        bot.load_extension('item_tracker')
+        bot.load_extension('.buttons', package = 'discord_hvz')
+        bot.load_extension('.chatbot', package = 'discord_hvz')
+        bot.load_extension('.commands', package = 'discord_hvz')
+        bot.load_extension('.display', package = 'discord_hvz')
+        bot.load_extension('.item_tracker', package = 'discord_hvz')
 
         bot.run(TOKEN)
 

@@ -10,10 +10,10 @@ from discord.commands import Option
 from discord.ext import commands
 from loguru import logger
 
-from config import config
+from .config import config
 
 if typing.TYPE_CHECKING:
-    from discord_hvz import HVZBot
+    from main import HVZBot
 
 log = logger
 
@@ -193,9 +193,7 @@ class HVZButtonCog(commands.Cog):
         if self.readied:
             logger.error('Cannot add a postable button after on_ready has been called.')
             return
-        if not isinstance(button, HVZButton):
-            logger.error(f'Cannot add postable button to HVZButtonCog. Its type is: {type(button)}')
-            return
+
         self.postable_buttons.append(button)
 
 

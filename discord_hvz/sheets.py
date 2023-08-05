@@ -2,7 +2,7 @@ from __future__ import print_function, annotations
 
 import asyncio
 import logging
-import os.path
+from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, TYPE_CHECKING
 
@@ -13,31 +13,32 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from loguru import logger
 
-import utilities as util
-from config import config
+from .utilities import pool_function
+from .config import config
 
 if TYPE_CHECKING:
     import sqlalchemy
-    from hvzdb import HvzDb
-
-log = logger
+    from database import HvzDb
 
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
-# ID of Google Sheet: can be taken from the sheet address. Google account must have permission
-SPREADSHEET_ID = config['sheet_id']
 SAMPLE_RANGE_NAME = 'Output!A2:B'
+
+CREDENTIALS_PATH = config.path_root / 'credentials.json'
+TOKEN_PATH = config.path_root / 'token.json'
 
 
 class SheetsInterface:
     db: HvzDb
+    sheet_id: str
 
     def __init__(self, db: HvzDb):
         self.setup(db)
         self.waiting_tables: Dict[str, asyncio.Task] = {}
+        self.sheet_id = config['sheet_id']
 
     def setup(self, db):
 
@@ -49,8 +50,8 @@ class SheetsInterface:
         # The file token.json stores the user's access and refresh tokens, and is
         # created automatically when the authorization flow completes for the first
         # time.
-        if os.path.exists('token.json'):
-            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        if TOKEN_PATH.exists():
+            creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
 
         # If the creds need to be refreshed, try to.
         if creds and creds.expired and creds.refresh_token:
@@ -62,11 +63,11 @@ class SheetsInterface:
         if not creds or not creds.valid:
             # If there are no creds, or they are not valid, log in.
             flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
+                str(CREDENTIALS_PATH), SCOPES)
             creds = flow.run_local_server(port=0)
 
             # Save the credentials for the next run
-            with open('token.json', 'w') as token:
+            with open(TOKEN_PATH, 'w') as token:
                 token.write(creds.to_json())
 
         try:
@@ -79,14 +80,14 @@ class SheetsInterface:
         self.spreadsheets = service.spreadsheets()
 
     def check_creds(self):
-        if os.path.exists('token.json'):
-            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        if TOKEN_PATH.exists():
+            creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
             if creds.valid:
                 return
         self.setup(self.db)
 
     def update_table(self, table_name: str):
-        util.pool_function(
+        pool_function(
             function=self._export,
             wait_seconds=10.0,
             table_name=table_name
@@ -135,28 +136,28 @@ class SheetsInterface:
 
 
         # Erases all columns up to the number of columns that could be written.
-        self.spreadsheets.values().clear(spreadsheetId=SPREADSHEET_ID, range=range).execute()
+        self.spreadsheets.values().clear(spreadsheetId=self.sheet_id, range=range).execute()
 
         body = {'values': values}
 
         try:
-            result = self.spreadsheets.values().update(spreadsheetId=SPREADSHEET_ID, range=range,
+            result = self.spreadsheets.values().update(spreadsheetId=self.sheet_id, range=range,
                                                        valueInputOption='USER_ENTERED', body=body).execute()
         except Exception as e:
-            log.exception('There was an exception with the Google API request! Here it is: %s' % e)
+            logger.exception('There was an exception with the Google API request! Here it is: %s' % e)
         else:
-            log.debug('{0} cells updated.'.format(result.get('updatedCells')))
+            logger.debug('{0} cells updated.'.format(result.get('updatedCells')))
 
     # Returns a 2D list of data requested from the specified range in the specified sheet. Range must be given in A1 notation
     # Currently cannot specify which spreadsheet to pull from, but that'll depend on how this function is used
     # Returns 0 if the reading fails
     def read_sheet(self, sheet_name, range):
         try:
-            result = self.spreadsheets.values().get(spreadsheetId=SPREADSHEET_ID,
+            result = self.spreadsheets.values().get(spreadsheetId=self.sheet_id,
                                                     range='\'%s\'!%s' % (sheet_name, range)).execute()
         except Exception as e:
             s = str(e).split('Details: ')
-            log.error('Error when excecuting read_sheet() with arguments \"%s\" and \"%s\"  ----> %s' % (
+            logger.error('Error when excecuting read_sheet() with arguments \"%s\" and \"%s\"  ----> %s' % (
                 sheet_name, range, s[1]))
             return 0
         else:
