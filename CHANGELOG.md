@@ -6,7 +6,8 @@ All noteable changes to this project will be documented in this file.
 
 #### Features
 
-- Added modal chatbots. These are chatbots that appear as pop-up windows within Discord with a list of questions and fill-in dialogues. 
+- Added modal chatbots. These are chatbots that appear as pop-up windows within Discord with a list of questions and fill-in dialogues.
+They are an alternative to direct-message chatbots that register players and log tags.
 Their requirements are more restrictive, but they are quicker to use: especially on mobile.
 See the updated chatbot documentation for details.
 - The default tag_logging chatbot script is now modal.
@@ -19,7 +20,7 @@ See the updated chatbot documentation for details.
 - The location and name of the database file can now be specified in config.yml
 - Updated the underlying libraries to stay up-to-date with Discord API changes
 - Improved general error handling regarding the chatbot
-- Under-the-hood reorganization for easier to navigate code
+- Under-the-hood reorganization for easier to navigate code. This is the biggest risk of bugs.
 
 #### Breaking Changes
 
@@ -28,7 +29,8 @@ See the updated chatbot documentation for details.
 - Since the database file location and name can be specified in `config.yml`, old configs will be missing the `database_path` field.  
 The bot will still load `hvzdb.db` files from the original location, but this is depreciated.  
 You may wish to copy the notes and field from the new `config.yml`
-- Since the core code has been reorganized, there is a new installation method. See the [documentation](https://conner-anderson.github.io/discord-hvz-docs/0.3.0/installation/#updating).
+- Since the core code has been reorganized, there is a new installation method for the Advanced Install. See the [documentation](https://conner-anderson.github.io/discord-hvz-docs/0.3.0/installation/#updating).
+Specifically, do not merely copy the new files atop the old. 
 
 ### 0.2.1 Patch Release
 

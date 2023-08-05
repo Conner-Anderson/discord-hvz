@@ -23,7 +23,7 @@ registration: true
 tag_logging: true
 
 # If true, the OZ's identity will not be included in tag announcements. 
-silent_oz: false
+#silent_oz: false
 
 # Will the database be automatically exported to a Google Sheet? Requires some setup.
 # Turn this off if you're having trouble with Google Sheets
@@ -90,5 +90,5 @@ database_tables:
 # For a file in the top directory (default), use "name_of_my_database.db"
 # For a file in a directory within the top directory, use "my_database_folder/my_database_name.db"
 # To start your path at the root of the drive, start with a '/'. Example: "/Users/JohnDoe/Documents/discord-hvz/cool_database.db"
-database_path: "hvzdb.db"
+database_path: "game_database.db"
 
