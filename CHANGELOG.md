@@ -9,7 +9,7 @@ All noteable changes to this project will be documented in this file.
 - Added modal chatbots. These are chatbots that appear as pop-up windows within Discord with a list of questions and fill-in dialogues.
 They are an alternative to direct-message chatbots that register players and log tags.
 Their requirements are more restrictive, but they are quicker to use: especially on mobile.
-See the updated chatbot documentation for details.
+See the updated [chatbot documentation](https://conner-anderson.github.io/discord-hvz-docs/0.3.0/customized_chatbots/) for details.
 - The default tag_logging chatbot script is now modal.
 
 #### Bug Fixes
