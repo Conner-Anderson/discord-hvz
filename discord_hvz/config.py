@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import sys
-from typing import Dict, List
+from typing import Dict, List, Any
 from ruamel.yaml import YAML
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 from dateutil import tz
 from pathlib import Path
+from pydantic import BaseModel, validator, BeforeValidator, ConfigDict
+from pydantic_yaml import parse_yaml_raw_as, to_yaml_str
 
-from dataclasses import dataclass
+from dataclasses import dataclass, Field
+from typing_extensions import Annotated
 
 from loguru import logger
 
@@ -19,6 +22,34 @@ yaml.preserve_quotes = True
 # config = yaml.safe_load(file)
 
 DEFAULT_DB_PATH = Path('game_database.db')
+
+def to_tzinfo(x: Any) -> tzinfo:
+    try:
+        timezone_offset = int(x)
+    except ValueError:
+        result = tz.gettz(str(x))
+        if result is None:
+            raise ConfigError(f'The given timezone setting "{x}" is invalid. It can be an offset '
+                              f'from UTC, such as "-5", or a preferably an IANA timezone database name. See '
+                              f'https://en.wikipedia.org/wiki/List_of_tz_database_time_zones')
+        if tz.datetime_ambiguous(datetime.now(), tz=result):
+            logger.warning(f'The timezone ({x}) you have chosen is a real '
+                           f'timezone, but could lead to ambiguous times because of Daylight Savings or a similar '
+                           f'thing. A location is better.')
+    else:
+        return timezone(
+            offset=timedelta(hours=int(timezone_offset))
+        )
+
+RealDate = Annotated[tzinfo, BeforeValidator(to_tzinfo)]
+
+@dataclass
+class MyModel(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    server_id: int
+    sheet_id: str
+    timezone: RealDate
+
 
 class ConfigError(Exception):
     def __init__(self, message=None):
@@ -160,18 +191,18 @@ class HVZConfig:
             return True
 
 
-try:
-    path_root = None
-    if getattr(sys, 'frozen', False):
-        path_root = Path(sys.executable).parent
-    else:
-        path_root = Path().cwd()
-    logger.info(f"PATH_ROOT: {path_root}")
-    config = HVZConfig(path_root, path_root / "config.yml")
-except ConfigError as e:
-    logger.error(e)
-    logger.info('Press Enter to close.')
-    input()
+# try:
+#     path_root = None
+#     if getattr(sys, 'frozen', False):
+#         path_root = Path(sys.executable).parent
+#     else:
+#         path_root = Path().cwd()
+#     logger.info(f"PATH_ROOT: {path_root}")
+#     config = HVZConfig(path_root, path_root / "config.yml")
+# except ConfigError as e:
+#     logger.error(e)
+#     logger.info('Press Enter to close.')
+#     input()
 
 
 @dataclass
@@ -182,3 +213,14 @@ class ConfigChecker:
     def get_state(self):
         return config[self.config_key]
 
+
+
+
+
+
+if __name__ == "__main__":
+    path = Path().cwd().parent / "config.yml"
+    with open(path) as fp:
+        yml = yaml.load(fp)
+    m1 = parse_yaml_raw_as(MyModel, str(yml))
+    logger.info(f"{m1.server_id} {m1.timezone}")
