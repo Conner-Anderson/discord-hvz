@@ -4,9 +4,10 @@ import sys
 from typing import Dict, List, Any
 from ruamel.yaml import YAML
 from datetime import datetime, timedelta, timezone, tzinfo
+from zoneinfo import ZoneInfo
 from dateutil import tz
 from pathlib import Path
-from pydantic import BaseModel, validator, BeforeValidator, ConfigDict
+from pydantic import BaseModel, validator, BeforeValidator, ConfigDict, SkipValidation
 from pydantic_yaml import parse_yaml_raw_as, to_yaml_str
 
 from dataclasses import dataclass, Field
@@ -23,11 +24,11 @@ yaml.preserve_quotes = True
 
 DEFAULT_DB_PATH = Path('game_database.db')
 
-def to_tzinfo(x: Any) -> tzinfo:
+def to_tzinfo(x: Any) -> ZoneInfo:
     try:
         timezone_offset = int(x)
     except ValueError:
-        result = tz.gettz(str(x))
+        result = ZoneInfo(str(x))
         if result is None:
             raise ConfigError(f'The given timezone setting "{x}" is invalid. It can be an offset '
                               f'from UTC, such as "-5", or a preferably an IANA timezone database name. See '
@@ -37,11 +38,14 @@ def to_tzinfo(x: Any) -> tzinfo:
                            f'timezone, but could lead to ambiguous times because of Daylight Savings or a similar '
                            f'thing. A location is better.')
     else:
-        return timezone(
+        result = timezone(
             offset=timedelta(hours=int(timezone_offset))
         )
+        shifted_datetime = datetime.now() + timedelta(hours=int(timezone_offset))
+        result = ZoneInfo(str(shifted_datetime.astimezone().tzinfo))
+        return result
 
-RealDate = Annotated[tzinfo, BeforeValidator(to_tzinfo)]
+RealDate = Annotated[ZoneInfo, BeforeValidator(to_tzinfo), SkipValidation]
 
 @dataclass
 class MyModel(BaseModel):
