@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone, tzinfo
 from zoneinfo import ZoneInfo
 from dateutil import tz
 from pathlib import Path
-from pydantic import BaseModel, BeforeValidator, AfterValidator, PlainValidator, ValidationError, Field
+from pydantic import BaseModel, BeforeValidator, AfterValidator, PlainValidator, ValidationError, Field, model_validator
 from pydantic_core import ErrorDetails
 from pydantic_yaml import parse_yaml_raw_as, to_yaml_str
 
@@ -23,10 +23,17 @@ yaml = YAML()
 yaml.preserve_quotes = True
 
 
-# file = open('config.yml', mode='r')
-# config = yaml.safe_load(file)
 
-DEFAULT_DB_PATH = Path('game_database.db')
+PATH_ROOT: Union[Path, None] = None
+if getattr(sys, 'frozen', False):
+    PATH_ROOT = Path(sys.executable).parent
+elif __name__ == "__main__":
+    PATH_ROOT = Path().cwd().parent
+else:
+    PATH_ROOT = Path().cwd()
+
+DEFAULT_DB_PATH: Path= PATH_ROOT / 'game_database.db'
+CONFIG_PATH: Path = PATH_ROOT / 'config.yml'
 
 CUSTOM_MESSAGES = {
     'value_error': "{formatted_loc} set to '{input}': {msg}",
@@ -34,10 +41,11 @@ CUSTOM_MESSAGES = {
     'bool_parsing': "{formatted_loc} set to '{input}': This must be a boolean value, such as True or False.",
     'string_type': "{formatted_loc} set to '{input}': This must be text.",
     'url_scheme': 'Hey, use the right URL scheme! I wanted {expected_schemes}.',
+    'missing': "Missing the field {formatted_loc}, which is required."
 }
 
 
-def convert_errors(e: ValidationError, custom_messages: Dict[str, str]) -> str:
+def format_errors(e: ValidationError, custom_messages: Dict[str, str]) -> str:
     '''
     Converts a ValidationError into a string listing the errors meant for end users.
     custom_messages is a dict mapping the error type to a message which may include formatting variables.
@@ -53,9 +61,12 @@ def convert_errors(e: ValidationError, custom_messages: Dict[str, str]) -> str:
     msg = ""
 
     for error in e.errors():
-        formatted_loc = error["loc"][0]
-        for loc in error["loc"][1:]:
-            formatted_loc += f".{loc}"
+        logger.info("loc: {}".format(error["loc"]))
+        if len(error["loc"]) > 0:
+            formatted_loc = error["loc"][0]
+            for loc in error["loc"][1:]:
+                formatted_loc += f".{loc}"
+        else: formatted_loc = ""
         custom_message = custom_messages.get(error['type'], None)
         if not custom_message:
             custom_message = "[{} set to {}] {}".format(formatted_loc, error["input"], error["msg"])
@@ -64,7 +75,9 @@ def convert_errors(e: ValidationError, custom_messages: Dict[str, str]) -> str:
 
         ctx = error.get('ctx')
         if ctx:
+            logger.debug(f"There was a ctx: {ctx}")
             error = ctx | error
+        #logger.info(f"custom_message: {custom_message}")
         custom_message = custom_message.format(formatted_loc=formatted_loc, **error)
 
         msg += custom_message + "\n"
@@ -90,9 +103,33 @@ def validate_database_type(x: str) -> str:
         if type == x: return x
     else: raise ValueError(f"'{x}' is not a valid database type. Must be one of: string, boolean, integer, datetime, incrementing_integer")
 
+def validate_database_path(path_str: str) -> Path:
+    db_path = PATH_ROOT / path_str
+    #logger.info(f"Checking {db_path}")
+    if db_path.is_dir():
+        #logger.info(f"Found folder: {db_path}")
+        return db_path / DEFAULT_DB_PATH.name
+    if not db_path.suffix == ".db":
+        if not db_path.suffix:
+            raise ValueError(
+                f"'database_path' in {CONFIG_PATH.name} is a folder that doesn't exist. \n"
+                f"Either create the folder to have the bot generate a database file with the default name, "
+                f"or specify the file name, such as 'game_database.db' \n"
+                f"Given path: '{path_str}' which points to {db_path}"
+            )
+        raise ValueError(
+            f"'database_path' in {CONFIG_PATH.name} is either set to a file that doesn't end in '.db' \n"
+            f"or a folder that doesn't exist. Given path: '{path_str}' which points to {db_path}"
+        )
+    if not db_path.exists():
+        return DEFAULT_DB_PATH
 
-RealDate = Annotated[ZoneInfo, PlainValidator(to_tzinfo)]
+    return db_path
+
+
+RealTimezone = Annotated[ZoneInfo, PlainValidator(to_tzinfo)]
 DatabaseType = Annotated[str, AfterValidator(validate_database_type)]
+DatabasePath = Annotated[Path, PlainValidator(validate_database_path)]
 
 class ChannelNames(BaseModel):
     tag_announcements: str = Field(default="tag-announcements", alias="tag-announcements")
@@ -106,21 +143,31 @@ class RoleNames(BaseModel):
 
 
 class MyModel(BaseModel):
-    #model_config = ConfigDict(arbitrary_types_allowed=True)
+    '''
+    A configuration model
+    TODO: Figure out what happened to silent_oz option
+    '''
     server_id: int
-    sheet_id: str
-    timezone: RealDate
-    registration: bool
-    tag_logging: bool
-    google_sheet_export: bool
-    sheet_names: Dict[str, str]
+    sheet_id: str = Field(default=None)
+    timezone: RealTimezone
+    registration: bool = Field(default=True)
+    tag_logging: bool = Field(default=True)
+    google_sheet_export: bool = Field(default=True)
+    sheet_names: Dict[str, str] = Field(default=None)
     channel_names: ChannelNames
     role_names: RoleNames
     database_tables: Dict[str, Dict[str, DatabaseType]]
-    database_path: str
+    database_path: DatabasePath
 
     class Config:
         arbitrary_types_allowed = True
+
+    @model_validator(mode='after')
+    def check_config(self) -> MyModel:
+        logger.warning("Checking...")
+        if self.google_sheet_export and not (self.sheet_names and self.sheet_id):
+            raise ValueError("If 'google_sheet_export' is set to true, both 'sheet_names' and 'sheet_id' must be provided.")
+        return self
 
 
 
@@ -205,30 +252,7 @@ class HVZConfig:
         self._config[key] = value
         self.commit()
 
-    def find_database_path(self, configured_path: str) -> Path:
-        top_dir = self.path_root
-        db_path = top_dir / configured_path
-        #logger.info(f"Checking {db_path}")
-        if db_path.is_dir():
-            #logger.info(f"Found folder: {db_path}")
-            return db_path / DEFAULT_DB_PATH.name
-        if not db_path.suffix == ".db":
-            if not db_path.suffix:
-                raise ConfigError(
-                    f"'database_path' in {self.filepath.name} is a folder that doesn't exist. \n"
-                    f"Either create the folder to have the bot generate a database file with the default name, "
-                    f"or specify the file name, such as 'game_database.db' \n"
-                    f"Given path: '{configured_path}' which points to {db_path}"
-                )
-            raise ConfigError(
-                f"'database_path' in {self.filepath.name} is either set to a file that doesn't end in '.db' \n"
-                f"or a folder that doesn't exist. Given path: '{configured_path}' which points to {db_path}"
-            )
-        if db_path.exists():
-            return db_path
 
-        return self.path_root / DEFAULT_DB_PATH
-            #raise ConfigError(f'Could not find the database file')
 
     def check_setup_prelaunch(self) -> bool:
 
@@ -265,19 +289,22 @@ class HVZConfig:
         else:
             return True
 
+config = None
+try:
+    with open(CONFIG_PATH) as fp:
+        yml = yaml.load(fp)
+    try:
+        config = parse_yaml_raw_as(MyModel, str(yml))
+    except pydantic.ValidationError as e:
+        msg = f"There were errors reading the configuration file, {CONFIG_PATH.name}: \n" + format_errors(e, CUSTOM_MESSAGES)
 
-# try:
-#     path_root = None
-#     if getattr(sys, 'frozen', False):
-#         path_root = Path(sys.executable).parent
-#     else:
-#         path_root = Path().cwd()
-#     logger.info(f"PATH_ROOT: {path_root}")
-#     config = HVZConfig(path_root, path_root / "config.yml")
-# except ConfigError as e:
-#     logger.error(e)
-#     logger.info('Press Enter to close.')
-#     input()
+        logger.error(msg)
+    else:
+        logger.info(f"{config.server_id} {config.timezone} {config.channel_names.tag_announcements}")
+except ConfigError as e:
+    logger.error(e)
+    logger.info('Press Enter to close.')
+    input()
 
 
 @dataclass
@@ -294,16 +321,4 @@ class ConfigChecker:
 
 
 if __name__ == "__main__":
-    path = Path().cwd().parent / "config.yml"
-    with open(path) as fp:
-        yml = yaml.load(fp)
-    try:
-        m1 = parse_yaml_raw_as(MyModel, str(yml))
-    except pydantic.ValidationError as e:
-        msg = f"There were errors reading the configuration: \n" + convert_errors(e, CUSTOM_MESSAGES)
-
-        logger.error(msg)
-
-
-    else:
-        logger.info(f"{m1.server_id} {m1.timezone} {m1.channel_names.tag_announcements}")
+    ...
