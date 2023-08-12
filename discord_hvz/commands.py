@@ -356,7 +356,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             await ctx.respond(f'The config setting \"{setting}\" is currently set to \"{found_setting}\"')
             return
 
-        config.__setattr__(setting, choice)
+        setattr(config, setting, choice)
         await ctx.respond(f'Set \"{setting}\" to \"{choice}\"')
 
     @slash_command()

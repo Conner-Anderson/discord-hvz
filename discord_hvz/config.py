@@ -10,15 +10,16 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
 from pydantic import BaseModel, BeforeValidator, AfterValidator, PlainValidator, ValidationError, Field, \
-    model_validator, PrivateAttr
+    model_validator, PrivateAttr, field_serializer
 from pydantic_core import ErrorDetails, PydanticCustomError
-from pydantic_yaml import parse_yaml_raw_as, to_yaml_str
+from pydantic_yaml import parse_yaml_raw_as, to_yaml_str, to_yaml_file
 
 from dataclasses import dataclass
 from typing_extensions import Annotated
 
 from loguru import logger
 
+# This yaml instance is only for preserving the config file comments and such
 yaml = YAML()
 yaml.preserve_quotes = True
 
@@ -205,6 +206,22 @@ class HVZConfig(BaseModel):
 
         return self
 
+    @field_serializer('timezone')
+    def serialize_timezone(self, timezone: ZoneInfo, _info):
+        return str(timezone)
+
+    def __setattr__(self, key, value):
+
+        original_value = self.__getattribute__(key)
+
+        super().__setattr__(key, value)
+        if type(original_value) in (int, str, bool):
+            ruamel_yaml[key] = value
+            yaml.dump(ruamel_yaml, CONFIG_PATH)
+        else:
+            logger.warning(
+                f"Tried to modify the config value '{key}' which is not int, str, or bool. Aborting. Attempted value: {value}")
+
     @property
     def path_root(self) -> Path:
         '''Returns the bot\'s root path.'''
@@ -225,10 +242,10 @@ class ConfigError(Exception):
 config = None
 try:
     with open(CONFIG_PATH) as fp:
-        yml = yaml.load(fp)
+        ruamel_yaml = yaml.load(fp)
     try:
         logger.info("Loading config now")
-        config = parse_yaml_raw_as(HVZConfig, str(yml))
+        config = parse_yaml_raw_as(HVZConfig, str(ruamel_yaml))
     except pydantic.ValidationError as e:
         msg = f"There were errors reading the configuration file, {CONFIG_PATH.name}: \n" + format_errors(e,
                                                                                                           CUSTOM_MESSAGES)
@@ -253,4 +270,8 @@ class ConfigChecker:
 
 
 if __name__ == "__main__":
-    ...
+
+    new_yaml = to_yaml_str(config)
+    config.registration = False
+    logger.info(f"Registration: {config.registration}")
+
