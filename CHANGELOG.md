@@ -7,6 +7,7 @@ All noteable changes to this project will be documented in this file.
 #### Bug Fixes
 
 - Un-commented the "silent_oz" option in the default config.yml
+- Slightly improved startup times
 
 #### Minor Changes
 

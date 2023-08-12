@@ -17,8 +17,6 @@ from sqlalchemy.exc import NoSuchTableError
 from discord_hvz.sheets import SheetsInterface
 from discord_hvz.config import config
 
-# TODO: Make database name more human-friendly by default, and have it configurable
-
 if TYPE_CHECKING:
     pass
 
