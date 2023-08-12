@@ -348,7 +348,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
 
 
         found_setting = getattr(config, setting, None)
-        if not found_setting:
+
+        if found_setting is None:
             await ctx.respond(f'\"{setting}\" did not match any configuration settings. Case-sensitive.')
             return
 
