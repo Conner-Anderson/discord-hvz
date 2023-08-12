@@ -517,13 +517,13 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             if not script:
                 script = self.loaded_scripts.get(interaction.custom_id)
                 if not script:
-                    raise ConfigError(f'There is no chatbot called "{chatbot_kind}", so this command doesn\'t work.')
+                    raise ConfigError(f'There is no chatbot called "{script}", so this command doesn\'t work.')
                 chatbot_kind = interaction.custom_id
 
             member = interaction.user
 
             if not script.config_checker.get_state() and not override_config:
-                raise ConfigError(f'The chatbot {chatbot_kind} is disabled in the bot\'s configuration. ')
+                raise ConfigError(f'The chatbot {script.kind} is disabled in the bot\'s configuration. ')
 
             existing = self.active_chatbots.get(member.id)
 

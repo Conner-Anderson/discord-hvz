@@ -100,6 +100,7 @@ def to_tzinfo(x: Any) -> ZoneInfo:
 
 
 def validate_database_type(x: str) -> str:
+    '''Validates the strings acceptable to define types for database columns.'''
     valid_types = ["string", "boolean", "incrementing_integer", "datetime", "integer"]
     x = x.strip().lower()
     for type in valid_types:
@@ -110,6 +111,7 @@ def validate_database_type(x: str) -> str:
 
 
 def validate_database_path(path_str: str) -> Path:
+    '''Validates the given path to the database file, giving helpful errors.'''
     db_path = PATH_ROOT / path_str
     # logger.info(f"Checking {db_path}")
     if db_path.is_dir():
@@ -133,18 +135,21 @@ def validate_database_path(path_str: str) -> Path:
     return db_path
 
 
+# Custom annotated types to tell Pydantic how to handle particular sorts of data
 RealTimezone = Annotated[ZoneInfo, PlainValidator(to_tzinfo)]
 DatabaseType = Annotated[str, AfterValidator(validate_database_type)]
 DatabasePath = Annotated[Path, PlainValidator(validate_database_path)]
 
 
 class ChannelNames(BaseModel):
+    ''' Channels the bot requires. The Discord server must have these.'''
     tag_announcements: str = Field(default="tag-announcements", alias="tag-announcements")
     report_tags: str = Field(default="report-tags", alias="report-tags")
     zombie_chat: str = Field(default="zombie-chat", alias="zombie-chat")
 
 
 class RoleNames(BaseModel):
+    ''' Roles the bot requires. The Discord server must have these.'''
     zombie: str = Field(default="zombie")
     human: str = Field(default="human")
     player: str = Field(default="player")
@@ -152,14 +157,14 @@ class RoleNames(BaseModel):
 
 class HVZConfig(BaseModel):
     '''
-    A configuration model
-    TODO: Figure out what happened to silent_oz option
+    A pydantic configuration model for the entire bot
     '''
     server_id: int
     sheet_id: str = Field(default=None)
     timezone: RealTimezone
     registration: bool = Field(default=True)
     tag_logging: bool = Field(default=True)
+    silent_oz: bool = Field(default=True)
     google_sheet_export: bool = Field(default=True)
     sheet_names: Dict[str, str] = Field(default=None)
     channel_names: ChannelNames
@@ -247,8 +252,9 @@ try:
         logger.info("Loading config now")
         config = parse_yaml_raw_as(HVZConfig, str(ruamel_yaml))
     except pydantic.ValidationError as e:
-        msg = f"There were errors reading the configuration file, {CONFIG_PATH.name}: \n" + format_errors(e,
-                                                                                                          CUSTOM_MESSAGES)
+        msg = f"There were errors reading the configuration file, {CONFIG_PATH.name}: \n" \
+              + format_errors(e, CUSTOM_MESSAGES) \
+              + "For help with configuration, see the documentation at https://conner-anderson.github.io/discord-hvz-docs/latest/config_options/"
         raise ConfigError(msg) from e
     else:
         logger.success("Successfully loaded config")
@@ -266,12 +272,10 @@ class ConfigChecker:
     config_key: str
 
     def get_state(self):
-        return config.__getattr__(self.config_key)
+        return config.__getattribute__(self.config_key)
 
 
 if __name__ == "__main__":
-
     new_yaml = to_yaml_str(config)
     config.registration = False
     logger.info(f"Registration: {config.registration}")
-
