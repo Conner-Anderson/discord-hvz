@@ -23,7 +23,7 @@ registration: true
 tag_logging: true
 
 # If true, the OZ's identity will not be included in tag announcements. 
-#silent_oz: false
+silent_oz: false
 
 # Will the database be automatically exported to a Google Sheet? Requires some setup.
 # Turn this off if you're having trouble with Google Sheets

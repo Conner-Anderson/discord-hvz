@@ -19,14 +19,17 @@ from dotenv import load_dotenv
 from loguru import logger
 from sqlalchemy.exc import NoSuchColumnError
 
-# "Unused" imports required for pyinstaller
-from discord_hvz.commands import AdminCommandsCog
-from discord_hvz.buttons import HVZButtonCog
-from discord_hvz.chatbot import ChatBotManager
-from discord_hvz.display import DisplayCog
-from discord_hvz.item_tracker import ItemTrackerCog
-
 from discord_hvz.config import config, ConfigError, ConfigChecker
+
+# The below imports are commented to prevent double-importing.
+# These modules need to exist in "hiddenimports" in discord_hvz.spec for the sake of pyinstaller
+# from discord_hvz.commands import AdminCommandsCog
+# from discord_hvz.buttons import HVZButtonCog
+# from discord_hvz.chatbot import ChatBotManager
+# from discord_hvz.display import DisplayCog
+# from discord_hvz.item_tracker import ItemTrackerCog
+
+
 from discord_hvz.database import HvzDb
 
 # The latest Discord HvZ release this code is, or is based on.
@@ -151,7 +154,7 @@ class HVZBot(discord.ext.commands.Bot):
             try:
 
                 for guild in self.guilds:
-                    if guild.id == config['server_id']:
+                    if guild.id == config.server_id:
                         self.guild = guild
                         break
                 else:
@@ -162,35 +165,29 @@ class HVZBot(discord.ext.commands.Bot):
                 await self.guild.fetch_channels()
                 await self.guild.fetch_roles()
 
-                needed_roles_names = ['zombie', 'human', 'player']
+                needed_roles_names = [config.role_names.zombie, config.role_names.human, config.role_names.player]
                 missing_role_names = []
-                for needed_role_name in needed_roles_names:
-                    try:
-                        role_name = config['role_names'][needed_role_name]
-                    except KeyError:
-                        # If there is no role name assigned in the config, use a default
-                        role_name = needed_role_name
+                for role_name in needed_roles_names:
 
                     found_role = discord.utils.find(lambda c: c.name.lower() == role_name, self.guild.roles)
                     if found_role is None:
-                        missing_role_names.append(needed_role_name)
+                        missing_role_names.append(role_name)
                     else:
-                        self.roles[needed_role_name] = found_role
+                        self.roles[role_name] = found_role
 
-                needed_channel_names = ['tag-announcements', 'report-tags', 'zombie-chat']
+                needed_channel_names = [
+                    config.channel_names.zombie_chat,
+                    config.channel_names.tag_announcements,
+                    config.channel_names.report_tags
+                ]
                 missing_channel_names = []
-                for needed_channel_name in needed_channel_names:
-                    try:
-                        channel_name = config['channel_names'][needed_channel_name]
-                    except KeyError:
-                        # If there is no channel name assigned in the config, use a default
-                        channel_name = needed_channel_name
+                for channel_name in needed_channel_names:
 
                     found_channel = discord.utils.find(lambda c: c.name.lower() == channel_name, self.guild.channels)
                     if found_channel is None:
-                        missing_channel_names.append(needed_channel_name)
+                        missing_channel_names.append(channel_name)
                     else:
-                        self.channels[needed_channel_name] = found_channel
+                        self.channels[channel_name] = found_channel
 
                 msg = ''
                 if missing_role_names:
@@ -273,7 +270,7 @@ class HVZBot(discord.ext.commands.Bot):
         new_zombie_count = len(self.roles['zombie'].members)
 
         msg = f'<@{tagged_member.id}> has turned zombie!'
-        if not config['silent_oz']:
+        if not config.silent_oz:
             msg += f'\nTagged by <@{tagger_member.id}>'
             msg += tag_time.strftime(' at about %I:%M %p')
 
@@ -303,9 +300,6 @@ def main():
             logger.error("You need your Discord bot token to be in a file called '.env' "
                          "Find this on your Application's general information page on your Discord Developer Console. "
                          "The entire file should contain only this: TOKEN='replace_me_with_your_token'")
-            return
-        if not config.check_setup_prelaunch():
-            logger.error('The bot did not launch due to the above Errors found in configuration.')
             return
 
         bot = HVZBot()

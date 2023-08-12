@@ -2,6 +2,17 @@
 
 All noteable changes to this project will be documented in this file.
 
+### 0.3.1 Patch Release
+
+#### Bug Fixes
+
+- Un-commented the "silent_oz" option in the default config.yml
+- Slightly improved startup times
+
+#### Minor Changes
+
+- Reworked the configuration system behind the scenes to be more robust and make issues easier to diagnose.
+
 ### 0.3.0 Minor Version Release
 
 #### Features
