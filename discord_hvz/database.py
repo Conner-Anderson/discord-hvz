@@ -22,8 +22,6 @@ from discord_hvz.config import config
 if TYPE_CHECKING:
     pass
 
-
-logger.success("About to load database")
 def dump(obj):
     """Prints the passed object in a very detailed form for debugging"""
     for attr in dir(obj):

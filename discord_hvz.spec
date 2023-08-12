@@ -14,7 +14,13 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[(dateutil_path, 'dateutil')],
-    hiddenimports=[],
+    hiddenimports=[
+        "discord_hvz.commands",
+        "discord_hvz.buttons",
+        "discord_hvz.chatbot",
+        "discord_hvz.display",
+        "discord_hvz.item_tracker"
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

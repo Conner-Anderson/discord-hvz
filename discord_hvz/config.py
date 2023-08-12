@@ -256,8 +256,7 @@ try:
               + format_errors(e, CUSTOM_MESSAGES) \
               + "For help with configuration, see the documentation at https://conner-anderson.github.io/discord-hvz-docs/latest/config_options/"
         raise ConfigError(msg) from e
-    else:
-        logger.success("Successfully loaded config")
+
 except ConfigError as e:
     logger.error(e)
     logger.info('Press Enter to close.')

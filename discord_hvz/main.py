@@ -21,12 +21,13 @@ from sqlalchemy.exc import NoSuchColumnError
 
 from discord_hvz.config import config, ConfigError, ConfigChecker
 
-# "Unused" imports required for pyinstaller
-from discord_hvz.commands import AdminCommandsCog
-from discord_hvz.buttons import HVZButtonCog
-from discord_hvz.chatbot import ChatBotManager
-from discord_hvz.display import DisplayCog
-from discord_hvz.item_tracker import ItemTrackerCog
+# The below imports are commented to prevent double-importing.
+# These modules need to exist in "hiddenimports" in discord_hvz.spec for the sake of pyinstaller
+# from discord_hvz.commands import AdminCommandsCog
+# from discord_hvz.buttons import HVZButtonCog
+# from discord_hvz.chatbot import ChatBotManager
+# from discord_hvz.display import DisplayCog
+# from discord_hvz.item_tracker import ItemTrackerCog
 
 
 from discord_hvz.database import HvzDb

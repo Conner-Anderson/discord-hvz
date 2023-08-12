@@ -20,8 +20,6 @@ def dump(obj):
     for attr in dir(obj):
         print("obj.%s = %r" % (attr, getattr(obj, attr)))
 
-logger.success("About to load commands")
-
 DISCORD_MESSAGE_MAX_LENGTH = 2000
 
 guild_id_list = [config.server_id]
