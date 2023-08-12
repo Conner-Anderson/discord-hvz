@@ -9,7 +9,7 @@ from discord.ext import commands
 from loguru import logger
 
 from .utilities import generate_tag_tree, respond_paginated
-from .config import config
+from discord_hvz.config import config
 
 if TYPE_CHECKING:
     from main import HVZBot
@@ -20,10 +20,11 @@ def dump(obj):
     for attr in dir(obj):
         print("obj.%s = %r" % (attr, getattr(obj, attr)))
 
+logger.success("About to load commands")
 
 DISCORD_MESSAGE_MAX_LENGTH = 2000
 
-guild_id_list = [config['server_id']]
+guild_id_list = [config.server_id]
 
 CONFIG_CHOICES = ['registration', 'tag_logging', 'silent_oz', 'google_sheet_export']
 
@@ -345,9 +346,9 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             'silent_oz' Are OZ names omitted from tag announcements? Default: False
         """
 
-        try:
-            found_setting = config[setting]
-        except KeyError:
+
+        found_setting = getattr(config, setting, None)
+        if not found_setting:
             await ctx.respond(f'\"{setting}\" did not match any configuration settings. Case-sensitive.')
             return
 
@@ -355,7 +356,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             await ctx.respond(f'The config setting \"{setting}\" is currently set to \"{found_setting}\"')
             return
 
-        config[setting] = choice
+        config.__setattr__(setting, choice)
         await ctx.respond(f'Set \"{setting}\" to \"{choice}\"')
 
     @slash_command()

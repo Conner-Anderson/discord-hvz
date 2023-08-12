@@ -26,7 +26,7 @@ log = logger
 yaml = YAML(typ='safe')
 
 # Used for creating commands
-guild_id_list = [config['server_id']]
+guild_id_list = [config.server_id]
 
 
 @dataclass(frozen=True)
@@ -125,7 +125,7 @@ class QuestionData:
 
         # TODO: Find a more robust and flexible way to have keyword values
         if isinstance(prefilled_value, str) and prefilled_value.strip().lower() == ('current_time' or 'current time'):
-            now = datetime.now(tz=config.time_zone) - timedelta(minutes=1)
+            now = datetime.now(tz=config.timezone) - timedelta(minutes=1)
             prefilled_value = now.strftime('%I:%M %p')
         return discord.ui.InputText(
             style=style,

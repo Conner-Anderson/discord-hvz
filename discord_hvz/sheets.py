@@ -38,7 +38,7 @@ class SheetsInterface:
     def __init__(self, db: HvzDb):
         self.setup(db)
         self.waiting_tables: Dict[str, asyncio.Task] = {}
-        self.sheet_id = config['sheet_id']
+        self.sheet_id = config.sheet_id
 
     def setup(self, db):
 
@@ -102,7 +102,7 @@ class SheetsInterface:
         database_columns = self.db.get_column_names(table_name)
 
         column_order: List[str] = []
-        for key in config['database_tables'][table_name]:
+        for key in config.database_tables[table_name]:
             column_order.append(key.casefold())
 
         # Add columns that are in the database, but don't have their order declared in the config to the end.
@@ -124,7 +124,7 @@ class SheetsInterface:
 
 
         values.insert(0, column_order)
-        sheet_name = config['sheet_names'][table_name]
+        sheet_name = config.sheet_names[table_name]
 
         # Build a string that represents the range to overwrite for Sheets. Example: 'Members'!A:L
         range = f"'{sheet_name}'"

@@ -23,7 +23,7 @@ async def registration_end(responses: Dict[str, Any], bot: HVZBot, target_member
     responses['id'] = str(target_member.id)
     responses['discord_name'] = target_member.name
     responses['nickname'] = target_member.nick
-    responses['registration_time'] = datetime.now(tz=config.time_zone)
+    responses['registration_time'] = datetime.now(tz=config.timezone)
     responses['oz'] = False
     responses['tag_code'] = make_tag_code(bot.db)
 
@@ -46,7 +46,7 @@ async def tag_logging_end(responses: Dict[str, Any], bot: HVZBot, target_member:
     responses['tagger_name'] = tagger_member_row.name
     responses['tagger_discord_name'] = tagger_member.name
     responses['tagger_nickname'] = tagger_member.nick
-    responses['report_time'] = datetime.now(tz=config.time_zone)
+    responses['report_time'] = datetime.now(tz=config.timezone)
     responses['revoked_tag'] = False
 
 
@@ -73,7 +73,7 @@ async def registration_start(member: discord.Member, bot: HVZBot) -> None:
     raise ValueError('You are already registered for HvZ!')
 
 async def tag_logging_start(member: discord.Member, bot: HVZBot) -> None:
-    if config['tag_logging'] is False:
+    if config.tag_logging is False:
         raise ValueError('The admin has not enabled tagging yet.')
     try:
         bot.db.get_member(member)

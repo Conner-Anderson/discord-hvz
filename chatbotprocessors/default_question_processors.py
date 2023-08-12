@@ -66,13 +66,13 @@ def tag_code_to_member_id(input_text: str, bot: HVZBot) -> str:
 
 def tag_time(input_text: str, bot: HVZBot) -> datetime:
     given_tag_time: str = input_text
-    tag_datetime = datetime.now(tz=config.time_zone)
+    tag_datetime = datetime.now(tz=config.timezone)
     if given_tag_time.casefold().find('yesterday') != -1:
         tag_datetime -= timedelta(days=1)
         given_tag_time = given_tag_time.replace('yesterday', '').replace('Yesterday', '')
     tag_datetime = parser.parse(given_tag_time + ' and 0 seconds', default=tag_datetime)
 
-    if tag_datetime > datetime.now(tz=config.time_zone):
+    if tag_datetime > datetime.now(tz=config.timezone):
         raise ValueError('The tag time you stated is in the future. Try again.')
 
     return tag_datetime

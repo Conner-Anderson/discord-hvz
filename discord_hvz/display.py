@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from database import HvzDb
     from main import HVZBot
 
-guild_id_list = [config['server_id']]
+guild_id_list = [config.server_id]
 LAST_GAME_PLOT_HASH = None
 
 def create_game_plot(db: 'HvzDb', filepath=None) -> discord.File:
@@ -147,8 +147,8 @@ class PlayersTodayElement(PanelElement):
             rows = panel.bot.db.get_rows(
                 table='members',
                 search_column_name='registration_time',
-                lower_value=datetime.now(tz=config.time_zone) - timedelta(days=1),
-                upper_value=datetime.now(tz=config.time_zone)
+                lower_value=datetime.now(tz=config.timezone) - timedelta(days=1),
+                upper_value=datetime.now(tz=config.timezone)
 
             )
             count = len(rows)
@@ -156,7 +156,7 @@ class PlayersTodayElement(PanelElement):
             count = 0
 
         extra = ''
-        if not config['registration']:
+        if not config.registration:
             extra = ' (Registration Closed)'
         embed.add_field(name='New Players, Last 24h', value=str(count) + extra)
 
@@ -171,8 +171,8 @@ class TagsTodayElement(PanelElement):
             rows = panel.bot.db.get_rows(
                 table='tags',
                 search_column_name='tag_time',
-                lower_value=datetime.now(tz=config.time_zone) - timedelta(days=1),
-                upper_value=datetime.now(tz=config.time_zone)
+                lower_value=datetime.now(tz=config.timezone) - timedelta(days=1),
+                upper_value=datetime.now(tz=config.timezone)
             )
             count = len(rows)
         except ValueError:
@@ -257,7 +257,7 @@ class HVZPanel:
             if file:
                 output_file = file
 
-        time_string = datetime.now(tz=config.time_zone).strftime('%B %d, %I:%M %p')
+        time_string = datetime.now(tz=config.timezone).strftime('%B %d, %I:%M %p')
         if self.live:
             embed.set_footer(text=f'Live updating. Updated: {time_string}')
         else:

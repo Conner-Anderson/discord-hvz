@@ -27,7 +27,7 @@ Make sure to load this cog when your bot starts!
 
 # this is the list of role IDs that will be added as buttons.
 button_functions = ['register', 'tag_log']
-guild_id_list = [config['server_id']]
+guild_id_list = [config.server_id]
 
 
 class HVZButton(discord.ui.Button):

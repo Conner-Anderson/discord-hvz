@@ -22,6 +22,8 @@ from discord_hvz.config import config
 if TYPE_CHECKING:
     pass
 
+
+logger.success("About to load database")
 def dump(obj):
     """Prints the passed object in a very detailed form for debugging"""
     for attr in dir(obj):
@@ -36,7 +38,7 @@ class HvzDb:
     metadata_obj: MetaData = field(init=False, default_factory=MetaData)
     tables: Dict[str, Table] = field(init=False, default_factory=dict)
     sheet_interface: SheetsInterface = field(init=False, default=None)
-    filepath: Path = config.db_path
+    filepath: Path = config.database_path
     database_config: Dict[str, Dict[str, str]] = field(init=False, default_factory=dict)
 
     # Table names that cannot be created in the config. Reserved for cogs / modules
@@ -68,7 +70,7 @@ class HvzDb:
     
     def __post_init__(self):
         # TODO: Need to make sure the required tables are always created. Might be config-depended now...
-        self.database_config: Dict[str, Dict[str, str]] = copy.deepcopy(config['database_tables'])
+        self.database_config: Dict[str, Dict[str, str]] = copy.deepcopy(config.database_tables)
         self.engine = create_engine(f"sqlite+pysqlite:///{str(self.filepath)}", future=True)
 
         if not self.filepath.exists():
@@ -105,7 +107,7 @@ class HvzDb:
 
         self.metadata_obj.create_all(self.engine)
 
-        if config['google_sheet_export'] == True:
+        if config.google_sheet_export == True:
             self.sheet_interface = SheetsInterface(self)
 
     def prepare_table(self, table_name: str, columns: Dict[str, Union[str, type]]) -> None:
