@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 import typing
 from typing import List, Optional
+from enum import Enum
 
 import discord
 from discord.commands import Option
@@ -28,6 +29,15 @@ Make sure to load this cog when your bot starts!
 # this is the list of role IDs that will be added as buttons.
 button_functions = ['register', 'tag_log']
 guild_id_list = [config.server_id]
+
+class ButtonColors(str, Enum):
+    blurple = "blurple",
+    gray = "gray",
+    grey = "gray",
+    green = "green",
+    red = "red",
+    url = "url"
+
 
 
 class HVZButton(discord.ui.Button):

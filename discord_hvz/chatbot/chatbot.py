@@ -21,6 +21,7 @@ from discord_hvz.buttons import HVZButton
 import chatbotprocessors
 from .modal import ChatbotModal
 from .chatbot_utilities import Response, ResponseError, ChatbotState, disable_previous_buttons
+from .script_models import load_model
 
 log = logger
 yaml = YAML(typ='safe')
@@ -480,6 +481,8 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
         file = open(path, mode='r')
         scripts_data = yaml.load(file)
         file.close()
+        # Temporary model loading for development
+        model = load_model()
 
         for kind, script in scripts_data.items():
 

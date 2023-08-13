@@ -61,7 +61,7 @@ tag_logging:
   starting_processor: tag_logging_start
   ending_processor: tag_logging_end
   postable_button_label: Log a Tag
-  postable_button_color: Green
+  postable_button_color: green
   questions:
   - column: tagged_id
     display_name: Tag Code
