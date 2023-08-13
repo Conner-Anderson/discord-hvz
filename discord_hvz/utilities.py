@@ -4,6 +4,7 @@ import random
 import string
 from inspect import iscoroutinefunction
 from typing import Dict, List, TYPE_CHECKING, Union
+from pydantic import ValidationError
 
 import discord
 from discord.ext import pages
@@ -246,6 +247,45 @@ def have_lists_changed(list1: List, list2: List, items: List) -> bool:
         elif item in list2 and item not in list1:
             return True
     return False
+
+def format_pydantic_errors(e: ValidationError, custom_messages: Dict[str, str]) -> str:
+    '''
+    Converts a ValidationError into a string listing the errors meant for end users.
+    custom_messages is a dict mapping the error type to a message which may include formatting variables.
+    Errors types: https://docs.pydantic.dev/latest/errors/validation_errors/
+    Available formatting variables:
+    {loc} a tuple of locations of the option in the file
+    {formatted_loc} a formatted string of the option location, such as "sheet_names.members"
+    {input} the given input to the option
+    {msg} the original error message
+    {type} the error type
+    {url} Pydantic's documentation for this error type
+    '''
+    msg = ""
+
+    for error in e.errors():
+        logger.info("loc: {}".format(error["loc"]))
+        if len(error["loc"]) > 0:
+            formatted_loc = error["loc"][0]
+            for loc in error["loc"][1:]:
+                formatted_loc += f".{loc}"
+        else:
+            formatted_loc = ""
+        custom_message = custom_messages.get(error['type'], None)
+        if not custom_message:
+            custom_message = "[{} set to {}] {}".format(formatted_loc, error["input"], error["msg"])
+            if error.get("url"):
+                custom_message += "\nSee " + error["url"]
+
+        ctx = error.get('ctx')
+        if ctx:
+            logger.debug(f"There was a ctx: {ctx}")
+            error = ctx | error
+        # logger.info(f"custom_message: {custom_message}")
+        custom_message = custom_message.format(formatted_loc=formatted_loc, **error)
+
+        msg += custom_message + "\n"
+    return msg
 
 
 def dump(obj):

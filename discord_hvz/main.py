@@ -316,8 +316,8 @@ def main():
         logger.error(f'Discord failed to log in: {e}')
     except KeyboardInterrupt:
         logger.info('Keyboard Interrupt!')
-    except ConfigError as e:
-        logger.error(f'{e} \n Check the log file for detailed information.')
+    except (ConfigError, discord.errors.ExtensionFailed) as e:
+        logger.error(e)
         logger.opt(exception=True).debug(e)
     except Exception as e:
         logger.exception(e)

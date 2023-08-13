@@ -30,7 +30,7 @@ Make sure to load this cog when your bot starts!
 button_functions = ['register', 'tag_log']
 guild_id_list = [config.server_id]
 
-class ButtonColors(str, Enum):
+class ButtonColor(str, Enum):
     blurple = "blurple",
     gray = "gray",
     grey = "gray",
