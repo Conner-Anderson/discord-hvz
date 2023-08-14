@@ -310,7 +310,7 @@ def main():
         bot.load_extension('.display', package = 'discord_hvz')
         bot.load_extension('.item_tracker', package = 'discord_hvz')
 
-        bot.run(TOKEN)
+        #bot.run(TOKEN)
 
     except discord.errors.LoginFailure as e:
         logger.error(f'Discord failed to log in: {e}')

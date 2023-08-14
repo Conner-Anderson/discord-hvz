@@ -5,7 +5,7 @@ from typing_extensions import Annotated
 from enum import Enum, IntEnum
 from pathlib import Path
 
-#import pydantic
+# import pydantic
 from pydantic import BaseModel, BeforeValidator, AfterValidator, PlainValidator, ValidationError, Field, \
     model_validator, field_validator, PrivateAttr, field_serializer, RootModel, FieldValidationInfo, ValidationInfo
 from pydantic_core import ErrorDetails, PydanticCustomError
@@ -30,8 +30,9 @@ CUSTOM_MESSAGES = {
     'string_type': "{formatted_loc} set to '{input}': This must be text.",
     'url_scheme': 'Hey, use the right URL scheme! I wanted {expected_schemes}.',
     'missing': "Missing the field {formatted_loc}, which is required.",
-    'model_error': "Error when interpreting {formatted_loc}: {msg}"
+    'model_error': "Error when interpreting '{formatted_loc}': {msg}"
 }
+
 
 def validate_question_processor(x: Any) -> callable:
     processor: Union[callable, None] = chatbotprocessors.question_processors.get(x)
@@ -39,11 +40,13 @@ def validate_question_processor(x: Any) -> callable:
         raise ValueError("Processor does not match any function.")
     return processor
 
+
 def validate_script_processor(x: Any) -> callable:
     processor: Union[callable, None] = chatbotprocessors.script_processors.get(x)
     if not processor:
         raise ValueError("Processor does not match any function.")
     return processor
+
 
 def validate_button_color(x: Any) -> str:
     try:
@@ -56,9 +59,10 @@ QuestionProcessor = Annotated[callable, PlainValidator(validate_question_process
 ScriptProcessor = Annotated[callable, PlainValidator(validate_script_processor)]
 ButtonColor = Annotated[ButtonColor, BeforeValidator(validate_button_color)]
 
+
 class QuestionDatas(BaseModel):
     column: str
-    display_name: str = Field(default=None)
+    display_name: str = Field(default=None) # Required for non-modal chatbots
     query: str = Field(max_length=2000)
     valid_regex: str = Field(default=None)
     rejection_response: str = Field(default=None, max_length=2000)
@@ -66,16 +70,18 @@ class QuestionDatas(BaseModel):
     processor: QuestionProcessor = Field(default=None)
     button_options: Dict[str, ButtonColor] = None
 
+    class Config:
+        frozen = True
+
     @model_validator(mode="after")
     def check_question(self) -> QuestionDatas:
-        if not self.display_name:
-            self.display_name = self.column
 
         if bool(self.valid_regex) ^ bool(self.rejection_response):
             raise PydanticCustomError(
                 "model_error",
                 "If either 'valid_regex' or 'rejection_response' is supplied, the other must be also."
             )
+
         return self
 
     def get_option_buttons(self, callback: callable) -> Union[List[HVZButton], None]:
@@ -86,7 +92,7 @@ class QuestionDatas(BaseModel):
         for label, color in self.button_options.items():
             buttons.append(
                 HVZButton(
-                    function = callback,
+                    function=callback,
                     custom_id=label,
                     label=label,
                     color=color,
@@ -96,8 +102,8 @@ class QuestionDatas(BaseModel):
         return buttons
 
 
-
 class ScriptDatas(BaseModel):
+    _kind: str = None  # Must be set by model in above hierarchy
     table: str
     modal: bool = False
     modal_title: str = None
@@ -108,6 +114,10 @@ class ScriptDatas(BaseModel):
     postable_button_color: ButtonColor = ButtonColor.green
     postable_button_label: str = Field(default=None)
     questions: List[QuestionDatas]
+
+    class Config:
+        frozen = True
+        str_strip_whitespace = True
 
     @field_validator('questions', mode='before')
     @classmethod
@@ -122,20 +132,65 @@ class ScriptDatas(BaseModel):
 
     @model_validator(mode='after')
     def check_script(self, info: ValidationInfo) -> ScriptDatas:
+        if len(self.questions) < 1:
+            raise PydanticCustomError(
+                "model_error",
+                "Script must have at least one question."
+            )
+
+        all_columns = []
+        for q in self.questions:
+            if q.column.lower() in all_columns:
+                raise PydanticCustomError(
+                    "model_error",
+                    f"This script uses the column name {q.column} for two questions. Questions must save to unique columns in the database."
+                )
+            all_columns.append(q.column.lower())
+
         if self.modal:
             modal_buttons = False
             for q in self.questions:
                 if q.button_options:
                     modal_buttons = True
             if modal_buttons:
-                logger.warning(f"At least one question in scripts.yml is modal, but also has 'button_options'. Ignoring the buttons.")
+                logger.warning(
+                    f"At least one question in scripts.yml is modal, but also has 'button_options'. Ignoring the buttons.")
+        else:
+            missing_display_names = False
+            for q in self.questions:
+                if not q.display_name:
+                    missing_display_names = True
+                    break
+            if missing_display_names:
+                raise PydanticCustomError(
+                    "model_error",
+                    f"This script is not modal, and so requires a 'display_name' in each question."
+                )
+
+
         return self
 
+    @property
+    def kind(self) -> str:
+        return self._kind
 
 
 class ScriptFile(RootModel):
     '''A pydantic model for the scripts.yml file'''
     root: Dict[str, ScriptDatas]
+
+    @field_validator('root', mode='after')
+    @classmethod
+    def inject_kind(cls, root: Dict[str, ScriptDatas], info: FieldValidationInfo) -> Any:
+        for name, data in root.items():
+            data._kind = name
+        return root
+
+    @property
+    def scripts(self) -> Dict[str, ScriptDatas]:
+        '''A shortcut for fetching dictionary of scripts'''
+        return self.root
+
 
 def load_model():
     filepath = config.path_root / "scripts.yml"
@@ -152,7 +207,7 @@ def load_model():
         logger.exception(e)
     else:
         logger.success("Parsed model without error")
-        logger.info(model.root['registration'].questions[0].processor)
+        logger.info(model.root['registration'].kind)
         return model
 
 
