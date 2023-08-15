@@ -14,6 +14,7 @@ from ruamel.yaml import YAML
 
 if TYPE_CHECKING:
     from discord_hvz.main import HVZBot
+    from .script_models import ScriptDatas, QuestionDatas
 
 from discord_hvz.config import config, ConfigError, ConfigChecker
 from discord_hvz.buttons import HVZButton
@@ -32,10 +33,10 @@ guild_id_list = [config.server_id]
 
 @dataclass(frozen=True)
 class QuestionData:
-    '''
+    """
     A static data structure to store a question that is part of a chatbot.
     The names of the dataclass parameters directly map to names in the yaml file.
-    '''
+    """
     column: str
     display_name: str
     query: str
@@ -52,11 +53,11 @@ class QuestionData:
 
     @classmethod
     def build(cls, question_data: Dict, chatbotmanager: ChatBotManager, modal=False) -> QuestionData:
-        '''
+        """
         Constructs a QuestionData.
         These names are processed, then passed to build the class. A missing or incorrect name returns an error.
         Most of this method validates bad configurations and builds certain fields from existing ones
-        '''
+        """
         for pair in cls.coupled_attributes:  # Throw error if both of a pair of coupled attributes don't exist
             for i in range(0, 2):
                 this_attr = pair[i]
@@ -120,7 +121,7 @@ class QuestionData:
                 raise e
 
     def get_input_text(self, prefilled_value=None) -> discord.ui.InputText:
-        '''Creates an InputText object, which is an element of a modal dialogue.'''
+        """Creates an InputText object, which is an element of a modal dialogue."""
         style = discord.InputTextStyle.long if self.modal_long else discord.InputTextStyle.short
         prefilled_value = prefilled_value or self.modal_default
 
@@ -264,7 +265,7 @@ class ScriptData:
         return output
 
     def create_modal(self, chatbot: ChatBot, interaction: discord.Interaction, disable_buttons=False) -> ChatbotModal:
-        '''Creates a modal based on the script'''
+        """Creates a modal based on the script"""
         modal = ChatbotModal(
             title=self.modal_title[:45],
             chatbot=chatbot,
@@ -289,7 +290,7 @@ class ScriptData:
 
 @dataclass
 class ChatBot:
-    script: ScriptData
+    script: ScriptDatas
     bot: HVZBot
     chat_member: discord.Member
     chatbot_manager: ChatBotManager
@@ -304,7 +305,7 @@ class ChatBot:
             self.target_member = self.chat_member
 
     def __str__(self) -> str:
-        return f'<@{self.chat_member.id}>, Script: {str(self.script)}'
+        return f'<@{self.chat_member.id}>, Script: {str(self.script.kind)}'
 
     def __int__(self) -> int:
         return self.chat_member.id
@@ -334,36 +335,55 @@ class ChatBot:
 
             if question.button_options:
                 view = discord.ui.View(timeout=None)
-                for button in question.button_options:
+                for button in question.get_option_buttons(callback=self.chatbot_manager.receive_interaction):
                     view.add_item(button)
 
         elif self.state is ChatbotState.REVIEWING:
             log.debug('Entered reviewing mode')
             view = discord.ui.View(timeout=None)
 
-            view.add_item(self.script.special_buttons['submit'])
-            view.add_item(self.script.special_buttons['modify'])
-            msg = self.script.get_review_string(self.responses)
+            view.add_item(HVZButton(
+                self.chatbot_manager.receive_interaction,
+                custom_id='submit',
+                label='Submit',
+                color='green',
+                unique=True
+            ))
+            view.add_item(HVZButton(
+                self.chatbot_manager.receive_interaction,
+                custom_id='modify',
+                label='Edit Answers',
+                color='blurple',
+                unique=True
+            ))
+            view.add_item(HVZButton(
+                self.chatbot_manager.receive_interaction,
+                custom_id='cancel',
+                label='Cancel',
+                color='gray',
+                unique=True
+            ))
+            msg = self.create_review_string(self.responses, self.script)
 
         elif self.state is ChatbotState.MODIFYING_SELECTION:
             view = discord.ui.View(timeout=None)
-            for button in self.script.review_selection_buttons:
+            for button in self.script.get_selection_buttons(self.chatbot_manager.receive_interaction):
                 view.add_item(button)
             msg = 'Select answer to modify:'
 
         if self.script.modal:
-            await self.send_modal(interaction)
+            await self.send_modal(interaction, self.script)
         else:
             await self.chat_member.send(msg, view=view)
 
     async def receive(self, message: str, interaction: discord.Interaction = None) -> bool:
-        '''Receives user responses into the chatbot. Returns True if the chatbot is complete.'''
+        """Receives user responses into the chatbot. Returns True if the chatbot is complete."""
 
         message = message.strip()
         processed_response = message
 
         if self.script.modal and message == 'modify' and interaction:
-            await self.send_modal(interaction, disable_buttons=True)
+            await self.send_modal(interaction, self.script, disable_buttons=True)
             self.state = ChatbotState.MODIFYING
             return False
 
@@ -399,7 +419,7 @@ class ChatBot:
             self.responses[self.next_question] = Response(message, processed_response)
             self.next_question += 1
 
-            if (self.next_question > len(self.script) - 1) or (self.state is ChatbotState.MODIFYING):
+            if (self.next_question > len(self.script.questions) - 1) or (self.state is ChatbotState.MODIFYING):
                 self.state = ChatbotState.REVIEWING
 
 
@@ -411,7 +431,7 @@ class ChatBot:
                 except ResponseError as e:
                     await self.chat_member.send(str(e))
                 else:
-                    await self.chat_member.send(self.script.ending)
+                    await self.chat_member.send(self.script.ending if self.script.ending else "Complete!")
                     logger.info(
                         f'Chatbot "{self.script.kind}" with {self.chat_member.name} (Nickname: {self.chat_member.nick}) completed successfully.'
                     )
@@ -440,14 +460,33 @@ class ChatBot:
         await self.ask_question()
         return False
 
-    async def send_modal(self, interaction: discord.Interaction, existing_chatbot: ChatBot = None,
+    async def send_modal(self, interaction: discord.Interaction, script: ScriptDatas, existing_chatbot: ChatBot = None,
                          disable_buttons=False):
-        '''Responds to an interaction with the chatbot's modal version.'''
+        """Responds to an interaction with the chatbot's modal version."""
 
-        await interaction.response.send_modal(self.script.create_modal(self, interaction, disable_buttons))
+        modal = ChatbotModal(
+            title=script.modal_title[:45] if script.modal_title else script.kind,
+            chatbot=self,
+            interaction=interaction,
+            disable_buttons=disable_buttons
+        )
+
+        for i, question in enumerate(script.questions):
+            prefilled_value = self.responses.get(i)
+            if prefilled_value: prefilled_value = prefilled_value.raw_response
+            try:
+                modal.add_item(
+                    self.create_modal_input_text(question, prefilled_value)
+                )
+            except ValueError as e:
+                logger.warning(
+                    f'There was an error building a modal for a chatbot. Script name: {script.kind} Error: {e}')
+                break
+
+        await interaction.response.send_modal(modal)
 
     async def save(self):
-        '''Attempts to save a chatbot's data to the database'''
+        """Attempts to save a chatbot's data to the database"""
         response_map: dict[str, Any] = {}
 
         # Convert the dictionary of indexed response objects to a map of question names to response values
@@ -465,35 +504,68 @@ class ChatBot:
 
         self.bot.db.add_row(self.script.table, response_map_processed)
 
+    def create_review_string(self, responses: dict[int, Response], script: ScriptDatas) -> str:
+        # Return a string list of questions and responses, useful for reviewing answers
+        # TODO: Rework responses to not require this sort of int indexing
+        output = ''
+        for i, q in enumerate(script.questions):
+            response = responses[i].raw_response
+            output += f"**{q.display_name}**: {response}\n"
+        return output
+
+    # TODO: Consider moving this and other such methods to script_models or as static function
+    def create_modal_input_text(self, question: QuestionDatas, prefilled_value=None) -> discord.ui.InputText:
+        """Creates an InputText object, which is an element of a modal dialogue."""
+        style = discord.InputTextStyle.long if question.modal_long else discord.InputTextStyle.short
+        prefilled_value = prefilled_value or question.modal_default
+
+        # TODO: Find a more robust and flexible way to have keyword values
+        if isinstance(prefilled_value, str) and prefilled_value.strip().lower() == ('current_time' or 'current time'):
+            now = datetime.now(tz=config.timezone) - timedelta(minutes=1)
+            prefilled_value = now.strftime('%I:%M %p')
+        return discord.ui.InputText(
+            style=style,
+            label=question.query[:45],
+            value=prefilled_value
+        )
+
+
+def slice_custom_id(text: str):
+    """
+    A custom id is a string tied to a Discord element such as a button or modal that identifies that particular one
+    to the bot. To make them unique, the bot may add a colon followed by a unique number.
+    This function removes the colon and unique number. If there is none, it returns the original text.
+    This type of string is generated within a HVZButton
+    """
+    return text[:text.find(':')]
+
 
 class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
-    '''
+    """
     The cog that the main bot imports to run the chatbot system.
-    '''
+    """
     bot: HVZBot
     active_chatbots: Dict[int, ChatBot] = {}  # Maps member ids to ChatBots
-    loaded_scripts: Dict[str, ScriptData] = {}
+    loaded_scripts: Dict[str, ScriptDatas] = {}
+    config_checkers: Dict[str, ConfigChecker] = {}
+    _postable_buttons: List[HVZButton] = []
 
     def __init__(self, bot: HVZBot, chatbot_config_checkers: Dict = None):
         self.bot = bot
         startup_data = bot.get_cog_startup_data(self)
         path = config.path_root / "scripts.yml"
-        file = open(path, mode='r')
-        scripts_data = yaml.load(file)
-        file.close()
-        # Temporary model loading for development
-        model = load_model()
 
-        for kind, script in scripts_data.items():
-
-            try:
-                config_checker = startup_data['config_checkers'][kind]
-            except KeyError:
-                config_checker = None
-
-            self.loaded_scripts[kind] = (
-                ScriptData.build(kind, script, chatbotmanager=self, config_checker=config_checker))
-
+        self.loaded_scripts = {s.kind: s for s in load_model(path).scripts}
+        self.config_checkers = {k: self.get_config_checker(k, self.bot) for k, s in self.loaded_scripts.items()}
+        for kind, script in self.loaded_scripts.items():
+            self._postable_buttons.append(
+                HVZButton(
+                    function=self.start_chatbot,
+                    custom_id=kind,
+                    label=getattr(script, 'postable_button_label', kind),
+                    color=getattr(script, 'postable_button_color', 'green'),
+                    postable_bot=self.bot)
+            )
         # TODO: Make the bot adapt to new critical chatbot names
         if not self.loaded_scripts.get("registration"):
             logger.warning(
@@ -521,11 +593,10 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
                 script = self.loaded_scripts.get(interaction.custom_id)
                 if not script:
                     raise ConfigError(f'There is no chatbot called "{script}", so this command doesn\'t work.')
-                chatbot_kind = interaction.custom_id
 
             member = interaction.user
 
-            if not script.config_checker.get_state() and not override_config:
+            if not self.config_checkers[script.kind].get_state() and not override_config:
                 raise ConfigError(f'The chatbot {script.kind} is disabled in the bot\'s configuration. ')
 
             existing = self.active_chatbots.get(member.id)
@@ -567,10 +638,10 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        '''
+        """
         A listener function that will receive direct messages from users.
         The happy path will call receive_response()
-        '''
+        """
         if message.channel.type != discord.ChannelType.private or message.author.bot:
             return
         author_id = message.author.id
@@ -590,7 +661,7 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             user_id = interaction.user.id
 
             custom_id = interaction.data['custom_id']
-            response_text = self.slice_custom_id(custom_id)
+            response_text = slice_custom_id(custom_id)
 
             try:
                 await self.receive_response(user_id, response_text, interaction=interaction)
@@ -601,9 +672,9 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
                     logger.exception(e)
 
     async def receive_response(self, author_id: int, response_text: str, interaction: discord.Interaction = None):
-        '''
+        """
         Receives all responses to a chatbot: direct messages, buttons, modals, etc.
-        '''
+        """
         log.debug(f'author_id: {author_id} response_text: {response_text}')
         chatbot = self.active_chatbots.get(author_id)
 
@@ -624,31 +695,27 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
         else:
             chatbot.processing = False
 
-    def slice_custom_id(self, text: str):
-        '''
-        A custom id is a string tied to a Discord element such as a button or modal that identifies that particular one
-        to the bot. To make them unique, the bot may add a colon followed by a unique number.
-        This function removes the colon and unique number. If there is none, it returns the original text.
-        This type of string is generated within a HVZButton
-        '''
-        return text[:text.find(':')]
-
     def list_active_chatbots(self) -> List[str]:
         output_list = []
         for i, chatbot in self.active_chatbots.items():
             output_list.append(str(chatbot))
         return output_list
 
-
-
     async def shutdown(self):
-        '''Sends a shutdown message to all members in a chatbot'''
+        """Sends a shutdown message to all members in a chatbot"""
         for i, chatbot in self.active_chatbots.items():
             await chatbot.chat_member.send(
                 'Unfortunately, the bot has shut down. You will need to restart this chatbot when it comes back online.'
             )
 
+    # TODO: Check if this is the best way to do this
+    def get_config_checker(self, key: str, bot: HVZBot) -> ConfigChecker | None:
+        try:
+            return bot.get_cog_startup_data(self)['config_checkers'][key]
+        except KeyError:
+            return None
+
 
 def setup(bot):
-    '''Called by Pycord to setup the cog'''
+    """Called by Pycord to setup the cog"""
     bot.add_cog(ChatBotManager(bot))  # add the cog to the bot

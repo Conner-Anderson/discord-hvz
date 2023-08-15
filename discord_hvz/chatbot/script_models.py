@@ -67,6 +67,7 @@ class QuestionDatas(BaseModel):
     valid_regex: str = Field(default=None)
     rejection_response: str = Field(default=None, max_length=2000)
     modal_default: str = None
+    modal_long: bool = False
     processor: QuestionProcessor = Field(default=None)
     button_options: Dict[str, ButtonColor] = None
 
@@ -101,6 +102,15 @@ class QuestionDatas(BaseModel):
             )
         return buttons
 
+    def get_selection_button(self, callback: callable) -> HVZButton:
+        '''Returns a button for selecting a response to modify.'''
+        return HVZButton(
+            callback,
+            custom_id=self.column,
+            label=self.display_name,
+            color='blurple',
+            unique=True
+        )
 
 class ScriptDatas(BaseModel):
     _kind: str = None  # Must be set by model in above hierarchy
@@ -109,8 +119,8 @@ class ScriptDatas(BaseModel):
     modal_title: str = None
     beginning: str = Field(default=None, max_length=2000)
     ending: str = Field(default=None, max_length=2000)
-    starting_processor: str = Field(default=None)
-    ending_processor: str = Field(default=None)
+    starting_processor: ScriptProcessor = Field(default=None)
+    ending_processor: ScriptProcessor = Field(default=None)
     postable_button_color: ButtonColor = ButtonColor.green
     postable_button_label: str = Field(default=None)
     questions: List[QuestionDatas]
@@ -174,6 +184,13 @@ class ScriptDatas(BaseModel):
     def kind(self) -> str:
         return self._kind
 
+    def get_selection_buttons(self, callback: callable) -> List[HVZButton]:
+        '''Returns a button for selecting a response to modify.'''
+        buttons = []
+        for q in self.questions:
+            buttons.append(q.get_selection_button(callback))
+        return buttons
+
 
 class ScriptFile(RootModel):
     '''A pydantic model for the scripts.yml file'''
@@ -187,13 +204,12 @@ class ScriptFile(RootModel):
         return root
 
     @property
-    def scripts(self) -> Dict[str, ScriptDatas]:
-        '''A shortcut for fetching dictionary of scripts'''
-        return self.root
+    def scripts(self) -> List[ScriptDatas]:
+        '''A shortcut for fetching list of scripts'''
+        return [value for value in self.root.values()]
 
 
-def load_model():
-    filepath = config.path_root / "scripts.yml"
+def load_model(filepath: Path) -> ScriptFile:
     with open(filepath) as fp:
         yaml_string = fp.read()
     try:
@@ -203,13 +219,12 @@ def load_model():
               + format_pydantic_errors(e, CUSTOM_MESSAGES) \
               + "For help with scripts, see the documentation at https://conner-anderson.github.io/discord-hvz-docs/latest/customized_chatbots/"
         raise ConfigError(msg) from e
+    # TODO: Check how exception handling works with this stuff
     except Exception as e:
         logger.exception(e)
     else:
-        logger.success("Parsed model without error")
-        logger.info(model.root['registration'].kind)
         return model
 
 
 if __name__ == "__main__":
-    load_model()
+    load_model(config.path_root / "scripts.yml")

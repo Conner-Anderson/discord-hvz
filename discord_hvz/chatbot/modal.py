@@ -6,9 +6,11 @@ import discord
 import regex
 
 from .chatbot_utilities import Response, ResponseError, ChatbotState, disable_previous_buttons
+from discord_hvz.buttons import HVZButton
 
 if TYPE_CHECKING:
     from discord_hvz.chatbot import ChatBot
+    from discord_hvz.chatbot.script_models import QuestionDatas, ScriptDatas
 
 from loguru import logger
 
@@ -47,6 +49,7 @@ class ChatbotModal(discord.ui.Modal):
         self.chatbot.state = ChatbotState.REVIEWING
 
         for i, question in enumerate(self.chatbot.script.questions):
+            question: QuestionDatas
             self.chatbot.responses[i] = Response(raw_responses[i], raw_responses[i])
             if question.valid_regex:
                 match = regex.fullmatch(r'{}'.format(question.valid_regex), raw_responses[i])
@@ -75,8 +78,20 @@ class ChatbotModal(discord.ui.Modal):
                 error_msg += f'\n\n{query}\n`{raw_responses[i]}`\n*{error}*'
 
             view = discord.ui.View(timeout=None)
-            view.add_item(self.chatbot.script.special_buttons['modify'])
-            view.add_item(self.chatbot.script.special_buttons['cancel'])
+            view.add_item(HVZButton(
+                self.chatbot.chatbot_manager.receive_interaction,
+                custom_id='modify',
+                label='Edit Answers',
+                color='blurple',
+                unique=True
+            ))
+            view.add_item(HVZButton(
+                self.chatbot.chatbot_manager.receive_interaction,
+                custom_id='cancel',
+                label='Cancel',
+                color='gray',
+                unique=True
+            ))
             # TODO: Ephemeral messages can't have persistent views. Thus these buttons can't be modifed
             # You can edit the message only through the original interaction.response. Can I save it?
             await interaction.response.send_message(error_msg, ephemeral=True, view=view)
@@ -86,7 +101,8 @@ class ChatbotModal(discord.ui.Modal):
             except ResponseError as e:
                 msg = str(e)
             else:
-                msg = self.chatbot.script.ending
+                ending = self.chatbot.script.ending
+                msg = ending if ending else "Complete!"
                 logger.info(
                     f'Chatbot "{self.chatbot.script.kind}" with {self.chatbot.chat_member.name} (Nickname: {self.chatbot.chat_member.nick}) completed successfully.'
                 )
