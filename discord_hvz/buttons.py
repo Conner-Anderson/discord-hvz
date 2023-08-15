@@ -56,7 +56,6 @@ class HVZButton(discord.ui.Button):
     ):
         """
         A button for one role. `custom_id` is needed for persistent views.
-        :type postable: bool
         :param style: If supplied, this overrides color
         :param custom_id:
         :param function:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from typing import TYPE_CHECKING
 
@@ -20,8 +19,6 @@ from discord_hvz.buttons import HVZButton
 from . import modal
 from .chatbot_utilities import Response, ResponseError, ChatbotState, disable_previous_buttons
 from .script_models import load_model
-
-log = logger
 
 # Used for creating commands
 guild_id_list = [config.server_id]
@@ -78,7 +75,7 @@ class ChatBot:
                     view.add_item(button)
 
         elif self.state is ChatbotState.REVIEWING:
-            log.debug('Entered reviewing mode')
+            logger.debug('Entered reviewing mode')
             view = discord.ui.View(timeout=None)
 
             view.add_item(HVZButton(
@@ -239,9 +236,8 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
     config_checkers: Dict[str, ConfigChecker] = {}
     _postable_buttons: List[HVZButton] = []
 
-    def __init__(self, bot: HVZBot, chatbot_config_checkers: Dict = None):
+    def __init__(self, bot: HVZBot):
         self.bot = bot
-        startup_data = bot.get_cog_startup_data(self)
         path = config.path_root / "scripts.yml"
 
         self.loaded_scripts = {s.kind: s for s in load_model(path).scripts}
@@ -263,7 +259,7 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             logger.warning(
                 f'There is no script in scripts.yml named "tag_logging", so the /tag create command will not function.')
 
-        log.debug('ChatBotManager Initialized')
+        logger.debug('ChatBotManager Initialized')
 
     async def start_chatbot(
             self,
@@ -274,7 +270,6 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
     ) -> None:
         # chatbot_kind only needed if the custom_id of the interaction isn't a valid script type
         response_msg = ''
-        modal = False
         error = False
         try:
             script = self.loaded_scripts.get(interaction.custom_id) or self.loaded_scripts.get(chatbot_kind)
@@ -312,7 +307,7 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             error = True
         except Exception as e:
             response_msg = f'The chatbot failed unexpectedly. Here is the error you can give to an admin: "{e}"'
-            log.exception(e)
+            logger.exception(e)
             error = True
         else:
             response_msg = 'Check your private messages.'
@@ -344,7 +339,7 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
         The happy path will call receive_response()
         """
         if interaction.type != discord.InteractionType.component:
-            log.warning('receive_interaction got something other than a component')
+            logger.warning('receive_interaction got something other than a component')
             return
         if interaction.channel.type in (discord.ChannelType.private, discord.ChannelType.text):
             user_id = interaction.user.id
@@ -364,7 +359,7 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
         """
         Receives all responses to a chatbot: direct messages, buttons, modals, etc.
         """
-        log.debug(f'author_id: {author_id} response_text: {response_text}')
+        logger.debug(f'author_id: {author_id} response_text: {response_text}')
         chatbot = self.active_chatbots.get(author_id)
 
         if chatbot is None or chatbot.processing is True:
@@ -376,7 +371,7 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             await chatbot.chat_member.send(
                 f'The chatbot had a critical error. You will need to retry from the beginning.')
             self.active_chatbots.pop(author_id)
-            log.exception(e)
+            logger.exception(e)
             return
 
         if completed:

@@ -30,7 +30,7 @@ class ChatbotModal(discord.ui.Modal):
         super().__init__(*args, timeout=800.0, **kwargs)
 
     async def on_timeout(self) -> None:
-        '''When the modal times-out, this shuts down the chatbot and lets the user know.'''
+        """When the modal times-out, this shuts down the chatbot and lets the user know."""
         logger.info("Modal timed out for chatbot.")
         self.chatbot.remove()
         await self.original_interaction.followup.send("Chatbot timed out.", ephemeral=True)
@@ -38,11 +38,11 @@ class ChatbotModal(discord.ui.Modal):
     '''Method is called when a user submits the modal'''
 
     async def callback(self, interaction: discord.Interaction):
-        '''
+        """
         A function that is called when the modal is submitted.
         Much of this code is duplicated from the non-modal chatbot code
         TODO: Unify this code with chatbot
-        '''
+        """
 
         raw_responses = [x.value.strip() for x in self.children]
         errors = []

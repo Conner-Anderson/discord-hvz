@@ -2,15 +2,12 @@ from __future__ import annotations
 from typing import Dict, List, Any, Union
 from typing_extensions import Annotated
 
-from enum import Enum, IntEnum
 from pathlib import Path
 
-# import pydantic
 from pydantic import BaseModel, BeforeValidator, AfterValidator, PlainValidator, ValidationError, Field, \
     model_validator, field_validator, PrivateAttr, field_serializer, RootModel, FieldValidationInfo, ValidationInfo
 from pydantic_core import ErrorDetails, PydanticCustomError
 from pydantic_yaml import parse_yaml_raw_as, to_yaml_str, to_yaml_file
-from discord.enums import ButtonStyle
 from ruamel.yaml import YAML
 
 from loguru import logger
@@ -86,7 +83,7 @@ class QuestionDatas(BaseModel):
         return self
 
     def get_option_buttons(self, callback: callable) -> Union[List[HVZButton], None]:
-        '''Returns a list of HVZButtons supplied as options to this question. Returns None if there are none.'''
+        """Returns a list of HVZButtons supplied as options to this question. Returns None if there are none."""
         buttons = []
         if not self.button_options:
             return None
@@ -103,7 +100,7 @@ class QuestionDatas(BaseModel):
         return buttons
 
     def get_selection_button(self, callback: callable) -> HVZButton:
-        '''Returns a button for selecting a response to modify.'''
+        """Returns a button for selecting a response to modify."""
         return HVZButton(
             callback,
             custom_id=self.column,
@@ -132,7 +129,7 @@ class ScriptDatas(BaseModel):
     @field_validator('questions', mode='before')
     @classmethod
     def check_questions(cls, x: List[Dict], info: FieldValidationInfo) -> List[Dict]:
-        '''If modal has already been set, and is true, limit to 5 questions.'''
+        """If modal has already been set, and is true, limit to 5 questions."""
         modal = info.data.get('modal', None)
         if modal is not None and modal:
             if len(x) > 5:
@@ -185,7 +182,7 @@ class ScriptDatas(BaseModel):
         return self._kind
 
     def get_selection_buttons(self, callback: callable) -> List[HVZButton]:
-        '''Returns a button for selecting a response to modify.'''
+        """Returns a button for selecting a response to modify."""
         buttons = []
         for q in self.questions:
             buttons.append(q.get_selection_button(callback))
@@ -193,7 +190,7 @@ class ScriptDatas(BaseModel):
 
 
 class ScriptFile(RootModel):
-    '''A pydantic model for the scripts.yml file'''
+    """A pydantic model for the scripts.yml file"""
     root: Dict[str, ScriptDatas]
 
     @field_validator('root', mode='after')
@@ -205,7 +202,7 @@ class ScriptFile(RootModel):
 
     @property
     def scripts(self) -> List[ScriptDatas]:
-        '''A shortcut for fetching list of scripts'''
+        """A shortcut for fetching list of scripts"""
         return [value for value in self.root.values()]
 
 
