@@ -4,9 +4,11 @@ from typing import TYPE_CHECKING
 
 import discord
 import regex
+from datetime import datetime, timedelta
 
 from .chatbot_utilities import Response, ResponseError, ChatbotState, disable_previous_buttons
 from discord_hvz.buttons import HVZButton
+from discord_hvz.config import config
 
 if TYPE_CHECKING:
     from discord_hvz.chatbot import ChatBot
@@ -116,3 +118,43 @@ class ChatbotModal(discord.ui.Modal):
                 await disable_previous_buttons(self.original_interaction)
             except Exception as e:
                 logger.exception(e)
+
+async def send_modal(interaction: discord.Interaction, chatbot: ChatBot,
+                     existing_chatbot: ChatBot = None, disable_buttons=False):
+    """Responds to an interaction with the chatbot's modal version."""
+    script = chatbot.script
+    modal = ChatbotModal(
+        title=script.modal_title[:45] if script.modal_title else script.kind,
+        chatbot=chatbot,
+        interaction=interaction,
+        disable_buttons=disable_buttons
+    )
+
+    for i, question in enumerate(script.questions):
+        prefilled_value = chatbot.responses.get(i)
+        if prefilled_value: prefilled_value = prefilled_value.raw_response
+        try:
+            modal.add_item(
+                create_modal_input_text(question, prefilled_value)
+            )
+        except ValueError as e:
+            logger.warning(
+                f'There was an error building a modal for a chatbot. Script name: {script.kind} Error: {e}')
+            break
+
+    await interaction.response.send_modal(modal)
+
+def create_modal_input_text(question: QuestionDatas, prefilled_value=None) -> discord.ui.InputText:
+    """Creates an InputText object, which is an element of a modal dialogue."""
+    style = discord.InputTextStyle.long if question.modal_long else discord.InputTextStyle.short
+    prefilled_value = prefilled_value or question.modal_default
+
+    # TODO: Find a more robust and flexible way to have keyword values
+    if isinstance(prefilled_value, str) and prefilled_value.strip().lower() == ('current_time' or 'current time'):
+        now = datetime.now(tz=config.timezone) - timedelta(minutes=1)
+        prefilled_value = now.strftime('%I:%M %p')
+    return discord.ui.InputText(
+        style=style,
+        label=question.query[:45],
+        value=prefilled_value
+    )

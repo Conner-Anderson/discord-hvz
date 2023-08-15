@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import List, Dict, Any
 from typing import TYPE_CHECKING
 
@@ -10,7 +9,6 @@ import discord
 import regex
 from discord.ext import commands
 from loguru import logger
-from ruamel.yaml import YAML
 
 if TYPE_CHECKING:
     from discord_hvz.main import HVZBot
@@ -19,16 +17,15 @@ if TYPE_CHECKING:
 from discord_hvz.config import config, ConfigError, ConfigChecker
 from discord_hvz.buttons import HVZButton
 
-import chatbotprocessors
-from .modal import ChatbotModal
+from . import modal
 from .chatbot_utilities import Response, ResponseError, ChatbotState, disable_previous_buttons
 from .script_models import load_model
 
 log = logger
-yaml = YAML(typ='safe')
 
 # Used for creating commands
 guild_id_list = [config.server_id]
+
 
 @dataclass
 class ChatBot:
@@ -114,7 +111,7 @@ class ChatBot:
             msg = 'Select answer to modify:'
 
         if self.script.modal:
-            await self.send_modal(interaction, self.script)
+            await modal.send_modal(interaction, self)
         else:
             await self.chat_member.send(msg, view=view)
 
@@ -125,7 +122,7 @@ class ChatBot:
         processed_response = message
 
         if self.script.modal and message == 'modify' and interaction:
-            await self.send_modal(interaction, self.script, disable_buttons=True)
+            await modal.send_modal(interaction, self, disable_buttons=True)
             self.state = ChatbotState.MODIFYING
             return False
 
@@ -202,31 +199,6 @@ class ChatBot:
         await self.ask_question()
         return False
 
-    async def send_modal(self, interaction: discord.Interaction, script: ScriptDatas, existing_chatbot: ChatBot = None,
-                         disable_buttons=False):
-        """Responds to an interaction with the chatbot's modal version."""
-
-        modal = ChatbotModal(
-            title=script.modal_title[:45] if script.modal_title else script.kind,
-            chatbot=self,
-            interaction=interaction,
-            disable_buttons=disable_buttons
-        )
-
-        for i, question in enumerate(script.questions):
-            prefilled_value = self.responses.get(i)
-            if prefilled_value: prefilled_value = prefilled_value.raw_response
-            try:
-                modal.add_item(
-                    self.create_modal_input_text(question, prefilled_value)
-                )
-            except ValueError as e:
-                logger.warning(
-                    f'There was an error building a modal for a chatbot. Script name: {script.kind} Error: {e}')
-                break
-
-        await interaction.response.send_modal(modal)
-
     async def save(self):
         """Attempts to save a chatbot's data to the database"""
         response_map: dict[str, Any] = {}
@@ -246,7 +218,8 @@ class ChatBot:
 
         self.bot.db.add_row(self.script.table, response_map_processed)
 
-    def create_review_string(self, responses: dict[int, Response], script: ScriptDatas) -> str:
+    @classmethod
+    def create_review_string(cls, responses: dict[int, Response], script: ScriptDatas) -> str:
         # Return a string list of questions and responses, useful for reviewing answers
         # TODO: Rework responses to not require this sort of int indexing
         output = ''
@@ -254,32 +227,6 @@ class ChatBot:
             response = responses[i].raw_response
             output += f"**{q.display_name}**: {response}\n"
         return output
-
-    # TODO: Consider moving this and other such methods to script_models or as static function
-    def create_modal_input_text(self, question: QuestionDatas, prefilled_value=None) -> discord.ui.InputText:
-        """Creates an InputText object, which is an element of a modal dialogue."""
-        style = discord.InputTextStyle.long if question.modal_long else discord.InputTextStyle.short
-        prefilled_value = prefilled_value or question.modal_default
-
-        # TODO: Find a more robust and flexible way to have keyword values
-        if isinstance(prefilled_value, str) and prefilled_value.strip().lower() == ('current_time' or 'current time'):
-            now = datetime.now(tz=config.timezone) - timedelta(minutes=1)
-            prefilled_value = now.strftime('%I:%M %p')
-        return discord.ui.InputText(
-            style=style,
-            label=question.query[:45],
-            value=prefilled_value
-        )
-
-
-def slice_custom_id(text: str):
-    """
-    A custom id is a string tied to a Discord element such as a button or modal that identifies that particular one
-    to the bot. To make them unique, the bot may add a colon followed by a unique number.
-    This function removes the colon and unique number. If there is none, it returns the original text.
-    This type of string is generated within a HVZButton
-    """
-    return text[:text.find(':')]
 
 
 class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
@@ -456,6 +403,16 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             return bot.get_cog_startup_data(self)['config_checkers'][key]
         except KeyError:
             return None
+
+
+def slice_custom_id(text: str):
+    """
+    A custom id is a string tied to a Discord element such as a button or modal that identifies that particular one
+    to the bot. To make them unique, the bot may add a colon followed by a unique number.
+    This function removes the colon and unique number. If there is none, it returns the original text.
+    This type of string is generated within a HVZButton
+    """
+    return text[:text.find(':')]
 
 
 def setup(bot):
