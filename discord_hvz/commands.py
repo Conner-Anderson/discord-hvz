@@ -480,15 +480,19 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         file_obj = [discord.File(config.script_path), discord.File(config.filepath)]
 
         # Send a message with the file attached
-        message = await ctx.author.send(files=file_obj, content='Here is the file you requested!')
+        message = await ctx.author.send(
+            files=file_obj,
+            content='Attached are the editable configuration files. Edit any of them, then *reply* to this message '
+            'with the edited files attached to update the bot\'s actual files.'
+        )
         self.config_download_messages.append(message.id)
         await ctx.respond("Replied in a Direct Message", ephemeral=True)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         """
-        A listener function that will receive direct messages from users.
-        The happy path will call receive_response()
+        A listener function that will receive direct messages from users and check if they are replying to a message
+            created by the /download_config command
         """
         valid_paths = {"config.yml": config.filepath, "scripts.yml": config.script_path}
         if message.channel.type != discord.ChannelType.private or message.author.bot:
@@ -497,9 +501,12 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         if not reference: return
         if not reference.message_id in self.config_download_messages: return
         filenames = [a.filename for a in message.attachments]
-        logger.info(f"Filenames: {filenames}")
         for attachment in message.attachments:
-            if not valid_paths.get(attachment.filename):
+            target_path = valid_paths.get(attachment.filename)
+            if not target_path:
+                await message.reply(f"The file {attachment.filename} does not match a file that can be written to.")
                 continue
-            thing = await attachment.read()
+            bytes = await attachment.read()
+            with open(target_path, 'wb') as file:
+                file.write(bytes)
 
