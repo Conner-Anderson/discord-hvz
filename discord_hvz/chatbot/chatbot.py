@@ -9,16 +9,17 @@ import regex
 from discord.ext import commands
 from loguru import logger
 
-if TYPE_CHECKING:
-    from discord_hvz.main import HVZBot
-    from .script_models import ScriptDatas, QuestionDatas
-
+from discord.commands import slash_command, Option
 from discord_hvz.config import config, ConfigError, ConfigChecker
 from discord_hvz.buttons import HVZButton
 
 from . import modal
 from .chatbot_utilities import Response, ResponseError, ChatbotState, disable_previous_buttons
 from .script_models import load_model
+
+if TYPE_CHECKING:
+    from discord_hvz.main import HVZBot
+    from .script_models import ScriptDatas, QuestionDatas
 
 # Used for creating commands
 guild_id_list = [config.server_id]
@@ -238,9 +239,8 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
 
     def __init__(self, bot: HVZBot):
         self.bot = bot
-        path = config.path_root / "scripts.yml"
 
-        self.loaded_scripts = {s.kind: s for s in load_model(path).scripts}
+        self.loaded_scripts = {s.kind: s for s in load_model(config.script_path).scripts}
         self.config_checkers = {k: self.get_config_checker(k, self.bot) for k, s in self.loaded_scripts.items()}
         for kind, script in self.loaded_scripts.items():
             self._postable_buttons.append(

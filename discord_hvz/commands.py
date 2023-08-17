@@ -1,6 +1,6 @@
 # from __future__ import annotations
 import time
-from typing import Union, TYPE_CHECKING, Optional
+from typing import Union, TYPE_CHECKING, Optional, List
 
 import discord
 from discord.commands import Option, SlashCommandGroup, slash_command
@@ -13,7 +13,7 @@ from discord_hvz.config import config
 
 if TYPE_CHECKING:
     from main import HVZBot
-    from chatbot import ChatBotManager
+    from discord_hvz.chatbot import ChatBotManager
 
 def dump(obj):
     """Prints the passed object in a very detailed form for debugging"""
@@ -32,9 +32,12 @@ def setup(bot):  # this is called by Pycord to setup the cog
 
 
 class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
+    bot: "HVZBot"
+    config_download_messages: List[int]
 
     def __init__(self, bot: "HVZBot"):
         self.bot = bot
+        self. config_download_messages = []
 
     member_group = SlashCommandGroup("member", "Commands for dealing with members.", guild_ids=guild_id_list)
     tag_group = SlashCommandGroup("tag", "Commands for dealing with tags.", guild_ids=guild_id_list)
@@ -470,3 +473,33 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         except Exception as e:
             await ctx.respond('Could not change permissions in the channels. Please give the bot permission to.')
             logger.warning(e)
+
+    @slash_command(name='download_config', description='Sends you the config files, which you can edit and re-upload.')
+    async def download_config(self, ctx: discord.ApplicationContext):
+
+        file_obj = [discord.File(config.script_path), discord.File(config.filepath)]
+
+        # Send a message with the file attached
+        message = await ctx.author.send(files=file_obj, content='Here is the file you requested!')
+        self.config_download_messages.append(message.id)
+        await ctx.respond("Replied in a Direct Message", ephemeral=True)
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """
+        A listener function that will receive direct messages from users.
+        The happy path will call receive_response()
+        """
+        valid_paths = {"config.yml": config.filepath, "scripts.yml": config.script_path}
+        if message.channel.type != discord.ChannelType.private or message.author.bot:
+            return
+        reference = message.reference
+        if not reference: return
+        if not reference.message_id in self.config_download_messages: return
+        filenames = [a.filename for a in message.attachments]
+        logger.info(f"Filenames: {filenames}")
+        for attachment in message.attachments:
+            if not valid_paths.get(attachment.filename):
+                continue
+            thing = await attachment.read()
+

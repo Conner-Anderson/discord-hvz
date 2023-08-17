@@ -138,6 +138,7 @@ class HVZConfig(BaseModel):
     # The root path of the bot
     _path_root: Path = PrivateAttr(default=PATH_ROOT)
     _filepath: Path = PrivateAttr(default=CONFIG_PATH)
+    _script_path: Path = PrivateAttr(default=PATH_ROOT / "scripts.yml")
 
     class Config:
         arbitrary_types_allowed = True
@@ -198,6 +199,11 @@ class HVZConfig(BaseModel):
     def filepath(self) -> Path:
         '''Returns the path to the config file. Use filepath.name for the filename.'''
         return self._filepath
+
+    @property
+    def script_path(self) -> Path:
+        '''Returns the path to the scripts file. Use script_path.name for the filename.'''
+        return self._script_path
 
 
 class ConfigError(Exception):
