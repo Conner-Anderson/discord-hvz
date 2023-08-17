@@ -167,7 +167,7 @@ class ChatBot:
                 except ResponseError as e:
                     await self.chat_member.send(str(e))
                 else:
-                    await self.chat_member.send(self.script.ending if self.script.ending else "Complete!")
+                    await self.chat_member.send(self.script.ending)
                     logger.info(
                         f'Chatbot "{self.script.kind}" with {self.chat_member.name} (Nickname: {self.chat_member.nick}) completed successfully.'
                     )

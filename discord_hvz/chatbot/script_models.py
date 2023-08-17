@@ -20,6 +20,8 @@ import chatbotprocessors
 yaml = YAML()
 yaml.preserve_quotes = True
 
+# TODO: Consider the ability to remotely upload scripts.yml
+
 CUSTOM_MESSAGES = {
     'value_error': "{formatted_loc} set to '{input}': {msg}",
     'int_parsing': "{formatted_loc} set to '{input}': This must be an integer.",
@@ -114,8 +116,8 @@ class ScriptDatas(BaseModel):
     table: str
     modal: bool = False
     modal_title: str = None
-    beginning: str = Field(default=None, max_length=2000)
-    ending: str = Field(default=None, max_length=2000)
+    beginning: str = Field(default="Starting chatbot.", max_length=2000)
+    ending: str = Field(default="Chatbot complete.", max_length=2000)
     starting_processor: ScriptProcessor = Field(default=None)
     ending_processor: ScriptProcessor = Field(default=None)
     postable_button_color: ButtonColor = ButtonColor.green

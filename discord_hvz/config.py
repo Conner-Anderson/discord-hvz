@@ -211,7 +211,6 @@ try:
     with open(CONFIG_PATH) as fp:
         ruamel_yaml = yaml.load(fp)
     try:
-        logger.info("Loading config now")
         config = parse_yaml_raw_as(HVZConfig, str(ruamel_yaml))
     except pydantic.ValidationError as e:
         msg = f"There were errors reading the configuration file, {CONFIG_PATH.name}: \n" \
