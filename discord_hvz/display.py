@@ -112,7 +112,7 @@ class HumanElement(PanelElement):
         return 'on_role_change'
 
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
-        human_count = len(panel.bot.roles['human'].members)
+        human_count = len(panel.bot.roles.human.members)
         embed.add_field(name='Humans', value=str(human_count))
 
 
@@ -122,7 +122,7 @@ class ZombieElement(PanelElement):
         return 'on_role_change'
 
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
-        count = len(panel.bot.roles['zombie'].members)
+        count = len(panel.bot.roles.zombie.members)
         embed.add_field(name='Zombies', value=str(count))
 
 
@@ -132,7 +132,7 @@ class PlayerElement(PanelElement):
         return 'on_role_change'
 
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
-        count = len(panel.bot.roles['player'].members)
+        count = len(panel.bot.roles.player.members)
         embed.add_field(name='Players', value=str(count))
 
 
@@ -381,7 +381,8 @@ class DisplayCog(discord.Cog, guild_ids=guild_id_list):
 
     @discord.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
-        for name, role in self.bot.roles.items():
+        for name, role in self.bot.roles.__dict__.items():
+            if not role: continue
             self.roles_to_watch.append(role)
         changed = have_lists_changed(before.roles, after.roles, self.roles_to_watch)
         if not changed:

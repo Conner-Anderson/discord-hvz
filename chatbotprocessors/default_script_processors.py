@@ -27,8 +27,8 @@ async def registration_end(responses: Dict[str, Any], bot: HVZBot, target_member
     responses['oz'] = False
     responses['tag_code'] = make_tag_code(bot.db)
 
-    await target_member.add_roles(bot.roles['player'])
-    await target_member.add_roles(bot.roles['human'])
+    await target_member.add_roles(bot.roles.player)
+    await target_member.add_roles(bot.roles.player)
 
     return responses
 
@@ -50,8 +50,8 @@ async def tag_logging_end(responses: Dict[str, Any], bot: HVZBot, target_member:
     responses['revoked_tag'] = False
 
 
-    await tagged_member.add_roles(bot.roles['zombie'])
-    await tagged_member.remove_roles(bot.roles['human'])
+    await tagged_member.add_roles(bot.roles.zombie)
+    await tagged_member.remove_roles(bot.roles.human)
     bot.db.edit_row('members', 'id', tagged_member.id, 'faction', 'zombie')
     await bot.announce_tag(tagged_member, tagger_member, responses['tag_time'])
 

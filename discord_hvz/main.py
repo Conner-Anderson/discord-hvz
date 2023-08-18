@@ -1,6 +1,7 @@
 #!/bin/python3
 from __future__ import annotations
 
+import dataclasses
 import functools
 import asyncio
 import logging
@@ -19,7 +20,7 @@ from dotenv import load_dotenv
 from loguru import logger
 from sqlalchemy.exc import NoSuchColumnError
 
-from discord_hvz.config import config, ConfigError, ConfigChecker
+from discord_hvz.config import config, ConfigError, ConfigChecker, ChannelNames
 
 # The below imports are commented to prevent double-importing.
 # These modules need to exist in "hiddenimports" in discord_hvz.spec for the sake of pyinstaller
@@ -76,12 +77,24 @@ class StartupError(Exception):
         if message is not None:
             super().__init__(message)
 
+@dataclasses.dataclass
+class BotChannels:
+    tag_announcements: discord.TextChannel
+    report_tags: discord.TextChannel
+    zombie_chat: discord.TextChannel
+
+@dataclasses.dataclass
+class BotRoles:
+    zombie: discord.Role
+    human: discord.Role
+    player: discord.Role
+
 
 class HVZBot(discord.ext.commands.Bot):
     guild: Guild | None
     db: HvzDb
-    roles: Dict[str, discord.Role]
-    channels: Dict[str, discord.TextChannel]
+    roles: BotRoles
+    channels: BotChannels
     discord_handler: loguru.Logger
     _cog_startup_data: Dict[str, Dict[str, Any]]
     readied: bool
@@ -116,8 +129,6 @@ class HVZBot(discord.ext.commands.Bot):
 
     def __init__(self):
         self.guild: Union[discord.Guild, None] = None
-        self.roles = {}
-        self.channels = {}
         self.db = HvzDb()
         self.readied = False
 
@@ -165,37 +176,17 @@ class HVZBot(discord.ext.commands.Bot):
                 await self.guild.fetch_channels()
                 await self.guild.fetch_roles()
 
-                needed_roles_names = [config.role_names.zombie, config.role_names.human, config.role_names.player]
-                missing_role_names = []
-                for role_name in needed_roles_names:
+                self.roles = BotRoles(
+                    zombie=self.str_to_role(config.role_names.zombie),
+                    human=self.str_to_role(config.role_names.human),
+                    player=self.str_to_role(config.role_names.player),
+                )
 
-                    found_role = discord.utils.find(lambda c: c.name.lower() == role_name, self.guild.roles)
-                    if found_role is None:
-                        missing_role_names.append(role_name)
-                    else:
-                        self.roles[role_name] = found_role
-
-                needed_channel_names = [
-                    config.channel_names.zombie_chat,
-                    config.channel_names.tag_announcements,
-                    config.channel_names.report_tags
-                ]
-                missing_channel_names = []
-                for channel_name in needed_channel_names:
-
-                    found_channel = discord.utils.find(lambda c: c.name.lower() == channel_name, self.guild.channels)
-                    if found_channel is None:
-                        missing_channel_names.append(channel_name)
-                    else:
-                        self.channels[channel_name] = found_channel
-
-                msg = ''
-                if missing_role_names:
-                    msg += f'These required roles are missing on the server: {missing_role_names}\n'
-                if missing_channel_names:
-                    msg += f'These required channels are missing on the server: {missing_channel_names}\n'
-                if msg:
-                    raise StartupError(msg)
+                self.channels = BotChannels(
+                    tag_announcements=self.str_to_channel(config.channel_names.tag_announcements),
+                    report_tags=self.str_to_channel(config.channel_names.report_tags),
+                    zombie_chat=self.str_to_channel(config.channel_names.zombie_chat),
+                )
 
                 log.success(
                     f'Discord-HvZ Bot launched correctly! Logged in as: {self.user.name} ------------------------------------------')
@@ -249,8 +240,8 @@ class HVZBot(discord.ext.commands.Bot):
             except ValueError:
                 return
             if not before.roles == after.roles:
-                zombie = self.roles['zombie'] in after.roles
-                human = self.roles['human'] in after.roles
+                zombie = self.roles.zombie in after.roles
+                human = self.roles.human in after.roles
                 if zombie and not human:
                     self.db.edit_row('members', 'id', after.id, 'faction', 'zombie')
                 elif human and not zombie:
@@ -264,10 +255,24 @@ class HVZBot(discord.ext.commands.Bot):
         member = self.guild.get_member(user_id)
         return member
 
+    def str_to_channel(self, string: str) -> discord.TextChannel:
+        result = discord.utils.find(lambda c: c.name.lower() == string.lower(), self.guild.channels)
+        if not result:
+            raise ValueError(f"Could not find channel '{string}' on the server.")
+        if not isinstance(result, discord.TextChannel):
+            raise ValueError(f"The channel '{string}' was found on the server, but it was not a text channel. Found channel type: {type(result)}")
+        return result
+
+    def str_to_role(self, string: str) -> discord.Role:
+        result = discord.utils.find(lambda c: c.name.lower() == string.lower(), self.guild.roles)
+        if not result:
+            raise ValueError(f"Could not find role '{string}' on the server.")
+        return result
+
     async def announce_tag(self, tagged_member: discord.Member, tagger_member: discord.Member, tag_time: datetime):
 
-        new_human_count = len(self.roles['human'].members)
-        new_zombie_count = len(self.roles['zombie'].members)
+        new_human_count = len(self.roles.human.members)
+        new_zombie_count = len(self.roles.human.members)
 
         msg = f'<@{tagged_member.id}> has turned zombie!'
         if not config.silent_oz:
@@ -276,7 +281,7 @@ class HVZBot(discord.ext.commands.Bot):
 
         msg += f'\nThere are now {new_human_count} humans and {new_zombie_count} zombies.'
 
-        await self.channels['tag-announcements'].send(msg)
+        await self.channels.tag_announcements.send(msg)
 
     def get_cog_startup_data(self, cog: commands.Cog | Type[commands.Cog]) -> Dict:
         # Fetches the startup_data dictionary from the bot when given a cog
