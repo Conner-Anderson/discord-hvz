@@ -133,6 +133,20 @@ async def respond_paginated(context: discord.ApplicationContext, message: str, m
     paginator = pages.Paginator(pages=divided_message)
     await paginator.respond(context.interaction, **kwargs)
 
+def abbreviate_message(message: str, max_char: int) -> str:
+    excess = len(message) - max_char
+    if excess < 1:
+        return message
+    inserted_message = "\n---\n    ---Message trimmed by ~{} characters---\n---\n"
+    buffer = len(inserted_message)
+    one = int((max_char/2)-buffer)
+    two = int((max_char/2))
+    logger.info(f"One: {type(one)} Two: {type(two)}")
+    output = message[:one] + inserted_message.format(excess+buffer) + message[two:]
+    if len(output) > max_char:
+        logger.warning(f"Abbreviation did not shorten enough")
+    return output[:max_char]
+
 
 def _get_ozs(bot: "HVZBot", db: HvzDb) -> List[sqlalchemy.engine.Row]:
     """
@@ -295,11 +309,10 @@ def dump(obj):
 
 
 if __name__ == '__main__':
-    from database import HvzDb
+    text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In ultrices semper ullamcorper. Aenean sollicitudin mi convallis libero faucibus rhoncus. Nulla facilisi. Mauris sollicitudin nulla a orci dictum, at cursus justo molestie. Nulla vel augue fringilla, imperdiet arcu non, mattis diam. Sed blandit felis nec lacus condimentum, eget tincidunt augue scelerisque. Aliquam sit amet elementum nibh, quis accumsan massa. Donec et aliquet enim, eu sollicitudin nunc. Maecenas mollis ac ex at semper. Sed hendrerit nunc at justo maximus, egestas mollis neque vehicula. "
+    msg = abbreviate_message(text, 300)
+    logger.info(msg)
 
-    db = HvzDb()
-    result = divide_string(generate_tag_tree(db), 200)
-    for x in result: print(x)
 
 
     """

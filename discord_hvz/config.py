@@ -104,10 +104,11 @@ DatabasePath = Annotated[Path, PlainValidator(validate_database_path)]
 
 
 class ChannelNames(BaseModel):
-    ''' Channels the bot requires. The Discord server must have these.'''
+    ''' Channels the bot requires. The Discord server must have these. bot_output is optional'''
     tag_announcements: str = Field(default="tag-announcements", alias="tag-announcements")
     report_tags: str = Field(default="report-tags", alias="report-tags")
     zombie_chat: str = Field(default="zombie-chat", alias="zombie-chat")
+    bot_output: str = Field(default=None, alias="bot-output")
 
 
 class RoleNames(BaseModel):

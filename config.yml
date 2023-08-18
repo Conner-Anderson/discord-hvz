@@ -36,10 +36,12 @@ sheet_names:
   tags: Tags
 
 # Assign the real channel names on the right to the variables on the left
+# All are required except bot-output, which is optional.
 channel_names:
   tag-announcements: tag-announcements
   report-tags: report-tags
   zombie-chat: zombie-chat
+  bot-output: bot-output
 
 # Assign the real role names on the right to the variables on the left
 role_names:

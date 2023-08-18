@@ -20,6 +20,7 @@ from loguru import logger
 from sqlalchemy.exc import NoSuchColumnError
 
 from discord_hvz.config import config, ConfigError, ConfigChecker
+from discord_hvz import utilities
 
 # The below imports are commented to prevent double-importing.
 # These modules need to exist in "hiddenimports" in discord_hvz.spec for the sake of pyinstaller
@@ -75,6 +76,17 @@ class StartupError(Exception):
     def __init__(self, message=None):
         if message is not None:
             super().__init__(message)
+
+class DiscordSink:
+    def __init__(self, channel: discord.channel, bot: HVZBot):
+        self.channel = channel
+        self.bot = bot
+
+    def write(self, message):
+        # Send log messages to the Discord channel
+        msg = utilities.abbreviate_message(message, 2000)
+        self.bot.loop.create_task(self.channel.send(msg))
+
 
 
 class HVZBot(discord.ext.commands.Bot):
@@ -164,6 +176,15 @@ class HVZBot(discord.ext.commands.Bot):
                 await self.guild.fetch_members(limit=500).flatten()
                 await self.guild.fetch_channels()
                 await self.guild.fetch_roles()
+
+                if config.logging_channel:
+                    logger_channel = discord.utils.find(lambda c: c.name.lower() == config.logging_channel, self.guild.channels)
+                    if logger_channel:
+                        logger.add(DiscordSink(channel=logger_channel, bot=self), level="INFO")
+                    else:
+                        logger.warning(f"A bot output channel was specified in {config.filepath.name}" 
+                                       f"as '{config.channel_names.bot_output}' but there is no channel by that name."
+                                       )
 
                 needed_roles_names = [config.role_names.zombie, config.role_names.human, config.role_names.player]
                 missing_role_names = []
