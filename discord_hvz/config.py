@@ -18,12 +18,15 @@ from dataclasses import dataclass
 from typing_extensions import Annotated
 
 from discord_hvz.utilities import format_pydantic_errors
+from discord_hvz import fallback
 
 from loguru import logger
 
 # This yaml instance is only for preserving the config file comments and such
 yaml = YAML()
 yaml.preserve_quotes = True
+
+
 
 PATH_ROOT: Union[Path, None] = None
 if getattr(sys, 'frozen', False):
@@ -35,6 +38,9 @@ else:
 
 DEFAULT_DB_PATH: Path = PATH_ROOT / 'game_database.db'
 CONFIG_PATH: Path = PATH_ROOT / 'config.yml'
+
+with open(CONFIG_PATH) as fp:
+    YAML_DATA = yaml.load(fp)
 
 CUSTOM_MESSAGES = {
     'value_error': "{formatted_loc} set to '{input}': {msg}",
@@ -185,8 +191,8 @@ class HVZConfig(BaseModel):
 
         super().__setattr__(key, value)
         if type(original_value) in (int, str, bool):
-            ruamel_yaml[key] = value
-            yaml.dump(ruamel_yaml, CONFIG_PATH)
+            YAML_DATA[key] = value
+            yaml.dump(YAML_DATA, CONFIG_PATH)
         else:
             logger.warning(
                 f"Tried to modify the config value '{key}' which is not int, str, or bool. Aborting. Attempted value: {value}")
@@ -214,23 +220,20 @@ class ConfigError(Exception):
 
 
 config = None
-try:
-    with open(CONFIG_PATH) as fp:
-        ruamel_yaml = yaml.load(fp)
+
+def start_config() -> HVZConfig:
+
     try:
-        config = parse_yaml_raw_as(HVZConfig, str(ruamel_yaml))
+        global config
+        config = parse_yaml_raw_as(HVZConfig, str(YAML_DATA))
+        return config
     except pydantic.ValidationError as e:
         msg = f"There were errors reading the configuration file, {CONFIG_PATH.name}: \n" \
               + format_pydantic_errors(e, CUSTOM_MESSAGES) \
               + "For help with configuration, see the documentation at https://conner-anderson.github.io/discord-hvz-docs/latest/config_options/"
         raise ConfigError(msg) from e
 
-except ConfigError as e:
-    logger.error(e)
-    logger.info('Press Enter to close.')
-    input()
-except Exception as e:
-    logger.exception(e)
+
 
 
 @dataclass

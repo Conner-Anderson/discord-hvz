@@ -21,8 +21,8 @@ from loguru import logger
 from sqlalchemy.exc import NoSuchColumnError
 from ruamel.yaml import YAML
 
-from discord_hvz.config import config, ConfigError, ConfigChecker, ChannelNames
-from discord_hvz import utilities
+from discord_hvz.config import config, start_config, ConfigError, ConfigChecker, ChannelNames
+from discord_hvz import utilities, fallback
 
 # The below imports are commented to prevent double-importing.
 # These modules need to exist in "hiddenimports" in discord_hvz.spec for the sake of pyinstaller
@@ -33,7 +33,28 @@ from discord_hvz import utilities
 # from discord_hvz.item_tracker import ItemTrackerCog
 
 
+
+try:
+    while True:
+        try:
+            start_config()
+        except Exception as e:
+            if isinstance(e, ConfigError):
+                logger.error(e)
+            else:
+                logger.exception(e)
+
+            restart = fallback.start_fallback(error=e)
+            if not restart: exit()
+            logger.warning("Restarting config parsing")
+        else:
+            break
+except Exception as e:
+    logger.exception(e)
+    exit()
+
 from discord_hvz.database import HvzDb
+
 
 # The latest Discord HvZ release this code is, or is based on.
 VERSION = "0.3.0"
@@ -186,18 +207,8 @@ class HVZBot(discord.ext.commands.Bot):
 
                 # Updates the cache with all members and channels and roles
                 await self.guild.fetch_members(limit=500).flatten()
-                await self.guild.fetch_channels()
-                await self.guild.fetch_roles()
 
-                if config.logging_channel:
-                    logger_channel = discord.utils.find(lambda c: c.name.lower() == config.logging_channel, self.guild.channels)
-                    if logger_channel and isinstance(logger_channel, discord.TextChannel):
-                        logger.add(DiscordSink(channel=logger_channel, bot=self), level="INFO")
-                        self.channels.bot_output = logger_channel
-                    else:
-                        logger.warning(f"A bot output channel was specified in {config.filepath.name}" 
-                                       f"as '{config.channel_names.bot_output}' but there is no text channel by that name."
-                                       )
+                await self.guild.fetch_roles()
 
                 self.roles = BotRoles(
                     zombie=self.str_to_role(config.role_names.zombie),
@@ -209,6 +220,16 @@ class HVZBot(discord.ext.commands.Bot):
                     report_tags=self.str_to_channel(config.channel_names.report_tags),
                     zombie_chat=self.str_to_channel(config.channel_names.zombie_chat),
                 )
+
+                if config.channel_names.bot_output:
+                    logger_channel = discord.utils.find(lambda c: c.name.lower() == config.channel_names.bot_output, self.guild.channels)
+                    if logger_channel and isinstance(logger_channel, discord.TextChannel):
+                        logger.add(DiscordSink(channel=logger_channel, bot=self), level="INFO")
+                        self.channels.bot_output = logger_channel
+                    else:
+                        logger.warning(f"A bot output channel was specified in {config.filepath.name}" 
+                                       f"as '{config.channel_names.bot_output}' but there is no text channel by that name."
+                                       )
 
                 log.success(
                     f'Discord-HvZ Bot launched correctly! Logged in as: {self.user.name} ------------------------------------------')
@@ -222,13 +243,16 @@ class HVZBot(discord.ext.commands.Bot):
                 await self.close()
                 time.sleep(1)
             else:
-                yaml = YAML()
-                yaml.default_flow_style = False
-                data = {
-                    'server_id': config.server_id,
-                    'bot_output_channel': self.channels.bot_output
-                }
-                yaml.dump(data, config.path_root / "logs/lastgood.yml")
+                try:
+                    last_good = fallback.LastGoodModel(
+                        server_id=config.server_id,
+                        bot_output_channel=self.channels.bot_output.id if self.channels.bot_output else None
+                    )
+                    last_good.model_dump_json()
+                    with open(config.path_root / "logs/lastgood.json", 'w') as fp:
+                        fp.write(last_good.model_dump_json())
+                except Exception as e:
+                    logger.exception(e)
 
         @self.event
         async def on_error(event: str, *args, **kwargs):
