@@ -164,7 +164,7 @@ def _get_ozs(bot: "HVZBot", db: HvzDb) -> List[sqlalchemy.engine.Row]:
         set_of_all_zombies.add(int(tag.tagger_id))
 
     # Adds anyone with the zombie role. The only new ids added should be from OZs who have made no tags.
-    for zombie_member in bot.roles['zombie'].members:
+    for zombie_member in bot.roles.zombie.members:
         set_of_all_zombies.add(zombie_member.id)
 
     for tagger_id in set_of_all_zombies:

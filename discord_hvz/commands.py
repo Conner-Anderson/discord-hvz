@@ -85,9 +85,9 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         bot.db.delete_row('members', 'id', str(member_id))
 
         if member:
-            await member.remove_roles(bot.roles['human'])
-            await member.remove_roles(bot.roles['zombie'])
-            await member.remove_roles(bot.roles['player'])
+            await member.remove_roles(bot.roles.human)
+            await member.remove_roles(bot.roles.zombie)
+            await member.remove_roles(bot.roles.player)
             msg += f'<@{member_id}> deleted from the game. Roles revoked, expunged from the database.'
         else:
             msg += f'{member_row.name} deleted from the game and expunged from the database.'
@@ -225,8 +225,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
                 msg += (f'Left <@{tagged_member.id}> as zombie because <@{existing_tag.tagger_id}> '
                         f'({existing_tag.tagger_name}) still tagged them in tag {existing_tag.tag_id}')
             except ValueError:
-                await tagged_member.add_roles(bot.roles['human'])
-                await tagged_member.remove_roles(bot.roles['zombie'])
+                await tagged_member.add_roles(bot.roles.human)
+                await tagged_member.remove_roles(bot.roles.zombie)
                 msg += f'Changed <@{tagged_member.id}> to human.'
 
         msg = f'Tag {tag_id} deleted. ' + msg
@@ -287,8 +287,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
                 msg += (f'Left <@{tagged_member.id}> as zombie because <@{existing_tag.tagger_id}> '
                         f'({existing_tag.tagger_name}) still tagged them in tag {existing_tag.tag_id}')
             except ValueError:
-                await tagged_member.add_roles(bot.roles['human'])
-                await tagged_member.remove_roles(bot.roles['zombie'])
+                await tagged_member.add_roles(bot.roles.human)
+                await tagged_member.remove_roles(bot.roles.zombie)
                 msg += f'Changed <@{tagged_member.id}> to human.'
 
         msg = f'Tag {tag_id} revoked. ' + msg
@@ -318,8 +318,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         if tagged_member is None:
             msg += f'Roles not changed since <@{tag_row.tagged_id}> ({tag_row.tagged_name}) is no longer on the server.'
         else:
-            await tagged_member.add_roles(bot.roles['zombie'])
-            await tagged_member.remove_roles(bot.roles['human'])
+            await tagged_member.add_roles(bot.roles.zombie)
+            await tagged_member.remove_roles(bot.roles.human)
             msg += f'Changed <@{tagged_member.id}> to zombie.'
 
         msg = f'Tag {tag_id} restored. ' + msg
@@ -461,8 +461,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         await ctx.respond(f'Changed <@{member_row.id}>\'s OZ status to {setting}')
 
         member = bot.guild.get_member(int(member_row.id))
-        t_channel = bot.channels['report-tags']
-        c_channel = bot.channels['zombie-chat']
+        t_channel = bot.channels.report_tags
+        c_channel = bot.channels.zombie_chat
         try:
             if setting:
                 await t_channel.set_permissions(member, read_messages=True)
