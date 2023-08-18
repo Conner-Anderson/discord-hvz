@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import sys
+import sys, os
 from typing import Dict, Union, Any, Type
 import discord
 from ruamel.yaml import YAML
@@ -8,7 +8,7 @@ from discord.ext import commands
 from loguru import logger
 from pathlib import Path
 
-
+TOKEN = os.getenv("TOKEN")
 
 # A minimal bot implementation to fall back on if the main one fails. For sending errors and restarting.
 PATH_ROOT: Union[Path, None] = None
@@ -43,4 +43,4 @@ def start_fallback():
 
     bot = FallbackBot()
 
-    bot.run()
+    bot.run(TOKEN)

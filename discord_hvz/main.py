@@ -18,6 +18,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from loguru import logger
 from sqlalchemy.exc import NoSuchColumnError
+from ruamel.yaml import YAML
 
 from discord_hvz.config import config, ConfigError, ConfigChecker
 from discord_hvz import utilities
@@ -229,6 +230,14 @@ class HVZBot(discord.ext.commands.Bot):
                 log.exception(e)
                 await self.close()
                 time.sleep(1)
+            else:
+                yaml = YAML()
+                yaml.default_flow_style = False
+                data = {
+                    'server_id': config.server_id,
+                    'bot_output_channel': self.channels.get('bot-output', None)
+                }
+                yaml.dump(data, config.path_root / "logs/lastgood.yml")
 
         @self.event
         async def on_error(event: str, *args, **kwargs):
