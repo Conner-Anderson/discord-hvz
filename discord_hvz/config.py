@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ruamel.yaml.comments
 import sys
 import zoneinfo
 from typing import Dict, List, Any, Union
@@ -18,12 +19,15 @@ from dataclasses import dataclass
 from typing_extensions import Annotated
 
 from discord_hvz.utilities import format_pydantic_errors
+from discord_hvz import fallback
 
 from loguru import logger
 
 # This yaml instance is only for preserving the config file comments and such
 yaml = YAML()
 yaml.preserve_quotes = True
+
+
 
 PATH_ROOT: Union[Path, None] = None
 if getattr(sys, 'frozen', False):
@@ -35,6 +39,8 @@ else:
 
 DEFAULT_DB_PATH: Path = PATH_ROOT / 'game_database.db'
 CONFIG_PATH: Path = PATH_ROOT / 'config.yml'
+
+
 
 CUSTOM_MESSAGES = {
     'value_error': "{formatted_loc} set to '{input}': {msg}",
@@ -140,6 +146,7 @@ class HVZConfig(BaseModel):
     _path_root: Path = PrivateAttr(default=PATH_ROOT)
     _filepath: Path = PrivateAttr(default=CONFIG_PATH)
     _script_path: Path = PrivateAttr(default=PATH_ROOT / "scripts.yml")
+    _yaml_data: ruamel.yaml.comments.CommentedMap = PrivateAttr(default=None)
 
     class Config:
         arbitrary_types_allowed = True
@@ -184,9 +191,11 @@ class HVZConfig(BaseModel):
         original_value = self.__getattribute__(key)
 
         super().__setattr__(key, value)
+        if not self._yaml_data:
+            return
         if type(original_value) in (int, str, bool):
-            ruamel_yaml[key] = value
-            yaml.dump(ruamel_yaml, CONFIG_PATH)
+            self._yaml_data[key] = value
+            yaml.dump(self._yaml_data, CONFIG_PATH)
         else:
             logger.warning(
                 f"Tried to modify the config value '{key}' which is not int, str, or bool. Aborting. Attempted value: {value}")
@@ -206,6 +215,14 @@ class HVZConfig(BaseModel):
         '''Returns the path to the scripts file. Use script_path.name for the filename.'''
         return self._script_path
 
+    @property
+    def yaml_data(self):
+        return self._yaml_data
+
+    @yaml_data.setter
+    def yaml_data(self, value):
+        self._yaml_data = value
+
 
 class ConfigError(Exception):
     def __init__(self, message=None):
@@ -214,23 +231,24 @@ class ConfigError(Exception):
 
 
 config = None
-try:
-    with open(CONFIG_PATH) as fp:
-        ruamel_yaml = yaml.load(fp)
+
+def start_config() -> HVZConfig:
+
     try:
-        config = parse_yaml_raw_as(HVZConfig, str(ruamel_yaml))
+        global config
+        with open(CONFIG_PATH) as fp:
+            yaml_data = yaml.load(fp)
+        logger.info(f"YAML_DATA type: {type(yaml_data)}")
+        config = parse_yaml_raw_as(HVZConfig, str(yaml_data))
+        config.yaml_data = yaml_data
+        return config
     except pydantic.ValidationError as e:
         msg = f"There were errors reading the configuration file, {CONFIG_PATH.name}: \n" \
               + format_pydantic_errors(e, CUSTOM_MESSAGES) \
               + "For help with configuration, see the documentation at https://conner-anderson.github.io/discord-hvz-docs/latest/config_options/"
         raise ConfigError(msg) from e
 
-except ConfigError as e:
-    logger.error(e)
-    logger.info('Press Enter to close.')
-    input()
-except Exception as e:
-    logger.exception(e)
+
 
 
 @dataclass
