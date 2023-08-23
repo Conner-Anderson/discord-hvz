@@ -4,6 +4,7 @@ import random
 import string
 from inspect import iscoroutinefunction
 from typing import Dict, List, TYPE_CHECKING, Union
+from pydantic import ValidationError
 
 import discord
 from discord.ext import pages
@@ -132,6 +133,20 @@ async def respond_paginated(context: discord.ApplicationContext, message: str, m
     paginator = pages.Paginator(pages=divided_message)
     await paginator.respond(context.interaction, **kwargs)
 
+def abbreviate_message(message: str, max_char: int) -> str:
+    excess = len(message) - max_char
+    if excess < 1:
+        return message
+    inserted_message = "\n---\n    ---Message trimmed by ~{} characters---\n---\n"
+    buffer = len(inserted_message)
+    one = int((max_char/2)-buffer)
+    two = int((max_char/2))
+    logger.info(f"One: {type(one)} Two: {type(two)}")
+    output = message[:one] + inserted_message.format(excess+buffer) + message[two:]
+    if len(output) > max_char:
+        logger.warning(f"Abbreviation did not shorten enough")
+    return output[:max_char]
+
 
 def _get_ozs(bot: "HVZBot", db: HvzDb) -> List[sqlalchemy.engine.Row]:
     """
@@ -149,7 +164,7 @@ def _get_ozs(bot: "HVZBot", db: HvzDb) -> List[sqlalchemy.engine.Row]:
         set_of_all_zombies.add(int(tag.tagger_id))
 
     # Adds anyone with the zombie role. The only new ids added should be from OZs who have made no tags.
-    for zombie_member in bot.roles['zombie'].members:
+    for zombie_member in bot.roles.zombie.members:
         set_of_all_zombies.add(zombie_member.id)
 
     for tagger_id in set_of_all_zombies:
@@ -247,6 +262,45 @@ def have_lists_changed(list1: List, list2: List, items: List) -> bool:
             return True
     return False
 
+def format_pydantic_errors(e: ValidationError, custom_messages: Dict[str, str]) -> str:
+    '''
+    Converts a ValidationError into a string listing the errors meant for end users.
+    custom_messages is a dict mapping the error type to a message which may include formatting variables.
+    Errors types: https://docs.pydantic.dev/latest/errors/validation_errors/
+    Available formatting variables:
+    {loc} a tuple of locations of the option in the file
+    {formatted_loc} a formatted string of the option location, such as "sheet_names.members"
+    {input} the given input to the option
+    {msg} the original error message
+    {type} the error type
+    {url} Pydantic's documentation for this error type
+    '''
+    msg = ""
+
+    for error in e.errors():
+        logger.info("loc: {}".format(error["loc"]))
+        if len(error["loc"]) > 0:
+            formatted_loc = error["loc"][0]
+            for loc in error["loc"][1:]:
+                formatted_loc += f".{loc}"
+        else:
+            formatted_loc = ""
+        custom_message = custom_messages.get(error['type'], None)
+        if not custom_message:
+            custom_message = "[{} set to {}] {}".format(formatted_loc, error["input"], error["msg"])
+            if error.get("url"):
+                custom_message += "\nSee " + error["url"]
+
+        ctx = error.get('ctx')
+        if ctx:
+            logger.debug(f"There was a ctx: {ctx}")
+            error = ctx | error
+        # logger.info(f"custom_message: {custom_message}")
+        custom_message = custom_message.format(formatted_loc=formatted_loc, **error)
+
+        msg += custom_message + "\n"
+    return msg
+
 
 def dump(obj):
     """Prints the passed object in a very detailed form for debugging"""
@@ -255,11 +309,10 @@ def dump(obj):
 
 
 if __name__ == '__main__':
-    from database import HvzDb
+    text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In ultrices semper ullamcorper. Aenean sollicitudin mi convallis libero faucibus rhoncus. Nulla facilisi. Mauris sollicitudin nulla a orci dictum, at cursus justo molestie. Nulla vel augue fringilla, imperdiet arcu non, mattis diam. Sed blandit felis nec lacus condimentum, eget tincidunt augue scelerisque. Aliquam sit amet elementum nibh, quis accumsan massa. Donec et aliquet enim, eu sollicitudin nunc. Maecenas mollis ac ex at semper. Sed hendrerit nunc at justo maximus, egestas mollis neque vehicula. "
+    msg = abbreviate_message(text, 300)
+    logger.info(msg)
 
-    db = HvzDb()
-    result = divide_string(generate_tag_tree(db), 200)
-    for x in result: print(x)
 
 
     """

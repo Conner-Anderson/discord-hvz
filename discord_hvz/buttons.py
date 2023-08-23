@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 import typing
 from typing import List, Optional
+from enum import Enum
 
 import discord
 from discord.commands import Option
@@ -29,6 +30,15 @@ Make sure to load this cog when your bot starts!
 button_functions = ['register', 'tag_log']
 guild_id_list = [config.server_id]
 
+class ButtonColor(str, Enum):
+    blurple = "blurple",
+    gray = "gray",
+    grey = "gray",
+    green = "green",
+    red = "red",
+    url = "url"
+
+
 
 class HVZButton(discord.ui.Button):
     valid_colors = ['blurple', 'gray', 'grey', 'green', 'red', 'url']
@@ -46,7 +56,6 @@ class HVZButton(discord.ui.Button):
     ):
         """
         A button for one role. `custom_id` is needed for persistent views.
-        :type postable: bool
         :param style: If supplied, this overrides color
         :param custom_id:
         :param function:

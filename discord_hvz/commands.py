@@ -1,6 +1,6 @@
 # from __future__ import annotations
 import time
-from typing import Union, TYPE_CHECKING, Optional
+from typing import Union, TYPE_CHECKING, Optional, List
 
 import discord
 from discord.commands import Option, SlashCommandGroup, slash_command
@@ -13,7 +13,7 @@ from discord_hvz.config import config
 
 if TYPE_CHECKING:
     from main import HVZBot
-    from chatbot import ChatBotManager
+    from discord_hvz.chatbot import ChatBotManager
 
 def dump(obj):
     """Prints the passed object in a very detailed form for debugging"""
@@ -32,9 +32,12 @@ def setup(bot):  # this is called by Pycord to setup the cog
 
 
 class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
+    bot: "HVZBot"
+    config_download_messages: List[int]
 
     def __init__(self, bot: "HVZBot"):
         self.bot = bot
+        self. config_download_messages = []
 
     member_group = SlashCommandGroup("member", "Commands for dealing with members.", guild_ids=guild_id_list)
     tag_group = SlashCommandGroup("tag", "Commands for dealing with tags.", guild_ids=guild_id_list)
@@ -82,9 +85,9 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         bot.db.delete_row('members', 'id', str(member_id))
 
         if member:
-            await member.remove_roles(bot.roles['human'])
-            await member.remove_roles(bot.roles['zombie'])
-            await member.remove_roles(bot.roles['player'])
+            await member.remove_roles(bot.roles.human)
+            await member.remove_roles(bot.roles.zombie)
+            await member.remove_roles(bot.roles.player)
             msg += f'<@{member_id}> deleted from the game. Roles revoked, expunged from the database.'
         else:
             msg += f'{member_row.name} deleted from the game and expunged from the database.'
@@ -222,8 +225,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
                 msg += (f'Left <@{tagged_member.id}> as zombie because <@{existing_tag.tagger_id}> '
                         f'({existing_tag.tagger_name}) still tagged them in tag {existing_tag.tag_id}')
             except ValueError:
-                await tagged_member.add_roles(bot.roles['human'])
-                await tagged_member.remove_roles(bot.roles['zombie'])
+                await tagged_member.add_roles(bot.roles.human)
+                await tagged_member.remove_roles(bot.roles.zombie)
                 msg += f'Changed <@{tagged_member.id}> to human.'
 
         msg = f'Tag {tag_id} deleted. ' + msg
@@ -284,8 +287,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
                 msg += (f'Left <@{tagged_member.id}> as zombie because <@{existing_tag.tagger_id}> '
                         f'({existing_tag.tagger_name}) still tagged them in tag {existing_tag.tag_id}')
             except ValueError:
-                await tagged_member.add_roles(bot.roles['human'])
-                await tagged_member.remove_roles(bot.roles['zombie'])
+                await tagged_member.add_roles(bot.roles.human)
+                await tagged_member.remove_roles(bot.roles.zombie)
                 msg += f'Changed <@{tagged_member.id}> to human.'
 
         msg = f'Tag {tag_id} revoked. ' + msg
@@ -315,8 +318,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         if tagged_member is None:
             msg += f'Roles not changed since <@{tag_row.tagged_id}> ({tag_row.tagged_name}) is no longer on the server.'
         else:
-            await tagged_member.add_roles(bot.roles['zombie'])
-            await tagged_member.remove_roles(bot.roles['human'])
+            await tagged_member.add_roles(bot.roles.zombie)
+            await tagged_member.remove_roles(bot.roles.human)
             msg += f'Changed <@{tagged_member.id}> to zombie.'
 
         msg = f'Tag {tag_id} restored. ' + msg
@@ -458,8 +461,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         await ctx.respond(f'Changed <@{member_row.id}>\'s OZ status to {setting}')
 
         member = bot.guild.get_member(int(member_row.id))
-        t_channel = bot.channels['report-tags']
-        c_channel = bot.channels['zombie-chat']
+        t_channel = bot.channels.report_tags
+        c_channel = bot.channels.zombie_chat
         try:
             if setting:
                 await t_channel.set_permissions(member, read_messages=True)
@@ -470,3 +473,40 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         except Exception as e:
             await ctx.respond('Could not change permissions in the channels. Please give the bot permission to.')
             logger.warning(e)
+
+    @slash_command(name='download_config', description='Sends you the config files, which you can edit and re-upload.')
+    async def download_config(self, ctx: discord.ApplicationContext):
+
+        file_obj = [discord.File(config.script_path), discord.File(config.filepath)]
+
+        # Send a message with the file attached
+        message = await ctx.author.send(
+            files=file_obj,
+            content='Attached are the editable configuration files. Edit any of them, then *reply* to this message '
+            'with the edited files attached to update the bot\'s actual files.'
+        )
+        self.config_download_messages.append(message.id)
+        await ctx.respond("Replied in a Direct Message", ephemeral=True)
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """
+        A listener function that will receive direct messages from users and check if they are replying to a message
+            created by the /download_config command
+        """
+        valid_paths = {"config.yml": config.filepath, "scripts.yml": config.script_path}
+        if message.channel.type != discord.ChannelType.private or message.author.bot:
+            return
+        reference = message.reference
+        if not reference: return
+        if not reference.message_id in self.config_download_messages: return
+        filenames = [a.filename for a in message.attachments]
+        for attachment in message.attachments:
+            target_path = valid_paths.get(attachment.filename)
+            if not target_path:
+                await message.reply(f"The file {attachment.filename} does not match a file that can be written to.")
+                continue
+            bytes = await attachment.read()
+            with open(target_path, 'wb') as file:
+                file.write(bytes)
+

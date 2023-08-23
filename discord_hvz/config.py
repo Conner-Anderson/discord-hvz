@@ -17,6 +17,8 @@ from pydantic_yaml import parse_yaml_raw_as, to_yaml_str, to_yaml_file
 from dataclasses import dataclass
 from typing_extensions import Annotated
 
+from discord_hvz.utilities import format_pydantic_errors
+
 from loguru import logger
 
 # This yaml instance is only for preserving the config file comments and such
@@ -43,46 +45,6 @@ CUSTOM_MESSAGES = {
     'missing': "Missing the field {formatted_loc}, which is required.",
     'model_error': "{msg}"
 }
-
-
-def format_errors(e: ValidationError, custom_messages: Dict[str, str]) -> str:
-    '''
-    Converts a ValidationError into a string listing the errors meant for end users.
-    custom_messages is a dict mapping the error type to a message which may include formatting variables.
-    Errors types: https://docs.pydantic.dev/latest/errors/validation_errors/
-    Available formatting variables:
-    {loc} a tuple of locations of the option in the file
-    {formatted_loc} a formatted string of the option location, such as "sheet_names.members"
-    {input} the given input to the option
-    {msg} the original error message
-    {type} the error type
-    {url} Pydantic's documentation for this error type
-    '''
-    msg = ""
-
-    for error in e.errors():
-        logger.info("loc: {}".format(error["loc"]))
-        if len(error["loc"]) > 0:
-            formatted_loc = error["loc"][0]
-            for loc in error["loc"][1:]:
-                formatted_loc += f".{loc}"
-        else:
-            formatted_loc = ""
-        custom_message = custom_messages.get(error['type'], None)
-        if not custom_message:
-            custom_message = "[{} set to {}] {}".format(formatted_loc, error["input"], error["msg"])
-            if error.get("url"):
-                custom_message += "\nSee " + error["url"]
-
-        ctx = error.get('ctx')
-        if ctx:
-            logger.debug(f"There was a ctx: {ctx}")
-            error = ctx | error
-        # logger.info(f"custom_message: {custom_message}")
-        custom_message = custom_message.format(formatted_loc=formatted_loc, **error)
-
-        msg += custom_message + "\n"
-    return msg
 
 
 def to_tzinfo(x: Any) -> ZoneInfo:
@@ -142,10 +104,11 @@ DatabasePath = Annotated[Path, PlainValidator(validate_database_path)]
 
 
 class ChannelNames(BaseModel):
-    ''' Channels the bot requires. The Discord server must have these.'''
+    ''' Channels the bot requires. The Discord server must have these. bot_output is optional'''
     tag_announcements: str = Field(default="tag-announcements", alias="tag-announcements")
     report_tags: str = Field(default="report-tags", alias="report-tags")
     zombie_chat: str = Field(default="zombie-chat", alias="zombie-chat")
+    bot_output: str = Field(default=None, alias="bot-output")
 
 
 class RoleNames(BaseModel):
@@ -176,6 +139,7 @@ class HVZConfig(BaseModel):
     # The root path of the bot
     _path_root: Path = PrivateAttr(default=PATH_ROOT)
     _filepath: Path = PrivateAttr(default=CONFIG_PATH)
+    _script_path: Path = PrivateAttr(default=PATH_ROOT / "scripts.yml")
 
     class Config:
         arbitrary_types_allowed = True
@@ -237,6 +201,11 @@ class HVZConfig(BaseModel):
         '''Returns the path to the config file. Use filepath.name for the filename.'''
         return self._filepath
 
+    @property
+    def script_path(self) -> Path:
+        '''Returns the path to the scripts file. Use script_path.name for the filename.'''
+        return self._script_path
+
 
 class ConfigError(Exception):
     def __init__(self, message=None):
@@ -249,11 +218,10 @@ try:
     with open(CONFIG_PATH) as fp:
         ruamel_yaml = yaml.load(fp)
     try:
-        logger.info("Loading config now")
         config = parse_yaml_raw_as(HVZConfig, str(ruamel_yaml))
     except pydantic.ValidationError as e:
         msg = f"There were errors reading the configuration file, {CONFIG_PATH.name}: \n" \
-              + format_errors(e, CUSTOM_MESSAGES) \
+              + format_pydantic_errors(e, CUSTOM_MESSAGES) \
               + "For help with configuration, see the documentation at https://conner-anderson.github.io/discord-hvz-docs/latest/config_options/"
         raise ConfigError(msg) from e
 
