@@ -189,15 +189,7 @@ class HVZBot(discord.ext.commands.Bot):
                 await self.guild.fetch_channels()
                 await self.guild.fetch_roles()
 
-                if config.logging_channel:
-                    logger_channel = discord.utils.find(lambda c: c.name.lower() == config.logging_channel, self.guild.channels)
-                    if logger_channel and isinstance(logger_channel, discord.TextChannel):
-                        logger.add(DiscordSink(channel=logger_channel, bot=self), level="INFO")
-                        self.channels.bot_output = logger_channel
-                    else:
-                        logger.warning(f"A bot output channel was specified in {config.filepath.name}" 
-                                       f"as '{config.channel_names.bot_output}' but there is no text channel by that name."
-                                       )
+
 
                 self.roles = BotRoles(
                     zombie=self.str_to_role(config.role_names.zombie),
@@ -210,6 +202,16 @@ class HVZBot(discord.ext.commands.Bot):
                     zombie_chat=self.str_to_channel(config.channel_names.zombie_chat),
                 )
 
+                if config.channel_names.bot_output:
+                    logger_channel = discord.utils.find(lambda c: c.name.lower() == config.channel_names.bot_output, self.guild.channels)
+                    if logger_channel and isinstance(logger_channel, discord.TextChannel):
+                        logger.add(DiscordSink(channel=logger_channel, bot=self), level="INFO")
+                        self.channels.bot_output = logger_channel
+                    else:
+                        logger.warning(f"A bot output channel was specified in {config.filepath.name}" 
+                                       f"as '{config.channel_names.bot_output}' but there is no text channel by that name."
+                                       )
+
                 log.success(
                     f'Discord-HvZ Bot launched correctly! Logged in as: {self.user.name} ------------------------------------------')
             except StartupError as e:
@@ -221,14 +223,6 @@ class HVZBot(discord.ext.commands.Bot):
                 log.exception(e)
                 await self.close()
                 time.sleep(1)
-            else:
-                yaml = YAML()
-                yaml.default_flow_style = False
-                data = {
-                    'server_id': config.server_id,
-                    'bot_output_channel': self.channels.bot_output
-                }
-                yaml.dump(data, config.path_root / "logs/lastgood.yml")
 
         @self.event
         async def on_error(event: str, *args, **kwargs):
