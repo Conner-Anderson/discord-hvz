@@ -294,9 +294,15 @@ class HvzDb:
             raise ValueError(f'Could not find a row where \"{search_column}\" is \"{search_value}\"')
         return result_row
 
-    def get_table(self, table) -> List[Row]:
+    def get_table(self, table: str | Table, columns: List[str] = None) -> List[Row]:
         _table = self._validate_table_selection(table)
-        selection = select(_table)
+        if columns:
+            valid_columns = self._validate_column_selection(_table, *columns)
+            if not isinstance(valid_columns, list):
+                valid_columns = [valid_columns]
+            selection = select(*valid_columns)
+        else:
+            selection = select(_table)
         with self.engine.begin() as conn:
             result = conn.execute(selection).all()
             return result

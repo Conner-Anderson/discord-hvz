@@ -212,6 +212,11 @@ class HVZBot(discord.ext.commands.Bot):
                                        f"as '{config.channel_names.bot_output}' but there is no text channel by that name."
                                        )
 
+                teams_cog = self.get_cog('TeamManagerCog')
+                if teams_cog:
+                    teams_cog.cleanup_teams()
+
+
                 log.success(
                     f'Discord-HvZ Bot launched correctly! Logged in as: {self.user.name} ------------------------------------------')
             except StartupError as e:

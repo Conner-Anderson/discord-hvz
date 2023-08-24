@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import discord
 import regex
-from discord.ext import commands
+from discord.ext import commands, tasks
 from loguru import logger
 
 from discord.commands import slash_command, Option
@@ -93,6 +93,49 @@ class TeamManagerCog(commands.Cog, guild_ids=guild_id_list):
                 # Role removed
                 self.delete_from_team(after.id, team_row['id'])
 
+    def cleanup_teams(self):
+        '''External facing method meant to be run after the bot is done readying'''
+        self._team_cleanup.start()
+
+    @tasks.loop(count=1)
+    async def _team_cleanup(self):
+        db = self.bot.db
+        member_table = db.get_table('members', columns=['id'])
+        team_table = db.get_table('teams', ['role_id', 'id'])
+
+        for member_row in member_table:
+            # For every member in the database
+            member_id = int(member_row['id'])
+
+            member = self.bot.get_member(member_id)
+            # TODO: Change this to use database joins
+            for role in member.roles:
+                for team in team_table:
+                    if team['role_id'] == role.id:
+                        if not self.is_member_on_team(member_id, team['id']):
+                            self.add_to_team(member_id, team['id'])
+                            logger.warning(f"Member was not on team, but had a team role. Added to team")
+
+            try:
+                teams = db.get_rows('team_member_link', 'member_id', member_id)
+            except ValueError:
+                continue
+            for row in teams:
+                # For every team the member is on
+                team_id = row['team_id']
+                role_id = db.get_rows_conditional('teams', {'id': team_id})[0]['role_id']
+
+                role = member.get_role(role_id)
+                if not role:
+                    self.delete_from_team(member_id, team_id)
+
+
+
+            # Get all teams member is on
+
+        # Check for members on teams who don't have the role
+        # Delete them from the teams
+
     def is_member_on_team(self, member_id: int, team_id: int) -> bool:
         search_pairs = {'member_id': member_id, 'team_id': team_id}
         try:
@@ -107,8 +150,16 @@ class TeamManagerCog(commands.Cog, guild_ids=guild_id_list):
         self.bot.db.add_row('team_member_link', team_link_data)
 
     def delete_from_team(self, member_id: int, team_id: int):
+        '''
+        Deletes a member_id-team_id association in the database
+        If there are duplicates in the database, all are deleted
+        If nothing to delete is found, do nothing
+        '''
         search_pairs = {'member_id': member_id, 'team_id': team_id}
-        self.bot.db.delete_row_conditional('team_member_link', search_pairs)
+        try:
+            self.bot.db.delete_row_conditional('team_member_link', search_pairs)
+        except ValueError:
+            pass
 
 
 
