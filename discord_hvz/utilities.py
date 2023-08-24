@@ -134,17 +134,21 @@ async def respond_paginated(context: discord.ApplicationContext, message: str, m
     await paginator.respond(context.interaction, **kwargs)
 
 def abbreviate_message(message: str, max_char: int) -> str:
+    '''Shortens a message to character length of max_char, inserting a notice in the middle.'''
+    message = str(message)
     excess = len(message) - max_char
     if excess < 1:
         return message
     inserted_message = "\n---\n    ---Message trimmed by ~{} characters---\n---\n"
     buffer = len(inserted_message)
-    one = int((max_char/2)-buffer)
-    two = int((max_char/2))
-    logger.info(f"One: {type(one)} Two: {type(two)}")
-    output = message[:one] + inserted_message.format(excess+buffer) + message[two:]
+    inserted_message = inserted_message.format(excess+buffer)
+    buffer = len(inserted_message) # Correcting for count length
+    one = int(max_char/2) - buffer
+    two = int(max_char/2) + excess
+    output = message[:one] + inserted_message + message[two:]
     if len(output) > max_char:
-        logger.warning(f"Abbreviation did not shorten enough")
+        difference = len(output) - max_char
+        print(f"Abbreviation did not shorten enough. Overrun by: {difference}")
     return output[:max_char]
 
 

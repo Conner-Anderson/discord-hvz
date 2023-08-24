@@ -227,6 +227,7 @@ class HVZBot(discord.ext.commands.Bot):
         @self.event
         async def on_error(event: str, *args, **kwargs):
             # exception = sys.exc_info()[1]
+            # TODO: Remove below
             logger.info(f'Args: {args}, kwargs: {kwargs}')
             logger.exception(f'The event "{event}" had an exception, which is being ignored. \n These are the arguments passed to the event: \n Positional Arguments: {args} \n Keyword Arguments: {kwargs}')
 
