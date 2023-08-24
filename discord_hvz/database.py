@@ -150,7 +150,7 @@ class HvzDb:
             try:
                 result.append(table.c[column])
             except KeyError:
-                raise ValueError(f'{column} not a column in {table.name}')
+                raise KeyError(f'{column} not a column in {table.name}')
 
         if len(result) == 1:
             return result[0]
