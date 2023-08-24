@@ -3,14 +3,15 @@ from __future__ import annotations
 import copy
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import List, Union, Dict, TYPE_CHECKING, ClassVar
+from typing import List, Union, Dict, TYPE_CHECKING, ClassVar, Any
+from collections.abc import Mapping
 
 import discord
 import sqlalchemy
 from loguru import logger
 from sqlalchemy import Table, Column, Integer, String, DateTime, Boolean
 from sqlalchemy import create_engine, MetaData
-from sqlalchemy import select, delete, update
+from sqlalchemy import select, delete, update, join
 from sqlalchemy.engine import Row
 from sqlalchemy.exc import NoSuchTableError
 
@@ -328,16 +329,31 @@ class HvzDb:
         self._table_updated(table)
         return True
 
+    def delete_row_conditional(self, table: Union[Table, str], col_val_pairs: Dict[str, Any]):
+        _table = self._validate_table_selection(table)
+
+        deletor = delete(_table)
+        for col, value in col_val_pairs.items():
+            valid_col = self._validate_column_selection(_table, col)
+            deletor.where(valid_col == value)
+        with self.engine.begin() as conn:
+            result = conn.execute(deletor)
+        if result.rowcount < 1:
+            raise ValueError(f'Could not find rows where all column-value pairs were satisfied.')
+        self._table_updated(table)
+        return True
+
     def get_rows(
             self,
             table: str,
-            search_column_name: str,
+            search_column: str,
             search_value=None,
             lower_value=None,
             upper_value=None,
             exclusion_column_name: str =None,
             exclusion_value=None
     ) -> List[Row]:
+        # TODO: Improve this doctstring
         """
         Returns a list of Row objects where the specified value matches.
         Meant to be used within the class.
@@ -354,7 +370,7 @@ class HvzDb:
         """
         _table = self._validate_table_selection(table)
         selection = select(_table)
-        _search_column = self._validate_column_selection(_table, search_column_name)
+        _search_column = self._validate_column_selection(_table, search_column)
 
         if search_value:
             selection = selection.where(_search_column == search_value)
@@ -374,11 +390,43 @@ class HvzDb:
 
         if len(result_rows) == 0:
             if lower_value:
-                raise ValueError(f'Could not find rows where "{search_column_name}" is between "{lower_value}" and "{upper_value}"')
+                raise ValueError(f'Could not find rows where "{search_column}" is between "{lower_value}" and "{upper_value}"')
             else:
-                raise ValueError(f'Could not find rows where \"{search_column_name}\" is \"{search_value}\"')
+                raise ValueError(f'Could not find rows where \"{search_column}\" is \"{search_value}\"')
 
         return result_rows
+
+    def get_rows_conditional(
+            self,
+            table: str,
+            search_pairs: Dict[str, Any],
+            exclusion_pairs: Dict[str, Any] = None,
+    ) -> List[Row]:
+        _table = self._validate_table_selection(table)
+        selection = select(_table)
+
+        for col, value in search_pairs.items():
+            valid_col = self._validate_column_selection(_table, col)
+            selection.where(valid_col == value)
+
+        if exclusion_pairs:
+            for col, value in exclusion_pairs.items():
+                valid_col = self._validate_column_selection(_table, col)
+                selection.where(valid_col != value)
+
+        with self.engine.begin() as conn:
+            result_rows: List[Row] = conn.execute(selection).all()
+
+        if len(result_rows) == 0:
+            if exclusion_pairs:
+                raise ValueError(f'Could not find rows meeting criteria.\n Search pairs: {search_pairs}\n Exclusion pairs: {exclusion_pairs}')
+            else:
+                raise ValueError(f'Could not find rows meeting criteria.\n Search pairs: {search_pairs}')
+
+        return result_rows
+
+    def join_test(self):
+        _table = self._validate_table_selection()
 
 
 # Below is just for testing when this file is run from the command line

@@ -338,6 +338,7 @@ def main():
         bot.load_extension('.commands', package = 'discord_hvz')
         bot.load_extension('.display', package = 'discord_hvz')
         bot.load_extension('.item_tracker', package = 'discord_hvz')
+        bot.load_extension('.teams', package='discord_hvz')
 
         bot.run(TOKEN)
 
@@ -345,10 +346,12 @@ def main():
         logger.error(f'Discord failed to log in: {e}')
     except KeyboardInterrupt:
         logger.info('Keyboard Interrupt!')
-    # TODO: ExtensionFailed catches errors that should have a stack trace, but also ones that should not
-    except (ConfigError, discord.errors.ExtensionFailed) as e:
+    # TODO: discord.errors.ExtensionFailed catches errors that should have a stack trace, but also ones that should not
+    except (ConfigError) as e:
         logger.error(e)
         logger.opt(exception=True).debug(e)
+    except discord.errors.ExtensionFailed as e:
+        logger.exception(e)
     except Exception as e:
         logger.exception(e)
     else:

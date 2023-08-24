@@ -146,7 +146,7 @@ class PlayersTodayElement(PanelElement):
         try:
             rows = panel.bot.db.get_rows(
                 table='members',
-                search_column_name='registration_time',
+                search_column='registration_time',
                 lower_value=datetime.now(tz=config.timezone) - timedelta(days=1),
                 upper_value=datetime.now(tz=config.timezone)
 
@@ -170,7 +170,7 @@ class TagsTodayElement(PanelElement):
         try:
             rows = panel.bot.db.get_rows(
                 table='tags',
-                search_column_name='tag_time',
+                search_column='tag_time',
                 lower_value=datetime.now(tz=config.timezone) - timedelta(days=1),
                 upper_value=datetime.now(tz=config.timezone)
             )
