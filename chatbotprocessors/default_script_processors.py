@@ -28,7 +28,7 @@ async def registration_end(responses: Dict[str, Any], bot: HVZBot, target_member
     responses['tag_code'] = make_tag_code(bot.db)
 
     await target_member.add_roles(bot.roles.player)
-    await target_member.add_roles(bot.roles.player)
+    await target_member.add_roles(bot.roles.human)
 
     return responses
 
