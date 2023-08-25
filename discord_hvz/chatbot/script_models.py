@@ -71,7 +71,7 @@ ButtonColor = Annotated[ButtonColor, BeforeValidator(validate_button_color)]
 
 class QuestionDatas(BaseModel):
     column: str
-    display_name: str = Field(default=None) # Required for non-modal chatbots
+    display_name: str = Field(default=None)  # Required for non-modal chatbots
     query: str = Field(max_length=2000)
     valid_regex: str = Field(default=None)
     rejection_response: str = Field(default=None, max_length=2000)
@@ -82,6 +82,7 @@ class QuestionDatas(BaseModel):
 
     class Config:
         frozen = False
+        str_strip_whitespace = True
 
     @model_validator(mode="after")
     def check_question(self) -> QuestionDatas:
@@ -121,6 +122,7 @@ class QuestionDatas(BaseModel):
             unique=True
         )
 
+
 class ScriptDatas(BaseModel):
     kind: str  # Not intended to be defined in script file. Defined by one step up in dictionary
     table: str
@@ -138,16 +140,14 @@ class ScriptDatas(BaseModel):
         frozen = False
         str_strip_whitespace = True
 
-    @field_validator('questions', mode='before')
-    @classmethod
-    def check_questions(cls, x: List[Dict], info: FieldValidationInfo) -> List[Dict]:
-        """If modal has already been set, and is true, limit to 5 questions."""
-        modal = info.data.get('modal', None)
-        if modal is not None and modal:
+    @model_validator(mode='after')
+    def check_questions_2(self, info: FieldValidationInfo) -> ScriptDatas:
+        x = self.questions
+        if self.modal:
             if len(x) > 5:
                 logger.warning(f"No more than 5 questions for a modal chatbot. Ignoring the last {len(x[5:])}.")
-            return x[:5]
-        return x
+                self.questions = x[:5]
+        return self
 
     @model_validator(mode='after')
     def check_script(self, info: ValidationInfo) -> ScriptDatas:
@@ -200,7 +200,6 @@ class ScriptDatas(BaseModel):
                     f"This script is not modal, and so requires a 'display_name' in each question."
                 )
 
-
         return self
 
     def get_selection_buttons(self, callback: callable) -> List[HVZButton]:
@@ -225,9 +224,7 @@ class ScriptFile(RootModel):
     @field_validator('root', mode='after')
     @classmethod
     def check_script(cls, root: Dict[str, ScriptDatas], info: FieldValidationInfo) -> Any:
-
         return root
-
 
     @property
     def scripts(self) -> List[ScriptDatas]:
