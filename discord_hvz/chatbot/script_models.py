@@ -199,8 +199,47 @@ class ScriptFile(RootModel):
     @classmethod
     def inject_kind(cls, root: Dict[str, ScriptDatas], info: FieldValidationInfo) -> Any:
         for name, data in root.items():
-            data._kind = name
+            data._kind = name # This is fine since it happens in a validator
         return root
+
+    @field_validator('root', mode='after')
+    @classmethod
+    def check_script(cls, root: Dict[str, ScriptDatas], info: FieldValidationInfo) -> Any:
+
+        for name, data in root.items():
+            required_processors = {
+                'registration': (
+                    ('starting_processor', chatbotprocessors.default_script_processors.registration_start),
+                    ('ending_processor', chatbotprocessors.default_script_processors.registration_end)
+                ),
+                'tag_logging': (
+                    ('starting_processor', chatbotprocessors.default_script_processors.tag_logging_start),
+                    ('ending_processor', chatbotprocessors.default_script_processors.tag_logging_end)
+                )
+            }
+
+            for kind, pairs in required_processors.items():
+                if name != kind:
+                    continue
+                for pair in pairs:
+                    actual_name, required = pair
+                    actual = getattr(data, actual_name)
+                    if not actual:
+                        logger.warning(
+                            f"The special chatbot '{kind}' in {config.script_path.name} is missing a value for '{actual_name}' "
+                            f"Unless you know what you're doing, set it to '{required.__name__}'."
+                        )
+                        break
+                    if actual_name != required:
+                        logger.warning(
+                            f"The special chatbot'{kind}' in {config.script_path.name} has a value for '{actual_name}' that is not default. "
+                            f"Unless you know exactly what you're doing, change it to '{required.__name__}'"
+                        )
+                        break
+        return root
+
+
+
 
     @property
     def scripts(self) -> List[ScriptDatas]:
