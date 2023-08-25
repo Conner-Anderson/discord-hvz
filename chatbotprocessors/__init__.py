@@ -1,13 +1,14 @@
 from inspect import getmembers, isfunction
+from typing import Dict
 
 from . import default_question_processors
 from . import default_script_processors
 from loguru import logger
 
-script_processors = {}
-question_processors = {}
+script_processors: Dict[str, callable] = {}
+question_processors: Dict[str, callable] = {}
 
-def fetch_functions(module):
+def fetch_functions(module) -> Dict[str, callable]:
     output_functions = {}
     functions = getmembers(module, isfunction)
     for tup in functions:

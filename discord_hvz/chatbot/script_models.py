@@ -34,17 +34,26 @@ CUSTOM_MESSAGES = {
 
 
 def validate_question_processor(x: Any) -> callable:
-    # TODO: Add better type validation
-    processor: Union[callable, None] = chatbotprocessors.question_processors.get(x)
+    try:
+        text = str(x)
+    except (AttributeError, TypeError) as e:
+        logger.debug(e)
+        raise ValueError("Processor value cannot be converted to a string.")
+    processor = chatbotprocessors.question_processors.get(text)
     if not processor:
-        raise ValueError("Processor does not match any function.")
+        raise ValueError("Processor does not match the name of any question processor function.")
     return processor
 
 
 def validate_script_processor(x: Any) -> callable:
-    processor: Union[callable, None] = chatbotprocessors.script_processors.get(x)
+    try:
+        text = str(x)
+    except (AttributeError, TypeError) as e:
+        logger.debug(e)
+        raise ValueError("Processor value cannot be converted to a string.")
+    processor: Union[callable, None] = chatbotprocessors.script_processors.get(text)
     if not processor:
-        raise ValueError("Processor does not match any function.")
+        raise ValueError("Processor does not match the name of any script processor function.")
     return processor
 
 
@@ -52,7 +61,7 @@ def validate_button_color(x: Any) -> str:
     try:
         return str(x).lower()
     except Exception as e:
-        raise ValueError(f"Must be able to turn this into text.") from e
+        raise ValueError(f"Must be able to transform the given button color into text.") from e
 
 
 QuestionProcessor = Annotated[callable, PlainValidator(validate_question_processor)]

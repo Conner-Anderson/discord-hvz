@@ -52,7 +52,7 @@ log = logger
 logger.remove()
 logger.add(sys.stderr, level="INFO")
 log_path = config.path_root / 'logs/discord-hvz_{time}.log'
-logger.add(log_path, rotation='1 week', level='DEBUG', mode='a')
+logger.add(log_path, rotation='1 week', level='DEBUG', mode='a', backtrace=True, diagnose=True)
 
 discord_handler = logging.getLogger('discord')
 
@@ -339,14 +339,14 @@ def main():
         bot.load_extension('.display', package = 'discord_hvz')
         bot.load_extension('.item_tracker', package = 'discord_hvz')
 
-        bot.run(TOKEN)
+        #bot.run(TOKEN)
 
     except discord.errors.LoginFailure as e:
         logger.error(f'Discord failed to log in: {e}')
     except KeyboardInterrupt:
         logger.info('Keyboard Interrupt!')
     # TODO: ExtensionFailed catches errors that should have a stack trace, but also ones that should not
-    except (ConfigError, discord.errors.ExtensionFailed) as e:
+    except (ConfigError) as e:
         logger.error(e)
         logger.opt(exception=True).debug(e)
     except Exception as e:
