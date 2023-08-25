@@ -12,6 +12,9 @@ All noteable changes to this project will be documented in this file.
 #### Minor Changes
 
 - Reworked the configuration system behind the scenes to be more robust and make issues easier to diagnose.
+- The default scripts no longer come with starting_process and ending_processor fields. 
+  The correct processors are added to registration and tag_logging chatbots automatically if none are specified.
+- Useless processor removed from the default script
 
 ### 0.3.0 Minor Version Release
 

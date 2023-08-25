@@ -9,8 +9,6 @@ registration:
   table: members
   beginning: I'll register you for HvZ. Type 'cancel' at any time to stop this conversation.
   ending: You are registered for HvZ! Please read the rules. New channels are available to you.
-  starting_processor: registration_start
-  ending_processor: registration_end
   postable_button_color: green
   postable_button_label: Register
   questions:
@@ -20,7 +18,6 @@ registration:
       What is your name? Use the name you would use for the mail center, like John Smith.
     valid_regex: '\D*'
     rejection_response: No numbers allowed in names.
-    processor: name
   - column: CPO
     display_name: CPO
     query: |-
@@ -58,8 +55,6 @@ tag_logging:
   modal_title: Log a Tag
   beginning: Let's log a tag. Type 'cancel' at any time to stop this conversation.
   ending: Tag logged! Make sure your newly-brainless friend feels welcome in the hoard.
-  starting_processor: tag_logging_start
-  ending_processor: tag_logging_end
   postable_button_label: Log a Tag
   postable_button_color: green
   questions:

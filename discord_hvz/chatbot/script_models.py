@@ -34,6 +34,7 @@ CUSTOM_MESSAGES = {
 
 
 def validate_question_processor(x: Any) -> callable:
+    # TODO: Add better type validation
     processor: Union[callable, None] = chatbotprocessors.question_processors.get(x)
     if not processor:
         raise ValueError("Processor does not match any function.")
@@ -112,7 +113,7 @@ class QuestionDatas(BaseModel):
         )
 
 class ScriptDatas(BaseModel):
-    _kind: str = None  # Must be set by model in above hierarchy
+    kind: str  # Not intended to be defined in script file. Defined by one step up in dictionary
     table: str
     modal: bool = False
     modal_title: str = None
@@ -156,6 +157,20 @@ class ScriptDatas(BaseModel):
                 )
             all_columns.append(q.column.lower())
 
+        default_processors = {
+            'registration': (chatbotprocessors.default_script_processors.registration_start,
+                             chatbotprocessors.default_script_processors.registration_end),
+            'tag_logging': (chatbotprocessors.default_script_processors.tag_logging_start,
+                            chatbotprocessors.default_script_processors.tag_logging_end)
+        }
+        # If there is no processor, use the default
+        if self.kind in default_processors:
+            start_processor, end_processor = default_processors[self.kind]
+            if not self.starting_processor:
+                self.starting_processor = start_processor
+            if not self.ending_processor:
+                self.ending_processor = end_processor
+
         if self.modal:
             modal_buttons = False
             for q in self.questions:
@@ -179,10 +194,6 @@ class ScriptDatas(BaseModel):
 
         return self
 
-    @property
-    def kind(self) -> str:
-        return self._kind
-
     def get_selection_buttons(self, callback: callable) -> List[HVZButton]:
         """Returns a button for selecting a response to modify."""
         buttons = []
@@ -195,50 +206,18 @@ class ScriptFile(RootModel):
     """A pydantic model for the scripts.yml file"""
     root: Dict[str, ScriptDatas]
 
-    @field_validator('root', mode='after')
+    @field_validator('root', mode='before')
     @classmethod
-    def inject_kind(cls, root: Dict[str, ScriptDatas], info: FieldValidationInfo) -> Any:
-        for name, data in root.items():
-            data._kind = name # This is fine since it happens in a validator
+    def inject_kind(cls, root: Dict[str, Dict], info: FieldValidationInfo):
+        for kind, chatbot in root.items():
+            chatbot['kind'] = kind
         return root
 
     @field_validator('root', mode='after')
     @classmethod
     def check_script(cls, root: Dict[str, ScriptDatas], info: FieldValidationInfo) -> Any:
 
-        for name, data in root.items():
-            required_processors = {
-                'registration': (
-                    ('starting_processor', chatbotprocessors.default_script_processors.registration_start),
-                    ('ending_processor', chatbotprocessors.default_script_processors.registration_end)
-                ),
-                'tag_logging': (
-                    ('starting_processor', chatbotprocessors.default_script_processors.tag_logging_start),
-                    ('ending_processor', chatbotprocessors.default_script_processors.tag_logging_end)
-                )
-            }
-
-            for kind, pairs in required_processors.items():
-                if name != kind:
-                    continue
-                for pair in pairs:
-                    actual_name, required = pair
-                    actual = getattr(data, actual_name)
-                    if not actual:
-                        logger.warning(
-                            f"The special chatbot '{kind}' in {config.script_path.name} is missing a value for '{actual_name}' "
-                            f"Unless you know what you're doing, set it to '{required.__name__}'."
-                        )
-                        break
-                    if actual_name != required:
-                        logger.warning(
-                            f"The special chatbot'{kind}' in {config.script_path.name} has a value for '{actual_name}' that is not default. "
-                            f"Unless you know exactly what you're doing, change it to '{required.__name__}'"
-                        )
-                        break
         return root
-
-
 
 
     @property
