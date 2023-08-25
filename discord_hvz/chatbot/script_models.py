@@ -81,7 +81,7 @@ class QuestionDatas(BaseModel):
     button_options: Dict[str, ButtonColor] = None
 
     class Config:
-        frozen = True
+        frozen = False
 
     @model_validator(mode="after")
     def check_question(self) -> QuestionDatas:
@@ -135,7 +135,7 @@ class ScriptDatas(BaseModel):
     questions: List[QuestionDatas]
 
     class Config:
-        frozen = True
+        frozen = False
         str_strip_whitespace = True
 
     @field_validator('questions', mode='before')
