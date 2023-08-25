@@ -9,7 +9,6 @@ import sys
 import time
 from datetime import datetime
 from os import getenv
-from pathlib import Path
 from typing import Dict, Union, Any, Type
 
 import discord
@@ -19,9 +18,8 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from loguru import logger
 from sqlalchemy.exc import NoSuchColumnError
-from ruamel.yaml import YAML
 
-from discord_hvz.config import config, ConfigError, ConfigChecker, ChannelNames
+from discord_hvz.config import config, ConfigError, ConfigChecker
 from discord_hvz import utilities
 
 # The below imports are commented to prevent double-importing.

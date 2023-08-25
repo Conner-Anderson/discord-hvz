@@ -9,7 +9,6 @@ import regex
 from discord.ext import commands
 from loguru import logger
 
-from discord.commands import slash_command, Option
 from discord_hvz.config import config, ConfigError, ConfigChecker
 from discord_hvz.buttons import HVZButton
 
