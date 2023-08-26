@@ -40,6 +40,7 @@ class HvzDb:
     # Table names that cannot be created in the config. Reserved for cogs / modules
     reserved_table_names: ClassVar[List[str]] = ['persistent_panels']
 
+    #TODO: Devise a better system for required columns. Also, test how users remove questions and add them
     required_columns: ClassVar[Dict[str, Dict[str, str]]] = {
         'members': {
             'id': 'Integer',
@@ -51,7 +52,16 @@ class HvzDb:
         'tags': {
             'tag_id': 'Integer',
             'tagger_id': 'Integer',
-            'tagger_name': 'String'
+            'tagger_name': 'String',
+            'tagger_nickname': 'String',
+            'tagger_discord_name': 'String',
+            'tagged_id': 'Integer',
+            'tagged_name': 'String',
+            'tagged_nickname': 'String',
+            'tagged_discord_name': 'String',
+            'tag_time': 'DateTime',
+            'report_time': 'DateTime',
+            'revoked_tag': 'Boolean'
         }
     }
 

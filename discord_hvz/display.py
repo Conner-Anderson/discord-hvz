@@ -48,12 +48,15 @@ def create_game_plot(db: 'HvzDb', filepath=None) -> discord.File:
         members_df = pd.read_sql_table('members', con=engine, columns=['registration_time', 'oz'])
 
         def total_players(x):
-            total = (members_df.registration_time < x.tag_time)
+            total = (members_df.registration_time <= x.tag_time)
             return total.sum()
 
         def total_zombies(x):
-            # Note: The database is giving the revoked_tag column as object types, thus converting to in to compare
-            total = (tags_df.tag_time < x.tag_time) & (tags_df.revoked_tag.astype('int32') == 0)
+            '''
+            To be given a pandas series which is a single tag. Compares the tag to the dataframe of all tags,
+            counting how many precede it (including it). Excludes revoked tags
+            '''
+            total = (tags_df.tag_time <= x.tag_time) & (tags_df.revoked_tag == False)
             return total.sum()
 
         oz_count = members_df['oz'].sum()

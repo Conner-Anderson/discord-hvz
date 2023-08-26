@@ -230,6 +230,7 @@ class HVZBot(discord.ext.commands.Bot):
 
         @self.listen()
         async def on_application_command_error(ctx, error):
+            logger.opt(exception=True).debug(error)
             error = getattr(error, 'original', error)
             log_level = None
             trace = False
@@ -250,6 +251,8 @@ class HVZBot(discord.ext.commands.Bot):
 
                 getattr(log.opt(exception=trace), log_level)(
                     f'{error.__class__.__name__} exception in command {ctx.command}: {error}')
+                print(type(error))
+
 
             await ctx.respond(f'The command at least partly failed: {error}')
 
@@ -293,15 +296,16 @@ class HVZBot(discord.ext.commands.Bot):
 
     async def announce_tag(self, tagged_member: discord.Member, tagger_member: discord.Member, tag_time: datetime):
 
-        new_human_count = len(self.roles.human.members)
-        new_zombie_count = len(self.roles.human.members)
+        new_h = len(self.roles.human.members)
+        new_z = len(self.roles.human.members)
 
         msg = f'<@{tagged_member.id}> has turned zombie!'
         if not config.silent_oz:
             msg += f'\nTagged by <@{tagger_member.id}>'
             msg += tag_time.strftime(' at about %I:%M %p')
-
-        msg += f'\nThere are now {new_human_count} humans and {new_zombie_count} zombies.'
+            msg += f"\nThere are now {new_h} humans and {new_z} zombie{'s' if new_z > 1 else ''}."
+        else:
+            msg += f"\nThere {'are' if new_z > 1 else 'is'} now {new_z} zombie{'s' if new_z > 1 else ''}."
 
         await self.channels.tag_announcements.send(msg)
 

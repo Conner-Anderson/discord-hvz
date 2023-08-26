@@ -82,7 +82,7 @@ database_tables:
     tagged_discord_name: String
     tag_time: DateTime
     report_time: DateTime
-    revoked_tag: String
+    revoked_tag: Boolean
 
 # The path to the game database file. If it does not exist, the bot will create it.
 # Regardless of which system you are on, use '/' forward slashes in the path.

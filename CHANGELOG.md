@@ -20,6 +20,13 @@ All noteable changes to this project will be documented in this file.
 
 - Changed all id columns in the 'members' and 'tags' database tables to integers. 
 This change is reflected by changed types in the 'database_tables' field of config.yml
+- Changed the 'revoked_tag' column of the 'tags' database table to a boolean.
+This change is reflected by a changed type in the 'database_tables' field of config.yml.
+Old databases *will* cause various errors.  
+**Solutions:**
+  - Delete your database and launch the bot. A fresh one will be re-created.
+  - Use a database editor such as [DB Browser for SQLite](https://sqlitebrowser.org/) to change the
+  type of the affected columns.
 
 ### 0.3.0 Minor Version Release
 

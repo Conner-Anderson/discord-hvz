@@ -63,10 +63,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         msg = ''
         if member:
             member_id = member.id
-
             if id:
                 msg += 'Both member and ID supplied. Ignoring ID.\n'
-
         elif id:
             try:
                 int(id)
@@ -212,8 +210,12 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         """
         bot = self.bot
         tag_row = bot.db.get_tag(tag_id)
-        # TODO: Improve error handling for non-existent tag_ids
-        bot.db.delete_row('tags', 'tag_id', tag_id)
+        try:
+            bot.db.delete_row('tags', 'tag_id', tag_id)
+        except ValueError as e:
+            print("Got value error from delete_row")
+            raise ValueError(f"There is no tag with an id of {tag_id}") from e
+
         msg = ''
         # TODO: This might use optional column values. At least need to think about it.
         tagged_member = bot.guild.get_member(int(tag_row.tagged_id))
@@ -325,6 +327,29 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
 
         msg = f'Tag {tag_id} restored. ' + msg
         await ctx.respond(msg)
+
+    @tag_group.command(name='list')
+    async def tag_list(self, ctx):
+        """
+        Lists all tags. The Google Sheet is probably better.
+
+        """
+
+        tags = self.bot.db.get_table('tags')
+        if not tags:
+            await ctx.respond(f'No tags found.')
+            return
+
+        message = ''
+
+        for tag in tags:
+            time = tag.tag_time.strftime('at about %I:%M %p on %b %d')
+            revoked = tag.revoked_tag
+            sub_string = f"{'REVOKED ' if revoked else ''}Tag {tag.tag_id}, <@{tag.tagger_id}> tagged <@{tag.tagged_id}>"\
+                f" {time}\n"
+            message += sub_string
+
+        await respond_paginated(ctx, message)
 
     @slash_command(name='config')
     async def config_command(
