@@ -212,6 +212,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         """
         bot = self.bot
         tag_row = bot.db.get_tag(tag_id)
+        # TODO: Improve error handling for non-existent tag_ids
         bot.db.delete_row('tags', 'tag_id', tag_id)
         msg = ''
         # TODO: This might use optional column values. At least need to think about it.

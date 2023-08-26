@@ -58,7 +58,7 @@ role_names:
 # tags: Tag_ID, Tagger_ID, Tagger_Name
 database_tables:
   members:
-    id: String
+    id: Integer
     name: String
     nickname: String
     discord_name: String
@@ -72,11 +72,11 @@ database_tables:
     oz: Boolean
   tags:
     tag_id: incrementing_integer
-    tagger_id: String
+    tagger_id: Integer
     tagger_name: String
     tagger_nickname: String
     tagger_discord_name: String
-    tagged_id: String
+    tagged_id: Integer
     tagged_name: String
     tagged_nickname: String
     tagged_discord_name: String

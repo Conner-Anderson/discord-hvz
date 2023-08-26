@@ -16,6 +16,11 @@ All noteable changes to this project will be documented in this file.
   The correct processors are added to registration and tag_logging chatbots automatically if none are specified.
 - Useless processor removed from the default script
 
+#### Breaking Changes
+
+- Changed all id columns in the 'members' and 'tags' database tables to integers. 
+This change is reflected by changed types in the 'database_tables' field of config.yml
+
 ### 0.3.0 Minor Version Release
 
 #### Features
