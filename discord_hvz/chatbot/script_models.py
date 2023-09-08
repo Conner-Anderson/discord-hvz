@@ -32,7 +32,8 @@ CUSTOM_MESSAGES = {
     'string_type': "{formatted_loc} set to '{input}': This must be text.",
     'url_scheme': 'Hey, use the right URL scheme! I wanted {expected_schemes}.',
     'missing': "Missing the field {formatted_loc}, which is required.",
-    'model_error': "Error when interpreting '{formatted_loc}': {msg}"
+    'model_error': "Error when interpreting '{formatted_loc}': {msg}",
+    'plain_error': "{msg}"
 }
 
 
@@ -87,6 +88,12 @@ class QuestionDatas(BaseModel):
     class Config:
         frozen = False
         str_strip_whitespace = True
+
+
+    @field_validator("column", mode="after")
+    @classmethod
+    def validate_column(cls, value: str) -> str:
+        return value.lower().strip()
 
     @model_validator(mode="after")
     def check_question(self) -> QuestionDatas:
@@ -228,6 +235,14 @@ class ScriptFile(RootModel):
     @field_validator('root', mode='after')
     @classmethod
     def check_script(cls, root: Dict[str, ScriptDatas], info: FieldValidationInfo) -> Any:
+        found_tables = []
+        for kind, data in root.items():
+            if data.table in found_tables:
+                raise PydanticCustomError(
+                    "plain_error",
+                    f"Two scripts use the same table name: '{data.table}'. One script per table please."
+                )
+            found_tables.append(data.table)
         return root
 
     @property
@@ -245,7 +260,6 @@ class ScriptFile(RootModel):
             for question in script.questions:
                 columns[question.column] = question.column_type
             schema[script.table] = columns
-        logger.info(f"Returning schema: \n{schema}")
         return schema
 
 def load_model(filepath: Path) -> ScriptFile:

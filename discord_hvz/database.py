@@ -44,8 +44,7 @@ class HvzDb:
     #TODO: Devise a better system for required columns. Also, test how users remove questions and add them
     required_columns: ClassVar[Dict[str, Dict[str, str]]] = {
         'members': {
-            'id': 'Integer',
-            'name': 'String',
+            'id': 'Integer', # TODO: Check bot for places that "name" is required, and "email"
             'discord_name': 'String',
             'nickname': 'String',
             'registration_time': 'DateTime',
@@ -88,33 +87,28 @@ class HvzDb:
                 "Now creating the needed tables..."
             )
 
-        for table_name, column_dict in self.database_config.items():
+        for table_name, configured_columns in self.database_config.items():
             try:
-                logger.info(f"Creating table schema object named {table_name}, whose columns are: {column_dict}")
                 self.tables[table_name] = Table(table_name, self.metadata_obj, autoload_with=self.engine)
-                continue
-            except NoSuchTableError: pass
-            # The rest of this for loop only happens if a new table is being created.
-            logger.warning(f'Found a table called "{table_name}" in the config, but not in the database. Creating the table.')
+            except NoSuchTableError:
+                logger.warning(
+                    f'A table called "{table_name}" was required, but it is not in the database. Creating the table now.')
+                self.add_configured_table(table_name, configured_columns)
+            else:
+                table = self.tables[table_name]
+                for column_name, column_type in configured_columns.items():
+                    try:
+                        self._validate_column_selection(table, column_name)
+                    except ValueError:
+                        logger.warning(
+                            f"The column '{column_name}' is needed for the '{table_name}' table "
+                            f"but that table already exists in the database, and so the column cannot be added. "
+                            f"Delete your database file ({config.database_path.name}) and restart the bot to fix this."
+                            f"If left alone, this will cause problems."
+                        )
 
 
-            column_args = []
-            # Add any required columns that are missing
 
-
-            # Create Columns from the config
-            for column_name, type_string in column_dict.items():
-                column_args.append(self._create_column_object(column_name, type_string))
-
-            if table_name in self.required_columns:
-                required_columns_table = self.required_columns[table_name]
-                for column_name, type_string in required_columns_table.items():
-                    if column_name in column_dict:
-                        continue
-                    column_args.append(self._create_column_object(column_name, type_string))
-                    logger.warning(f'The required column "{column_name}" was not found in the config for the table "{table_name}". Creating it.')
-
-            self.tables[table_name] = Table(table_name.casefold(), self.metadata_obj, *column_args)
 
         self.metadata_obj.create_all(self.engine)
 
@@ -141,6 +135,31 @@ class HvzDb:
         self.metadata_obj.create_all(self.engine)
         self.tables[table_name].column_names = columns.keys()
 
+    def add_configured_table(self, table_name: str, configured_columns: Dict[str, str]) -> None:
+
+        column_args = []
+        # Add any required columns that are missing
+
+        # Create a column object for each configured column
+        for column_name, type_string in configured_columns.items():
+            # Ensure required columns are of the right type
+            if table_name in self.required_columns and column_name in self.required_columns[table_name]:
+                if type_string.casefold() != self.required_columns[table_name][column_name].casefold():
+                    logger.warning(
+                        f"In {config.script_path.name}, the incorrect column_type '{type_string}' is specified for the '{column_name}' column for the "
+                        f"'{table_name}' table. This table and column are required by the bot for core functionality, "
+                        f"so this choice is being overridden. You should remove this choice, as it will only cause confusion."
+                    )
+                type_string = self.required_columns[table_name][column_name]
+            column_args.append(self._create_column_object(column_name, type_string))
+
+        if table_name in self.required_columns:
+            required_columns = self.required_columns[table_name]
+            for column_name, type_string in required_columns.items():
+                if not column_name in configured_columns:
+                    column_args.append(self._create_column_object(column_name, type_string))
+
+        self.tables[table_name] = Table(table_name.casefold(), self.metadata_obj, *column_args)
     def delete_table(self, table_name: str):
         self.tables[table_name].drop(bind=self.engine)
         logger.warning(f'Deleted table named {table_name}')
