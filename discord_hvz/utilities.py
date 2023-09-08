@@ -141,10 +141,9 @@ def abbreviate_message(message: str, max_char: int) -> str:
     buffer = len(inserted_message)
     one = int((max_char/2)-buffer)
     two = int((max_char/2))
-    logger.info(f"One: {type(one)} Two: {type(two)}")
     output = message[:one] + inserted_message.format(excess+buffer) + message[two:]
     if len(output) > max_char:
-        logger.warning(f"Abbreviation did not shorten enough")
+        print(f"Abbreviation did not shorten enough")
     return output[:max_char]
 
 
