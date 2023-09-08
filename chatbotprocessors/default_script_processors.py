@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 async def registration_end(responses: Dict[str, Any], bot: HVZBot, target_member: discord.Member) -> Dict[str, Any]:
 
     responses['faction'] = 'human'
-    responses['id'] = str(target_member.id)
+    responses['id'] = target_member.id
     responses['discord_name'] = target_member.name
     responses['nickname'] = target_member.nick
     responses['registration_time'] = datetime.now(tz=config.timezone)

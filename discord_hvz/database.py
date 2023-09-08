@@ -30,12 +30,13 @@ def dump(obj):
 
 @dataclass
 class HvzDb:
+    database_config: Dict[str, Dict[str, str]]
     engine: sqlalchemy.engine.Engine = field(init=False)
     metadata_obj: MetaData = field(init=False, default_factory=MetaData)
     tables: Dict[str, Table] = field(init=False, default_factory=dict)
     sheet_interface: SheetsInterface = field(init=False, default=None)
     filepath: Path = config.database_path
-    database_config: Dict[str, Dict[str, str]] = field(init=False, default_factory=dict)
+
 
     # Table names that cannot be created in the config. Reserved for cogs / modules
     reserved_table_names: ClassVar[List[str]] = ['persistent_panels']
@@ -45,6 +46,9 @@ class HvzDb:
         'members': {
             'id': 'Integer',
             'name': 'String',
+            'discord_name': 'String',
+            'nickname': 'String',
+            'registration_time': 'DateTime',
             'faction': 'String',
             'tag_code': 'String',
             'oz': 'Boolean'
@@ -76,7 +80,6 @@ class HvzDb:
     
     def __post_init__(self):
         # TODO: Need to make sure the required tables are always created. Might be config-depended now...
-        self.database_config: Dict[str, Dict[str, str]] = copy.deepcopy(config.database_tables)
         self.engine = create_engine(f"sqlite+pysqlite:///{str(self.filepath)}", future=True)
 
         if not self.filepath.exists():
@@ -87,9 +90,11 @@ class HvzDb:
 
         for table_name, column_dict in self.database_config.items():
             try:
+                logger.info(f"Creating table schema object named {table_name}, whose columns are: {column_dict}")
                 self.tables[table_name] = Table(table_name, self.metadata_obj, autoload_with=self.engine)
                 continue
             except NoSuchTableError: pass
+            # The rest of this for loop only happens if a new table is being created.
             logger.warning(f'Found a table called "{table_name}" in the config, but not in the database. Creating the table.')
 
 

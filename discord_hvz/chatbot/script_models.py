@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, List, Any, Union
+from typing import Dict, List, Any, Union, TYPE_CHECKING
 from typing_extensions import Annotated
 
 from pathlib import Path
@@ -12,10 +12,13 @@ from ruamel.yaml import YAML
 
 from loguru import logger
 
-from discord_hvz.config import config, ConfigError
+from discord_hvz.config import config, ConfigError, DatabaseType
 from discord_hvz.buttons import ButtonColor, HVZButton
 from discord_hvz.utilities import format_pydantic_errors
 import chatbotprocessors
+
+if TYPE_CHECKING:
+    from discord_hvz.database import HvzDb
 
 yaml = YAML()
 yaml.preserve_quotes = True
@@ -71,6 +74,7 @@ ButtonColor = Annotated[ButtonColor, BeforeValidator(validate_button_color)]
 
 class QuestionDatas(BaseModel):
     column: str
+    column_type: DatabaseType = 'string'
     display_name: str = Field(default=None)  # Required for non-modal chatbots
     query: str = Field(max_length=2000)
     valid_regex: str = Field(default=None)
@@ -231,6 +235,18 @@ class ScriptFile(RootModel):
         """A shortcut for fetching list of scripts"""
         return [value for value in self.root.values()]
 
+    def get_database_schema(self) -> Dict[str, Dict[str, str]]:
+        '''
+        Returns a representation of the tables and columns this ScriptFile will require.
+        '''
+        schema = {}
+        for script in self.scripts:
+            columns = {}
+            for question in script.questions:
+                columns[question.column] = question.column_type
+            schema[script.table] = columns
+        logger.info(f"Returning schema: \n{schema}")
+        return schema
 
 def load_model(filepath: Path) -> ScriptFile:
     with open(filepath) as fp:

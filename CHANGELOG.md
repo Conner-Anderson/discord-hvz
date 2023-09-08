@@ -27,6 +27,7 @@ Old databases *will* cause various errors.
   - Delete your database and launch the bot. A fresh one will be re-created.
   - Use a database editor such as [DB Browser for SQLite](https://sqlitebrowser.org/) to change the
   type of the affected columns.
+  - Contact the developer to migrate your database for you.
 
 ### 0.3.0 Minor Version Release
 

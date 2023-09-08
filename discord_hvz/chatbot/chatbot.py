@@ -239,7 +239,8 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
     def __init__(self, bot: HVZBot):
         self.bot = bot
 
-        self.loaded_scripts = {s.kind: s for s in load_model(config.script_path).scripts}
+        script_file_model = self.bot.get_cog_startup_data(self)['script_file_model']
+        self.loaded_scripts = {s.kind: s for s in script_file_model.scripts}
         self.config_checkers = {k: self.get_config_checker(k, self.bot) for k, s in self.loaded_scripts.items()}
         for kind, script in self.loaded_scripts.items():
             self._postable_buttons.append(

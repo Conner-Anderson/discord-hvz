@@ -48,8 +48,42 @@ registration:
     button_options:
       'Yes': Green
       'No': Red
+  - column: want_blaster
+    column_type: boolean
+    display_name: Want Blaster
+    query: |-
+      Want to borrow a blaster?
+    valid_regex: '(?i)\s*(yes|no)\s*'
+    rejection_response: Just need a yes or no here.
+    button_options:
+      'yes': Green
+      'no': Red
 
 tag_logging:
+  table: tags
+  modal: true
+  modal_title: Log a Tag
+  beginning: Let's log a tag. Type 'cancel' at any time to stop this conversation.
+  ending: Tag logged! Make sure your newly-brainless friend feels welcome in the hoard.
+  postable_button_label: Log a Tag
+  postable_button_color: green
+  questions:
+  - column: tagged_id
+    display_name: Tag Code
+    query: What is the tag code of the human you tagged?
+    valid_regex: '[a-zA-Z\d]{6}'
+    rejection_response: 'Invalid tag code. The tag code is 6 characters of numbers and capital
+      letters. None of these: 0 O Q I 1 D V U 5 S 2 Z'
+    processor: tag_code_to_member_id
+  - column: tag_time
+    display_name: Tag Time
+    query: "About when did the tag happen? Format: 3:04pm"
+    valid_regex: '(?i)\d{1,2}:[0-5]?[0-9]\s?(am|pm)\s?(yesterday)?'
+    rejection_response: Please use a format like 12:26pm or 7:00 am
+    modal_default: Current_Time
+    processor: tag_time
+
+test_logging:
   table: tags
   modal: true
   modal_title: Log a Tag

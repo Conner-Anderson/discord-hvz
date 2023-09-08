@@ -21,6 +21,7 @@ from sqlalchemy.exc import NoSuchColumnError
 
 from discord_hvz.config import config, ConfigError, ConfigChecker
 from discord_hvz import utilities
+from discord_hvz.chatbot import script_models
 
 # The below imports are commented to prevent double-importing.
 # These modules need to exist in "hiddenimports" in discord_hvz.spec for the sake of pyinstaller
@@ -140,7 +141,8 @@ class HVZBot(discord.ext.commands.Bot):
 
     def __init__(self):
         self.guild: Union[discord.Guild, None] = None
-        self.db = HvzDb()
+        script_file_model = script_models.load_model(config.script_path)
+        self.db = HvzDb(script_file_model.get_database_schema())
         self.readied = False
 
         intents = discord.Intents.all()
@@ -152,6 +154,7 @@ class HVZBot(discord.ext.commands.Bot):
         # cog_startup_data holds data that can be fetched by cogs during startup
         self._cog_startup_data = {
             'ChatBotManager': {
+                'script_file_model':script_file_model,
                 'config_checkers': {
                     'registration': ConfigChecker('registration'),
                     'tag_logging': ConfigChecker('tag_logging')
