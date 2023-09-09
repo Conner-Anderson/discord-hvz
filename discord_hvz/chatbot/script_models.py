@@ -9,7 +9,6 @@ from pydantic import BaseModel, BeforeValidator, PlainValidator, ValidationError
 from pydantic_core import PydanticCustomError
 from pydantic_yaml import parse_yaml_raw_as
 from ruamel.yaml import YAML
-from sqlalchemy.sql.sqltypes import TypeEngine, String
 
 from loguru import logger
 
@@ -17,7 +16,7 @@ from discord_hvz.config import config, ConfigError
 from discord_hvz.buttons import ButtonColor, HVZButton
 from discord_hvz.utilities import format_pydantic_errors
 import chatbotprocessors
-from discord_hvz.database import HvzDb
+from discord_hvz import database
 
 if TYPE_CHECKING:
     pass
@@ -45,7 +44,7 @@ def validate_question_processor(x: Any) -> callable:
     except (AttributeError, TypeError) as e:
         logger.debug(e)
         raise ValueError("Processor value cannot be converted to a string.")
-    processor = chatbotprocessors.question_processors.get(text)
+    processor = chatbotprocessors.QUESTION_PROCESSORS.get(text)
     if not processor:
         raise ValueError("Processor does not match the name of any question processor function.")
     return processor
@@ -57,20 +56,17 @@ def validate_script_processor(x: Any) -> callable:
     except (AttributeError, TypeError) as e:
         logger.debug(e)
         raise ValueError("Processor value cannot be converted to a string.")
-    processor: Union[callable, None] = chatbotprocessors.script_processors.get(text)
+    processor: Union[callable, None] = chatbotprocessors.SCRIPT_PROCESSORS.get(text)
     if not processor:
         raise ValueError("Processor does not match the name of any script processor function.")
     return processor
 
-def validate_database_type(x: str) -> TypeEngine:
+def validate_database_type(x: str) -> database.ValidColumnType:
     '''Validates the strings acceptable to define types for database columns.'''
-    this = HvzDb.valid_column_types
-    db_type = this.get(x.strip().casefold())
-    if db_type:
-        return db_type
-    else:
-        raise ValueError(
-            f"'{x}' is not a valid database type. Must be one of: string, boolean, integer, datetime, incrementing_integer, or equivalent python types.")
+    try:
+        return database.to_column_type(x)
+    except TypeError as e:
+        raise ValueError(str(e))
 
 
 def validate_button_color(x: Any) -> str:
@@ -83,7 +79,7 @@ def validate_button_color(x: Any) -> str:
 QuestionProcessor = Annotated[callable, PlainValidator(validate_question_processor)]
 ScriptProcessor = Annotated[callable, PlainValidator(validate_script_processor)]
 ButtonColor = Annotated[ButtonColor, BeforeValidator(validate_button_color)]
-DatabaseType = Annotated[TypeEngine, PlainValidator(validate_database_type)]
+DatabaseType = Annotated[database.ValidColumnType, PlainValidator(validate_database_type)]
 
 
 class QuestionDatas(BaseModel):
@@ -227,19 +223,21 @@ class ScriptDatas(BaseModel):
 
         # Checks each column type to make sure required columns get the right types
         # Also, unset column types are strings
-        required_columns = HvzDb.required_columns.get(self.table)
+        required_columns = chatbotprocessors.REQUIRED_COLUMNS.get(self.table)
+        logger.info(f"Required columns: {required_columns}")
         for question in self.questions:
             if required_columns and question.column in required_columns:
                 if question.column_type and question.column_type != required_columns[question.column]:
+                    wrong_type = database.COLUMN_TO_STR[question.column_type]
+                    right_type = database.COLUMN_TO_STR[required_columns[question.column]]
                     logger.warning(
-                        f"The '{question.column}' column is critical for bot function and is set to '{question.column_type}' "
-                        f"when it should be '{required_columns[question.column]}'. Forcing the correct type. "
+                        f"The '{question.column}' column is critical for bot function and is set to '{wrong_type}' "
+                        f"when it should be '{right_type}'. Forcing the correct type. "
                         f"To prevent confusion, please correct this value or remove it entirely."
                     )
                 question.column_type = required_columns[question.column]
             elif not question.column_type:
-                question.column_type = String
-
+                question.column_type = database.ValidColumnType.STRING
 
         return self
 
@@ -280,9 +278,10 @@ class ScriptFile(RootModel):
         """A shortcut for fetching list of scripts"""
         return [value for value in self.root.values()]
 
-    def get_database_schema(self) -> Dict[str, Dict[str, TypeEngine]]:
+    def get_database_schema(self) -> Dict[str, Dict[str, database.ValidColumnType]]:
         '''
         Returns a representation of the tables and columns this ScriptFile will require.
+        Also gets additional columns required by processors
         '''
         schema = {}
         for script in self.scripts:
@@ -290,6 +289,21 @@ class ScriptFile(RootModel):
             for question in script.questions:
                 columns[question.column] = question.column_type
             schema[script.table] = columns
+
+        required_columns = chatbotprocessors.REQUIRED_COLUMNS
+        for table_name, columns in required_columns.items():
+            if table_name not in schema:
+                schema[table_name] = required_columns[table_name]
+                continue
+            for column_name, column_type in columns.items():
+                if column_name in schema[table_name] and schema[table_name][column_name] != column_type:
+                    logger.warning(
+                        f"In {config.script_path.name} a question sets the {column_name} column of the {table_name} table "
+                        f"to the type {schema[table_name][column_name]}. This column is essential to bot function "
+                        f"and so the type is being corrected. Don't specify a type for this column to remove this warning. "
+                    )
+                schema[table_name][column_name] = column_type
+
         return schema
 
 def load_model(filepath: Path) -> ScriptFile:

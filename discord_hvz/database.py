@@ -4,6 +4,7 @@ import copy
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import List, Union, Dict, TYPE_CHECKING, ClassVar
+from enum import Enum
 
 import discord
 import sqlalchemy
@@ -21,17 +22,50 @@ from discord_hvz.config import config, ConfigError
 if TYPE_CHECKING:
     pass
 
-def dump(obj):
-    """Prints the passed object in a very detailed form for debugging"""
-    for attr in dir(obj):
-        try:
-            print("obj.%s = %r" % (attr, getattr(obj, attr)))
-        except Exception:
-            print('TYPE ERROR')
+class ValidColumnType(Enum):
+    INTEGER = Integer
+    INCR_INTEGER = Integer # Must be dealt with externally to have any difference
+    BOOLEAN = Boolean
+    STRING = String
+    DATETIME = DateTime
+
+STR_TO_COLUMN = {
+        'string': ValidColumnType.STRING,
+        'str': ValidColumnType.STRING,
+        'integer': ValidColumnType.INTEGER,
+        'int': ValidColumnType.INTEGER,
+        'incrementing_integer': ValidColumnType.INCR_INTEGER,
+        'incr_integer': ValidColumnType.INCR_INTEGER,
+        'boolean': ValidColumnType.BOOLEAN,
+        'bool': ValidColumnType.BOOLEAN,
+        'datetime': ValidColumnType.DATETIME,
+        'date': ValidColumnType.DATETIME
+    }
+
+COLUMN_TO_STR = {
+    ValidColumnType.STRING: 'string',
+    ValidColumnType.INTEGER: 'integer',
+    ValidColumnType.INCR_INTEGER: 'incrementing_integer',
+    ValidColumnType.BOOLEAN: 'boolean',
+    ValidColumnType.DATETIME: 'datetime',
+}
+
+
+def to_column_type(x) -> ValidColumnType:
+    '''Transforms the input into a ValidColumnType enum. Case and whitespace insensitive.'''
+    if isinstance(x, ValidColumnType):
+        return x
+    if isinstance(x, str):
+        column_type = STR_TO_COLUMN.get(x.strip().casefold())
+    else:
+        column_type = None
+    if not column_type:
+        raise TypeError(f"Could not convert '{x}' into a valid column type for the database. Valid values are: {STR_TO_COLUMN.keys()}")
+    return column_type
 
 @dataclass
 class HvzDb:
-    database_config: Dict[str, Dict[str, TypeEngine]]
+    database_config: Dict[str, Dict[str, ValidColumnType]]
     engine: sqlalchemy.engine.Engine = field(init=False)
     metadata_obj: MetaData = field(init=False, default_factory=MetaData)
     tables: Dict[str, Table] = field(init=False, default_factory=dict)
@@ -106,7 +140,7 @@ class HvzDb:
                         self._validate_column_selection(table, column_name)
                     except ValueError:
                         raise ConfigError(
-                            f"'{config.database_path.name}' says that '{column_name}' is needed for the '{table_name}' table "
+                            f"'{config.script_path.name}' says that '{column_name}' is needed for the '{table_name}' table "
                             f"but that table already exists in the database, and so the column cannot be added. "
                             f"Delete your database file ({config.database_path.name}) and restart the bot to fix this. "
                             f"If left alone, this will cause problems."
@@ -140,7 +174,7 @@ class HvzDb:
         self.metadata_obj.create_all(self.engine)
         self.tables[table_name].column_names = columns.keys()
 
-    def _add_configured_table(self, table_name: str, configured_columns: Dict[str, TypeEngine]) -> None:
+    def _add_configured_table(self, table_name: str, configured_columns: Dict[str, ValidColumnType]) -> None:
 
         column_args = []
         # Add any required columns that are missing
@@ -148,13 +182,6 @@ class HvzDb:
         # Create a column object for each configured column
         for column_name, column_type in configured_columns.items():
             column_args.append(self._create_column_object(column_name, column_type))
-
-        # Add required columns that aren't present
-        if table_name in self.required_columns:
-            required_columns = self.required_columns[table_name]
-            for column_name, column_type in required_columns.items():
-                if not column_name in configured_columns:
-                    column_args.append(self._create_column_object(column_name, column_type))
 
         self.tables[table_name] = Table(table_name.casefold(), self.metadata_obj, *column_args)
     def delete_table(self, table_name: str):
@@ -203,29 +230,18 @@ class HvzDb:
             logger.exception(f'The database failed to update to the Google Sheet with this error: {e}')
 
 
-    def _create_column_object(self, column_name: str, column_type: Union[str, TypeEngine]) -> Column:
+    def _create_column_object(self, column_name: str, column_type: Union[str, ValidColumnType]) -> Column:
         """
         Returns a Column object after forcing the name to lowercase and validating the type
-        :param column_name:
-        :param column_type: A string matching a valid column type
-        :return: Column object
+
         """
-        if not isinstance(column_type, str):
-            for type_name, valid_type in self.valid_column_types.items():
-                if isinstance(column_type, valid_type):
-                    column_type_object = column_type
-                    break
-            else:
-                raise TypeError(f'column_type is an invalid type: {type(column_type)}')
-        else:
-            try:
-                column_type_object = self.valid_column_types[column_type.casefold()]
-            except KeyError:
-                column_type_object = String
+        # Will raise KeyError on failure
+
+        column_type_object = to_column_type(column_type).value
 
         kwargs = {}
-        if column_type == 'incrementing_integer':
-            kwargs = {'primary_key': True, 'nullable':False, 'autoincrement':True}
+        if column_type == ValidColumnType.INCR_INTEGER:
+            kwargs = {'primary_key': True, 'nullable': False, 'autoincrement': True}
 
         return Column(column_name.casefold(), column_type_object, **kwargs)
 

@@ -43,6 +43,8 @@ Example: raise ValueError('You have entered a bad value. Please try again.')
 
 """
 
+REQUIRED_COLUMNS = {}
+
 def name(input_text: str, bot: HVZBot):
     return input_text
 

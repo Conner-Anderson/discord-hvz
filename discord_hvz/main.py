@@ -142,7 +142,7 @@ class HVZBot(discord.ext.commands.Bot):
     def __init__(self):
         self.guild: Union[discord.Guild, None] = None
         script_file_model = script_models.load_model(config.script_path)
-        self.db = HvzDb(script_file_model.get_database_schema())
+        self.db = HvzDb(database_config = script_file_model.get_database_schema())
         self.readied = False
 
         intents = discord.Intents.all()

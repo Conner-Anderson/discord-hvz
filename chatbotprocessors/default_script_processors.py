@@ -16,6 +16,41 @@ if TYPE_CHECKING:
 # If any of these processor functions return a ValueError exception, the error message will be displayed to the user.
 # All other exceptions are reported to them as generic errors.
 
+# If a global variable "REQUIRED_COLUMNS" is defined here that maps table columns to valid column types
+# the columns will be created in the database.
+# Basic schema is Dict[str, Dict[str, str]], which is: Dict[table_name, Dict[column_name, column_type]]
+# REQUIRED_COLUMNS = {'table_name': {'column_name': 'type_name',},}
+# If processors attempt to return responses for database columns that don't exist, an exception will be raised.
+# Valid database type strings (case-insensitive): string, integer, incrementing_integer, boolean, datetime
+# These strings are valid aliases for the above: str, int, incr_integer, bool, date
+
+REQUIRED_COLUMNS = {
+    'members': {
+        'id': 'Integer',
+        'name': 'String',
+        'discord_name': 'String',
+        'nickname': 'String',
+        'registration_time': 'DateTime',
+        'faction': 'String',
+        'tag_code': 'String',
+        'oz': 'Boolean'
+    },
+    'tags': {
+        'tag_id': 'Integer',
+        'tagger_id': 'Integer',
+        'tagger_name': 'String',
+        'tagger_nickname': 'String',
+        'tagger_discord_name': 'String',
+        'tagged_id': 'Integer',
+        'tagged_name': 'String',
+        'tagged_nickname': 'String',
+        'tagged_discord_name': 'String',
+        'tag_time': 'DateTime',
+        'report_time': 'DateTime',
+        'revoked_tag': 'Boolean'
+    }
+}
+
 
 async def registration_end(responses: Dict[str, Any], bot: HVZBot, target_member: discord.Member) -> Dict[str, Any]:
 
