@@ -137,10 +137,12 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         if not members:
             await ctx.respond(f'No members found.')
             return
-        # TODO: Reconcile the fact that this function requires an email cell
         message = ''
         for member in members:
-            sub_string = f'<@!{member.id}>\t{member.name}\t{member.email}\n'
+            name = ('\t' + member.name) if getattr(member, 'name') else ''
+            email = ('\t' + member.email) if getattr(member, 'email') else ''
+            nickname = ('\t' + member.nickname) if getattr(member, 'nickname') else ''
+            sub_string = f'<@!{member.id}>{name}{nickname}{email}\n'
             message += sub_string
 
         await respond_paginated(ctx, message)

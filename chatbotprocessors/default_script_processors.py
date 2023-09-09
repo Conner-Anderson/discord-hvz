@@ -27,7 +27,6 @@ if TYPE_CHECKING:
 REQUIRED_COLUMNS = {
     'members': {
         'id': 'Integer',
-        'name': 'String',
         'discord_name': 'String',
         'nickname': 'String',
         'registration_time': 'DateTime',
