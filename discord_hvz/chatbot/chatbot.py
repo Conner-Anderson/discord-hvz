@@ -204,16 +204,17 @@ class ChatBot:
         for i, response in self.responses.items():
             column = self.script.questions[i].column
             response_map[column] = response.processed_response
-        try:
-            response_map_processed = await self.script.ending_processor(
-                responses=response_map,
-                bot=self.bot,
-                target_member=self.target_member
-            )
-        except ValueError as e:
-            raise ResponseError(e)
+        if self.script.ending_processor:
+            try:
+                response_map = await self.script.ending_processor(
+                    responses=response_map,
+                    bot=self.bot,
+                    target_member=self.target_member
+                )
+            except ValueError as e:
+                raise ResponseError(e)
 
-        self.bot.db.add_row(self.script.table, response_map_processed)
+        self.bot.db.add_row(self.script.table, response_map)
 
     @classmethod
     def create_review_string(cls, responses: dict[int, Response], script: ScriptDatas) -> str:
