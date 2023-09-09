@@ -6,6 +6,7 @@ All noteable changes to this project will be documented in this file.
 
 #### Bug Fixes
 
+- Fixed chatbots besides the default two failing with an error
 - Un-commented the "silent_oz" option in the default config.yml
 - Slightly improved startup times
 
