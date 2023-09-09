@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Dict, Any, Union,  TYPE_CHECKING
+from typing import Dict, Any, Union, List,TYPE_CHECKING
 
 import pydantic
 from ruamel.yaml import YAML
@@ -126,6 +126,7 @@ class HVZConfig(BaseModel):
     role_names: RoleNames
     # Normally required, but check_config allows the old hvzdb.db default location for backwards-compatibility pre-0.3.0
     database_path: DatabasePath = Field(default=None)
+    sheet_columns: Dict[str, List[str]] = None
 
     # The root path of the bot
     _path_root: Path = PrivateAttr(default=PATH_ROOT)

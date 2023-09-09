@@ -59,3 +59,34 @@ role_names:
 # To start your path at the root of the drive, start with a '/'. Example: "/Users/JohnDoe/Documents/discord-hvz/cool_database.db"
 database_path: "game_database.db"
 
+# A way to specify what order the columns from the database are shown on the Google Sheet.
+# The lists of columns are categorized by the database table they appear in.
+# All columns will always show on the Google Sheet, but any not listed here will be added to the right.
+#
+
+sheet_columns:
+  members:
+    - id
+    - name
+    - nickname
+    - discord_name
+    - cpo
+    - faction
+    - tag_code
+    - oz_desire
+    - email
+    - want_bandana
+    - registration_time
+    - oz
+  tags:
+    - tag_id
+    - tagger_id
+    - tagger_name
+    - tagger_nickname
+    - tagger_discord_name
+    - tagged_id
+    - tagged_name
+    - tagged_nickname
+    - tag_time
+    - report_time
+    - revoked_tag

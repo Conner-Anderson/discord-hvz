@@ -25,6 +25,7 @@ All noteable changes to this project will be documented in this file.
 - The default scripts no longer come with starting_process and ending_processor fields. 
   The correct processors are added to registration and tag_logging chatbots automatically if none are specified.
 - Useless processor removed from the default script
+- Under-the-hood changes for developer sanity. He needs it.
 
 #### Breaking Changes
 
@@ -34,13 +35,15 @@ All noteable changes to this project will be documented in this file.
 
 - Changed all id columns in the 'members' and 'tags' database tables to integers, 
 and the 'revoked_tag' column of the 'tags' table to a boolean.
-This change is reflected by a changed type in the 'database_tables' field of config.yml.
 Old databases *will* cause various errors.  
 **Solutions:**
   - Delete your database and launch the bot. A fresh one will be re-created.
   - Use a database editor such as [DB Browser for SQLite](https://sqlitebrowser.org/) to change the
   type of the affected columns.
-  - Contact the developer to migrate your database for you.
+  - Contact the developer to migrate your database for you. He's happy to!
+- The 'database_tables' field of config.yml now does nothing and can be safely removed.
+- There is a new field of config.yml called 'sheet_columns'. See the [documentation](https://conner-anderson.github.io/discord-hvz-docs/0.4.0/config_options/#sheet_columns) for details.
+If you don't add it to your file, columns in your Google Sheet will have an arbitrary order, which is fine.
 
 ### 0.3.0 Minor Version Release
 

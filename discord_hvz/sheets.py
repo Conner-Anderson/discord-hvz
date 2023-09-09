@@ -101,9 +101,10 @@ class SheetsInterface:
         table: List[sqlalchemy.engine.Row] = self.db.get_table(table_name)
         database_columns = self.db.get_column_names(table_name)
 
-        column_order: List[str] = []
-        for key in config.database_tables[table_name]:
-            column_order.append(key.casefold())
+        if config.sheet_columns:
+            column_order = [c.strip().casefold() for c in config.sheet_columns[table_name] if c.strip().casefold() in database_columns]
+        else:
+            column_order = database_columns
 
         # Add columns that are in the database, but don't have their order declared in the config to the end.
         for column in database_columns:
