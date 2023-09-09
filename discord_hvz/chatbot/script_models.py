@@ -9,16 +9,18 @@ from pydantic import BaseModel, BeforeValidator, PlainValidator, ValidationError
 from pydantic_core import PydanticCustomError
 from pydantic_yaml import parse_yaml_raw_as
 from ruamel.yaml import YAML
+from sqlalchemy.sql.sqltypes import TypeEngine, String
 
 from loguru import logger
 
-from discord_hvz.config import config, ConfigError, DatabaseType
+from discord_hvz.config import config, ConfigError
 from discord_hvz.buttons import ButtonColor, HVZButton
 from discord_hvz.utilities import format_pydantic_errors
 import chatbotprocessors
+from discord_hvz.database import HvzDb
 
 if TYPE_CHECKING:
-    from discord_hvz.database import HvzDb
+    pass
 
 yaml = YAML()
 yaml.preserve_quotes = True
@@ -60,6 +62,16 @@ def validate_script_processor(x: Any) -> callable:
         raise ValueError("Processor does not match the name of any script processor function.")
     return processor
 
+def validate_database_type(x: str) -> TypeEngine:
+    '''Validates the strings acceptable to define types for database columns.'''
+    this = HvzDb.valid_column_types
+    db_type = this.get(x.strip().casefold())
+    if db_type:
+        return db_type
+    else:
+        raise ValueError(
+            f"'{x}' is not a valid database type. Must be one of: string, boolean, integer, datetime, incrementing_integer, or equivalent python types.")
+
 
 def validate_button_color(x: Any) -> str:
     try:
@@ -71,11 +83,12 @@ def validate_button_color(x: Any) -> str:
 QuestionProcessor = Annotated[callable, PlainValidator(validate_question_processor)]
 ScriptProcessor = Annotated[callable, PlainValidator(validate_script_processor)]
 ButtonColor = Annotated[ButtonColor, BeforeValidator(validate_button_color)]
+DatabaseType = Annotated[TypeEngine, PlainValidator(validate_database_type)]
 
 
 class QuestionDatas(BaseModel):
     column: str
-    column_type: DatabaseType = 'string'
+    column_type: DatabaseType = None # None values replaced with validator a level up
     display_name: str = Field(default=None)  # Required for non-modal chatbots
     query: str = Field(max_length=2000)
     valid_regex: str = Field(default=None)
@@ -88,6 +101,7 @@ class QuestionDatas(BaseModel):
     class Config:
         frozen = False
         str_strip_whitespace = True
+        arbitrary_types_allowed = True
 
 
     @field_validator("column", mode="after")
@@ -211,6 +225,22 @@ class ScriptDatas(BaseModel):
                     f"This script is not modal, and so requires a 'display_name' in each question."
                 )
 
+        # Checks each column type to make sure required columns get the right types
+        # Also, unset column types are strings
+        required_columns = HvzDb.required_columns.get(self.table)
+        for question in self.questions:
+            if required_columns and question.column in required_columns:
+                if question.column_type and question.column_type != required_columns[question.column]:
+                    logger.warning(
+                        f"The '{question.column}' column is critical for bot function and is set to '{question.column_type}' "
+                        f"when it should be '{required_columns[question.column]}'. Forcing the correct type. "
+                        f"To prevent confusion, please correct this value or remove it entirely."
+                    )
+                question.column_type = required_columns[question.column]
+            elif not question.column_type:
+                question.column_type = String
+
+
         return self
 
     def get_selection_buttons(self, callback: callable) -> List[HVZButton]:
@@ -250,7 +280,7 @@ class ScriptFile(RootModel):
         """A shortcut for fetching list of scripts"""
         return [value for value in self.root.values()]
 
-    def get_database_schema(self) -> Dict[str, Dict[str, str]]:
+    def get_database_schema(self) -> Dict[str, Dict[str, TypeEngine]]:
         '''
         Returns a representation of the tables and columns this ScriptFile will require.
         '''

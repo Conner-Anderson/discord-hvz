@@ -9,6 +9,7 @@ import discord
 import sqlalchemy
 from loguru import logger
 from sqlalchemy import Table, Column, Integer, String, DateTime, Boolean
+from sqlalchemy.sql.sqltypes import TypeEngine
 from sqlalchemy import create_engine, MetaData
 from sqlalchemy import select, delete, update
 from sqlalchemy.engine import Row
@@ -30,7 +31,7 @@ def dump(obj):
 
 @dataclass
 class HvzDb:
-    database_config: Dict[str, Dict[str, str]]
+    database_config: Dict[str, Dict[str, TypeEngine]]
     engine: sqlalchemy.engine.Engine = field(init=False)
     metadata_obj: MetaData = field(init=False, default_factory=MetaData)
     tables: Dict[str, Table] = field(init=False, default_factory=dict)
@@ -42,38 +43,42 @@ class HvzDb:
     reserved_table_names: ClassVar[List[str]] = ['persistent_panels']
 
     #TODO: Devise a better system for required columns. Also, test how users remove questions and add them
-    required_columns: ClassVar[Dict[str, Dict[str, str]]] = {
+    required_columns: ClassVar[Dict[str, Dict[str, TypeEngine]]] = {
         'members': {
-            'id': 'Integer', # TODO: Check bot for places that "name" is required, and "email"
-            'discord_name': 'String',
-            'nickname': 'String',
-            'registration_time': 'DateTime',
-            'faction': 'String',
-            'tag_code': 'String',
-            'oz': 'Boolean'
+            'id': Integer, # TODO: Check bot for places that "name" is required, and "email"
+            'discord_name': String,
+            'nickname': String,
+            'registration_time': DateTime,
+            'faction': String,
+            'tag_code': String,
+            'oz': Boolean
         },
         'tags': {
-            'tag_id': 'Integer',
-            'tagger_id': 'Integer',
-            'tagger_name': 'String',
-            'tagger_nickname': 'String',
-            'tagger_discord_name': 'String',
-            'tagged_id': 'Integer',
-            'tagged_name': 'String',
-            'tagged_nickname': 'String',
-            'tagged_discord_name': 'String',
-            'tag_time': 'DateTime',
-            'report_time': 'DateTime',
-            'revoked_tag': 'Boolean'
+            'tag_id': Integer,
+            'tagger_id': Integer,
+            'tagger_name': String,
+            'tagger_nickname': String,
+            'tagger_discord_name': String,
+            'tagged_id': Integer,
+            'tagged_name': String,
+            'tagged_nickname': String,
+            'tagged_discord_name': String,
+            'tag_time': DateTime,
+            'report_time': DateTime,
+            'revoked_tag': Boolean
         }
     }
 
-    valid_column_types: ClassVar[Dict[str, type]] = {
+    valid_column_types: ClassVar[Dict[str, TypeEngine]] = {
         'string': String,
+        'str': String,
         'integer': Integer,
+        'int': Integer,
         'incrementing_integer': Integer,
         'boolean': Boolean,
-        'datetime': DateTime
+        'bool': Boolean,
+        'datetime': DateTime,
+        'date': DateTime
     }
 
     
@@ -93,7 +98,7 @@ class HvzDb:
             except NoSuchTableError:
                 logger.warning(
                     f'A table called "{table_name}" was required, but it is not in the database. Creating the table now.')
-                self.add_configured_table(table_name, configured_columns)
+                self._add_configured_table(table_name, configured_columns)
             else:
                 table = self.tables[table_name]
                 for column_name, column_type in configured_columns.items():
@@ -135,29 +140,21 @@ class HvzDb:
         self.metadata_obj.create_all(self.engine)
         self.tables[table_name].column_names = columns.keys()
 
-    def add_configured_table(self, table_name: str, configured_columns: Dict[str, str]) -> None:
+    def _add_configured_table(self, table_name: str, configured_columns: Dict[str, TypeEngine]) -> None:
 
         column_args = []
         # Add any required columns that are missing
 
         # Create a column object for each configured column
-        for column_name, type_string in configured_columns.items():
-            # Ensure required columns are of the right type
-            if table_name in self.required_columns and column_name in self.required_columns[table_name]:
-                if type_string.casefold() != self.required_columns[table_name][column_name].casefold():
-                    logger.warning(
-                        f"In {config.script_path.name}, the incorrect column_type '{type_string}' is specified for the '{column_name}' column for the "
-                        f"'{table_name}' table. This table and column are required by the bot for core functionality, "
-                        f"so this choice is being overridden. You should remove this choice, as it will only cause confusion."
-                    )
-                type_string = self.required_columns[table_name][column_name]
-            column_args.append(self._create_column_object(column_name, type_string))
+        for column_name, column_type in configured_columns.items():
+            column_args.append(self._create_column_object(column_name, column_type))
 
+        # Add required columns that aren't present
         if table_name in self.required_columns:
             required_columns = self.required_columns[table_name]
-            for column_name, type_string in required_columns.items():
+            for column_name, column_type in required_columns.items():
                 if not column_name in configured_columns:
-                    column_args.append(self._create_column_object(column_name, type_string))
+                    column_args.append(self._create_column_object(column_name, column_type))
 
         self.tables[table_name] = Table(table_name.casefold(), self.metadata_obj, *column_args)
     def delete_table(self, table_name: str):
@@ -206,7 +203,7 @@ class HvzDb:
             logger.exception(f'The database failed to update to the Google Sheet with this error: {e}')
 
 
-    def _create_column_object(self, column_name: str, column_type: Union[str, type]) -> Column:
+    def _create_column_object(self, column_name: str, column_type: Union[str, TypeEngine]) -> Column:
         """
         Returns a Column object after forcing the name to lowercase and validating the type
         :param column_name:
@@ -214,8 +211,10 @@ class HvzDb:
         :return: Column object
         """
         if not isinstance(column_type, str):
-            if column_type in self.valid_column_types.items():
-                column_type_object = column_type
+            for type_name, valid_type in self.valid_column_types.items():
+                if isinstance(column_type, valid_type):
+                    column_type_object = column_type
+                    break
             else:
                 raise TypeError(f'column_type is an invalid type: {type(column_type)}')
         else:

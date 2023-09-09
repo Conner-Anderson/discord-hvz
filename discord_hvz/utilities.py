@@ -277,7 +277,6 @@ def format_pydantic_errors(e: ValidationError, custom_messages: Dict[str, str]) 
     msg = ""
 
     for error in e.errors():
-        logger.info("loc: {}".format(error["loc"]))
         if len(error["loc"]) > 0:
             formatted_loc = error["loc"][0]
             for loc in error["loc"][1:]:
@@ -292,7 +291,6 @@ def format_pydantic_errors(e: ValidationError, custom_messages: Dict[str, str]) 
 
         ctx = error.get('ctx')
         if ctx:
-            logger.debug(f"There was a ctx: {ctx}")
             error = ctx | error
         # logger.info(f"custom_message: {custom_message}")
         custom_message = custom_message.format(formatted_loc=formatted_loc, **error)
