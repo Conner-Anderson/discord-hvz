@@ -15,7 +15,7 @@ from sqlalchemy.engine import Row
 from sqlalchemy.exc import NoSuchTableError
 
 from discord_hvz.sheets import SheetsInterface
-from discord_hvz.config import config
+from discord_hvz.config import config, ConfigError
 
 if TYPE_CHECKING:
     pass
@@ -100,10 +100,10 @@ class HvzDb:
                     try:
                         self._validate_column_selection(table, column_name)
                     except ValueError:
-                        logger.warning(
-                            f"The column '{column_name}' is needed for the '{table_name}' table "
+                        raise ConfigError(
+                            f"'{config.database_path.name}' says that '{column_name}' is needed for the '{table_name}' table "
                             f"but that table already exists in the database, and so the column cannot be added. "
-                            f"Delete your database file ({config.database_path.name}) and restart the bot to fix this."
+                            f"Delete your database file ({config.database_path.name}) and restart the bot to fix this. "
                             f"If left alone, this will cause problems."
                         )
 
