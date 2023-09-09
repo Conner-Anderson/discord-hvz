@@ -2,7 +2,7 @@
 
 All noteable changes to this project will be documented in this file.
 
-### 0.3.1 Patch Release
+### 0.4.0 Minor Release
 
 #### Bug Fixes
 
@@ -11,7 +11,15 @@ All noteable changes to this project will be documented in this file.
 - Un-commented the "silent_oz" option in the default config.yml
 - Slightly improved startup times
 
+#### Features
+
+- Adding new questions to chatbot scripts now requires less manual work.
+  - The "database_tables" field of config.yml is no longer used and will be ignored. Any columns specified in the "column"
+  field of questions will be added to the database on creation. By default, the database will store answers as strings,
+  but this can be changed with the new "column_type" field on each question. Valid types are listed in the documentation.
+
 #### Minor Changes
+
 
 - Reworked the configuration system behind the scenes to be more robust and make issues easier to diagnose.
 - The default scripts no longer come with starting_process and ending_processor fields. 
@@ -20,9 +28,12 @@ All noteable changes to this project will be documented in this file.
 
 #### Breaking Changes
 
-- Changed all id columns in the 'members' and 'tags' database tables to integers. 
-This change is reflected by changed types in the 'database_tables' field of config.yml
-- Changed the 'revoked_tag' column of the 'tags' database table to a boolean.
+<font color="red"> There are breaking changes. </font> 
+
+**It is recommended to not update to this version during an active game due to the annoying database changes below.**
+
+- Changed all id columns in the 'members' and 'tags' database tables to integers, 
+and the 'revoked_tag' column of the 'tags' table to a boolean.
 This change is reflected by a changed type in the 'database_tables' field of config.yml.
 Old databases *will* cause various errors.  
 **Solutions:**

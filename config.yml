@@ -49,41 +49,6 @@ role_names:
   human: human
   player: player
 
-# The below lists define database tables. When the bot boots up, it will create any tables that don't exist.
-# It WILL NOT edit existing tables to match this config. To add or subtract columns, the table or database must be deleted
-# This config also defines the order the columns appear on the Google Sheet. Any unlisted columns will appear last
-# Column order on the Sheet IS changeable without remaking the database or tables
-# The following columns and tables are required and will appear in the database whether or not they are defined here.
-# members: ID, Name, Faction, Tag_Code, OZ
-# tags: Tag_ID, Tagger_ID, Tagger_Name
-database_tables:
-  members:
-    id: Integer
-    name: String
-    nickname: String
-    discord_name: String
-    cpo: String
-    faction: String
-    tag_code: String
-    oz_desire: String
-    email: String
-    want_bandana: String
-    registration_time: DateTime
-    oz: Boolean
-  tags:
-    tag_id: incrementing_integer
-    tagger_id: Integer
-    tagger_name: String
-    tagger_nickname: String
-    tagger_discord_name: String
-    tagged_id: Integer
-    tagged_name: String
-    tagged_nickname: String
-    tagged_discord_name: String
-    tag_time: DateTime
-    report_time: DateTime
-    revoked_tag: Boolean
-
 # The path to the game database file. If it does not exist, the bot will create it.
 # Regardless of which system you are on, use '/' forward slashes in the path.
 # The bot will search for the file in the top directory: the one that contains config.yml, .env, etc.

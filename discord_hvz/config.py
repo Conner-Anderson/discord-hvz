@@ -65,18 +65,6 @@ def to_tzinfo(x: Any) -> ZoneInfo:
                              f'https://en.wikipedia.org/wiki/List_of_tz_database_time_zones')
 
 
-def validate_database_type(x: str) -> TypeEngine:
-    '''Validates the strings acceptable to define types for database columns.'''
-    this = HvzDb.valid_column_types
-    db_type = this.get(x.strip().casefold())
-    if db_type:
-        logger.info(f"db_type is {type(db_type)}, {db_type}")
-        return db_type
-    else:
-        raise ValueError(
-            f"'{x}' is not a valid database type. Must be one of: string, boolean, integer, datetime, incrementing_integer, or equivalent python types.")
-
-
 def validate_database_path(path_str: str) -> Path:
     '''Validates the given path to the database file, giving helpful errors.'''
     db_path = PATH_ROOT / path_str
@@ -104,7 +92,6 @@ def validate_database_path(path_str: str) -> Path:
 
 # Custom annotated types to tell Pydantic how to handle particular sorts of data
 RealTimezone = Annotated[ZoneInfo, PlainValidator(to_tzinfo)]
-DatabaseType = Annotated[TypeEngine, AfterValidator(validate_database_type)]
 DatabasePath = Annotated[Path, PlainValidator(validate_database_path)]
 
 
@@ -137,7 +124,6 @@ class HVZConfig(BaseModel):
     sheet_names: Dict[str, str] = Field(default=None)
     channel_names: ChannelNames
     role_names: RoleNames
-    #database_tables: Dict[str, Dict[str, DatabaseType]]
     # Normally required, but check_config allows the old hvzdb.db default location for backwards-compatibility pre-0.3.0
     database_path: DatabasePath = Field(default=None)
 

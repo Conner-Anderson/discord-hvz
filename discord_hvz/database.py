@@ -4,7 +4,7 @@ import copy
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import List, Union, Dict, TYPE_CHECKING, ClassVar
-from enum import Enum
+from enum import Enum, auto
 
 import discord
 import sqlalchemy
@@ -23,11 +23,26 @@ if TYPE_CHECKING:
     pass
 
 class ValidColumnType(Enum):
-    INTEGER = Integer
-    INCR_INTEGER = Integer # Must be dealt with externally to have any difference
-    BOOLEAN = Boolean
-    STRING = String
-    DATETIME = DateTime
+    INTEGER = auto()
+    INCR_INTEGER = auto()
+    BOOLEAN = auto()
+    STRING = auto()
+    DATETIME = auto()
+
+    def to_db_type(self) -> type:
+        result = ENUM_TO_TYPE.get(self)
+        if not result:
+            raise KeyError("Could not convert enum to database type")
+        return result
+
+
+ENUM_TO_TYPE = {
+    ValidColumnType.INTEGER: Integer,
+    ValidColumnType.INCR_INTEGER: Integer,
+    ValidColumnType.BOOLEAN: Boolean,
+    ValidColumnType.STRING: String,
+    ValidColumnType.DATETIME: DateTime
+}
 
 STR_TO_COLUMN = {
         'string': ValidColumnType.STRING,
@@ -75,46 +90,6 @@ class HvzDb:
 
     # Table names that cannot be created in the config. Reserved for cogs / modules
     reserved_table_names: ClassVar[List[str]] = ['persistent_panels']
-
-    #TODO: Devise a better system for required columns. Also, test how users remove questions and add them
-    required_columns: ClassVar[Dict[str, Dict[str, TypeEngine]]] = {
-        'members': {
-            'id': Integer, # TODO: Check bot for places that "name" is required, and "email"
-            'discord_name': String,
-            'nickname': String,
-            'registration_time': DateTime,
-            'faction': String,
-            'tag_code': String,
-            'oz': Boolean
-        },
-        'tags': {
-            'tag_id': Integer,
-            'tagger_id': Integer,
-            'tagger_name': String,
-            'tagger_nickname': String,
-            'tagger_discord_name': String,
-            'tagged_id': Integer,
-            'tagged_name': String,
-            'tagged_nickname': String,
-            'tagged_discord_name': String,
-            'tag_time': DateTime,
-            'report_time': DateTime,
-            'revoked_tag': Boolean
-        }
-    }
-
-    valid_column_types: ClassVar[Dict[str, TypeEngine]] = {
-        'string': String,
-        'str': String,
-        'integer': Integer,
-        'int': Integer,
-        'incrementing_integer': Integer,
-        'boolean': Boolean,
-        'bool': Boolean,
-        'datetime': DateTime,
-        'date': DateTime
-    }
-
     
     def __post_init__(self):
         # TODO: Need to make sure the required tables are always created. Might be config-depended now...
@@ -142,8 +117,8 @@ class HvzDb:
                         raise ConfigError(
                             f"'{config.script_path.name}' says that '{column_name}' is needed for the '{table_name}' table "
                             f"but that table already exists in the database, and so the column cannot be added. "
-                            f"Delete your database file ({config.database_path.name}) and restart the bot to fix this. "
-                            f"If left alone, this will cause problems."
+                            f"Delete your database file ({config.database_path.name}) and restart the bot to fix this, "
+                            f"Or remove the question that requires this column from the script."
                         )
 
 
@@ -237,10 +212,10 @@ class HvzDb:
         """
         # Will raise KeyError on failure
 
-        column_type_object = to_column_type(column_type).value
+        column_type_object = to_column_type(column_type).to_db_type()
 
         kwargs = {}
-        if column_type == ValidColumnType.INCR_INTEGER:
+        if column_type is ValidColumnType.INCR_INTEGER:
             kwargs = {'primary_key': True, 'nullable': False, 'autoincrement': True}
 
         return Column(column_name.casefold(), column_type_object, **kwargs)

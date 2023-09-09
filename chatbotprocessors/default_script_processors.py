@@ -36,7 +36,7 @@ REQUIRED_COLUMNS = {
         'oz': 'Boolean'
     },
     'tags': {
-        'tag_id': 'Integer',
+        'tag_id': 'incrementing_integer',
         'tagger_id': 'Integer',
         'tagger_name': 'String',
         'tagger_nickname': 'String',

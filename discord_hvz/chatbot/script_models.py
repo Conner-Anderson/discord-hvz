@@ -224,7 +224,6 @@ class ScriptDatas(BaseModel):
         # Checks each column type to make sure required columns get the right types
         # Also, unset column types are strings
         required_columns = chatbotprocessors.REQUIRED_COLUMNS.get(self.table)
-        logger.info(f"Required columns: {required_columns}")
         for question in self.questions:
             if required_columns and question.column in required_columns:
                 if question.column_type and question.column_type != required_columns[question.column]:

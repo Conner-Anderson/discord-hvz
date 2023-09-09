@@ -35,7 +35,7 @@ from discord_hvz.chatbot import script_models
 from discord_hvz.database import HvzDb
 
 # The latest Discord HvZ release this code is, or is based on.
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 
 def dump(obj):
@@ -343,6 +343,9 @@ def main():
         bot.load_extension('.commands', package = 'discord_hvz')
         bot.load_extension('.display', package = 'discord_hvz')
         bot.load_extension('.item_tracker', package = 'discord_hvz')
+
+        tag = bot.db.get_tag(1)
+        logger.info(f"revoked type: {type(tag.revoked_tag)}")
 
         #bot.run(TOKEN)
 
