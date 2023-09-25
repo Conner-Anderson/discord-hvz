@@ -308,7 +308,7 @@ class HVZBot(discord.ext.commands.Bot):
             msg += tag_time.strftime(' at about %I:%M %p')
             msg += f"\nThere are now {new_h} humans and {new_z} zombie{'s' if new_z > 1 else ''}."
         else:
-            msg += f"\nThere {'are' if new_z > 1 else 'is'} now {new_z} zombie{'s' if new_z > 1 else ''}."
+            msg += f"\nThere {'are' if new_z > 1 else 'is'} now {new_z} zombie{'s' if new_z > 1 else ''}, apart from any OZs."
 
         await self.channels.tag_announcements.send(msg)
 

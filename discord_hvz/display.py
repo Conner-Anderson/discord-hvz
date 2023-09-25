@@ -68,7 +68,8 @@ def create_game_plot(db: 'HvzDb', filepath=None) -> discord.File:
         tags_df['Human_Count'] = tags_df['Player_Count'] - tags_df['Zombie_Count']
         tags_df.sort_values(by='tag_time', inplace=True)
 
-        fig = px.line(tags_df, x="tag_time", y=["Zombie_Count", "Human_Count"], title='Players over Time', markers=True)
+        title = "Players over Time" + (" (OZs counted as humans)" if config.silent_oz else "")
+        fig = px.line(tags_df, x="tag_time", y=["Zombie_Count", "Human_Count"], title=title, markers=True)
         fig.update_layout(
             xaxis_title = 'Tag Time',
             yaxis_title = 'Player Count',
@@ -126,7 +127,8 @@ class ZombieElement(PanelElement):
 
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
         count = len(panel.bot.roles.zombie.members)
-        embed.add_field(name='Zombies', value=str(count))
+        value = str(count) + (" (no OZ)" if config.silent_oz else "")
+        embed.add_field(name='Zombies', value=value)
 
 
 class PlayerElement(PanelElement):

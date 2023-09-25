@@ -17,6 +17,8 @@ All noteable changes to this project will be documented in this file.
   - The "database_tables" field of config.yml is no longer used and will be ignored. Any columns specified in the "column"
   field of questions will be added to the database on creation. By default, the database will store answers as strings,
   but this can be changed with the new "column_type" field on each question. Valid types are listed in the documentation.
+- When the `silent_oz` config option is `True`, the Zombies element of panels (from `/post_panel`) and all game plots note that
+  OZs are not included in  zombie counts. Tag announcements also note "There are now x zombies, apart from any OZs."
 
 #### Minor Changes
 
