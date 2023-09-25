@@ -300,7 +300,7 @@ class HVZBot(discord.ext.commands.Bot):
     async def announce_tag(self, tagged_member: discord.Member, tagger_member: discord.Member, tag_time: datetime):
 
         new_h = len(self.roles.human.members)
-        new_z = len(self.roles.human.members)
+        new_z = len(self.roles.zombie.members)
 
         msg = f'<@{tagged_member.id}> has turned zombie!'
         if not config.silent_oz:
