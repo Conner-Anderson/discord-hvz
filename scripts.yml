@@ -48,16 +48,6 @@ registration:
     button_options:
       'Yes': Green
       'No': Red
-  - column: want_blaster
-    column_type: boolean
-    display_name: Want Blaster
-    query: |-
-      Want to borrow a blaster?
-    valid_regex: '(?i)\s*(yes|no)\s*'
-    rejection_response: Just need a yes or no here.
-    button_options:
-      'yes': Green
-      'no': Red
 
 tag_logging:
   table: tags

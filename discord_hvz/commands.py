@@ -219,7 +219,6 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             raise ValueError(f"There is no tag with an id of {tag_id}") from e
 
         msg = ''
-        # TODO: This might use optional column values. At least need to think about it.
         tagged_member = bot.guild.get_member(int(tag_row.tagged_id))
         if tagged_member is None:
             msg += f'Roles not changed since <@{tag_row.tagged_id}> ({tag_row.tagged_name}) is no longer on the server.'

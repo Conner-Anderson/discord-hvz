@@ -92,7 +92,6 @@ class HvzDb:
     reserved_table_names: ClassVar[List[str]] = ['persistent_panels']
     
     def __post_init__(self):
-        # TODO: Need to make sure the required tables are always created. Might be config-depended now...
         self.engine = create_engine(f"sqlite+pysqlite:///{str(self.filepath)}", future=True)
 
         if not self.filepath.exists():
