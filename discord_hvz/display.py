@@ -14,7 +14,7 @@ import sqlalchemy
 from discord.commands import slash_command, Option
 from loguru import logger
 
-from .utilities import pool_function, have_lists_changed
+from .utilities import pool_function, have_lists_changed, generate_tag_tree
 from .config import config
 
 if TYPE_CHECKING:
@@ -195,6 +195,16 @@ class GamePlotElement(PanelElement):
         file = create_game_plot(panel.bot.db)
         embed.set_image(url=f'attachment://{file.filename}')
         return file
+
+
+class TagTreeElement(PanelElement):
+    @property
+    def refresh_event(self) -> str:
+        return 'on_role_change'
+
+    def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
+        tree = generate_tag_tree(panel.bot.db, panel.bot)
+        embed.add_field(name='Tag Tree', inline=False, value=tree[:4096])
 
 
 # Create a list of PanelElement classes available in the module
