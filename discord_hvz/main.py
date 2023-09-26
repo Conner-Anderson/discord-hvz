@@ -347,7 +347,7 @@ def main():
         tag = bot.db.get_tag(1)
         logger.info(f"revoked type: {type(tag.revoked_tag)}")
 
-        #bot.run(TOKEN)
+        bot.run(TOKEN)
 
     except discord.errors.LoginFailure as e:
         logger.error(f'Discord failed to log in: {e}')
