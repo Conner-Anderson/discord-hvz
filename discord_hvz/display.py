@@ -204,7 +204,7 @@ class TagTreeElement(PanelElement):
 
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
         tree = generate_tag_tree(panel.bot.db, panel.bot)
-        embed.add_field(name='Tag Tree', inline=False, value=tree[:4096])
+        embed.description = tree[:4096]
 
 
 # Create a list of PanelElement classes available in the module
