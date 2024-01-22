@@ -12,7 +12,7 @@ main = "discord_hvz:main"
 
 [tool.poetry.dependencies]
 python = ">=3.9.7,<3.11"
-py-cord = "^2.2.0"
+py-cord = "^2.4.0"
 SQLAlchemy = "^1.4.32"
 loguru = "^0.7.0"
 google-api-python-client = "^2.42.0"
