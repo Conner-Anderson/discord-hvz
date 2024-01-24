@@ -569,6 +569,17 @@ optional = false
 python-versions = ">=3.6"
 
 [[package]]
+name = "quickchart-io"
+version = "2.0.0"
+description = "A client for quickchart.io, a service that generates static chart images"
+category = "main"
+optional = false
+python-versions = ">=3.7,<4"
+
+[package.dependencies]
+requests = ">=2.28.1,<3.0.0"
+
+[[package]]
 name = "radon"
 version = "5.1.0"
 description = "Code Metrics in Python"
@@ -795,7 +806,7 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.9.7,<3.11"
-content-hash = "f7395618ac91a06e5dad00199296b3328b3222ea687ade0660ff20791b49049c"
+content-hash = "66fc6b94971e722d61792bd3392c5d11e2345e2011dddfc254b766501d32a124"
 
 [metadata.files]
 aiohttp = [
@@ -1593,6 +1604,9 @@ pytz = [
 pywin32-ctypes = [
     {file = "pywin32-ctypes-0.2.2.tar.gz", hash = "sha256:3426e063bdd5fd4df74a14fa3cf80a0b42845a87e1d1e81f6549f9daec593a60"},
     {file = "pywin32_ctypes-0.2.2-py3-none-any.whl", hash = "sha256:bf490a1a709baf35d688fe0ecf980ed4de11d2b3e37b51e5442587a75d9957e7"},
+]
+quickchart-io = [
+    {file = "quickchart_io-2.0.0-py3-none-any.whl", hash = "sha256:c44b5fb4d6e957fb85db0926e691684795e9fe5d6819d33f2daea795a0f6a36b"},
 ]
 radon = [
     {file = "radon-5.1.0-py2.py3-none-any.whl", hash = "sha256:fa74e018197f1fcb54578af0f675d8b8e2342bd8e0b72bef8197bc4c9e645f36"},

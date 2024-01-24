@@ -8,6 +8,7 @@ license = "MIT"
 [tool.poetry.scripts]
 discord_hvz = "discord_hvz:main"
 main = "discord_hvz:main"
+display = "discord_hvz:display"
 
 
 [tool.poetry.dependencies]
@@ -25,6 +26,7 @@ pandas = "^1.5"
 kaleido = "0.2.1"
 pydantic-yaml = "^1.1"
 tzdata = "*"
+quickchart-io = "^2.0.0"
 
 [tool.poetry.group.dev]
 optional = true

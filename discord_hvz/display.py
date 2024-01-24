@@ -99,6 +99,7 @@ def create_game_plot(db: 'HvzDb', filepath=None) -> discord.File:
     return file
 
 
+
 class PanelElement(ABC):
     @property
     @abstractmethod
@@ -424,4 +425,8 @@ Tags today: On tag or role change
 New players today: On registration
 
 """
+
+if __name__ == '__main__':
+    print("Trying")
+    create_game_plot('thing', 'this')
 
