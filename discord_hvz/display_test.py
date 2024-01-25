@@ -1,5 +1,6 @@
 
 from typing import TYPE_CHECKING, Dict, List, Union, Set
+import sys
 
 from quickchart import QuickChart
 
@@ -12,6 +13,9 @@ from loguru import logger
 
 #from .utilities import pool_function, have_lists_changed, generate_tag_tree
 #from .config import config
+
+logger.remove()
+logger.add(sys.stderr, level="INFO")
 
 
 LAST_GAME_PLOT_HASH = None
@@ -102,113 +106,130 @@ def create_quickchart(filepath) -> discord.File:
         LAST_GAME_PLOT_HASH = new_hash
 
 
-    elif LAST_GAME_PLOT_HASH != new_hash or not image_path.exists():
-        members_df = pd.read_sql_table('members', con=engine, columns=['registration_time', 'oz'])
 
-        def total_players(x):
-            total = (members_df.registration_time <= x.tag_time)
-            return total.sum()
+    members_df = pd.read_sql_table('members', con=engine, columns=['registration_time', 'oz'])
 
-        def total_zombies(x):
-            '''
-            To be given a pandas series which is a single tag. Compares the tag to the dataframe of all tags,
-            counting how many precede it (including it). Excludes revoked tags
-            '''
-            total = (tags_df.tag_time <= x.tag_time) & (tags_df.revoked_tag == False)
-            return total.sum()
+    def total_players(x):
+        total = (members_df.registration_time <= x.tag_time)
+        return total.sum()
 
-        oz_count = members_df['oz'].sum()
+    def total_zombies(x):
+        '''
+        To be given a pandas series which is a single tag. Compares the tag to the dataframe of all tags,
+        counting how many precede it (including it). Excludes revoked tags
+        '''
+        total = (tags_df.tag_time <= x.tag_time) & (tags_df.revoked_tag == False)
+        return total.sum()
 
-        player_count_sr = tags_df.apply(total_players, axis=1)
-        tags_df = tags_df.assign(Player_Count=player_count_sr)
-        zombie_count_sr = tags_df.apply(total_zombies, axis=1) + oz_count
-        tags_df = tags_df.assign(Zombie_Count=zombie_count_sr)
-        tags_df['Human_Count'] = tags_df['Player_Count'] - tags_df['Zombie_Count']
-        tags_df.sort_values(by='tag_time', inplace=True)
+    def format_datapoint(timestamp, y):
+        return {
+            "x": timestamp.isoformat(),
+            "y": y
+        }
 
-        title = "Players over Time"
-        print(type(list(tags_df.tag_time)[0]))
-        x_axis_labels = [x.timestamp() for x in list(tags_df.tag_time)]
-        print(x_axis_labels)
-        qc = QuickChart()
-        qc.width = 500
-        qc.height = 300
-        data = {
-                "labels": x_axis_labels,
-                "datasets": [{
-                    "label": "Foo",
-                    "data": [1, 2, 8, 10, 12, 15, 17]
+    oz_count = members_df['oz'].sum()
+
+    player_count_sr = tags_df.apply(total_players, axis=1)
+    tags_df = tags_df.assign(Player_Count=player_count_sr)
+    zombie_count_sr = tags_df.apply(total_zombies, axis=1) + oz_count
+    tags_df = tags_df.assign(Zombie_Count=zombie_count_sr)
+    tags_df['Human_Count'] = tags_df['Player_Count'] - tags_df['Zombie_Count']
+    tags_df.sort_values(by='tag_time', inplace=True)
+
+    title = "Players over Time"
+    #print(tags_df)
+
+    zombie_series = [format_datapoint(x, y) for x, y in zip(tags_df['tag_time'], tags_df['Zombie_Count'])]
+    human_series = [format_datapoint(x, y) for x, y in zip(tags_df['tag_time'], tags_df['Human_Count'])]
+    player_series = [format_datapoint(x, y) for x, y in zip(tags_df['tag_time'], tags_df['Player_Count'])]
+    print(zombie_series)
+
+    qc = QuickChart()
+    qc.width = 1000
+    qc.height = 600
+    data = {
+            "datasets": [
+                {
+                    "label": "Number of Zombies",
+                    "fill": "false",
+                    "data": zombie_series
                 },
                 {
-                    "label": "Bar",
-                    "data": [3, 4, 7, 20, 24, 56, 58]
-                }
-                ]
-            }
-        qc.config = {
-            "type": "line",
-            "stacked": "false",
-            "data": data,
-            "options": {
-                "scales": {
-                    "x": {
-                        "type": "time",
-                        "time": {
-                            "parser": "X",
-                            "displayFormats": {
-                                "day": "MMM DD"
-                            }
+                    "label": "Number of Humans",
+                    "fill": "false",
+                    "data": human_series
+                },
+                {
+                    "label": "Number of Players",
+                    "fill": "false",
+                    "data": player_series
+                },
+            ]
+        }
+    qc.config = {
+        "type": "line",
+        "stacked": "false",
+        "data": data,
+        "options": {
+            "scales": {
+                "xAxes": [{
+                    "type": "time",
+                    "time": {
+                        "unit": "day",
+                        "displayFormats": {
+                            "day": "ddd, MMM DD"
                         }
                     }
-                }
+                }]
             }
         }
+    }
 
-        qc.config = {
-          "type": "line",
-          "data": {
-            "datasets": [
+    boo = {
+      "type": "line",
+      "data": {
+        "datasets": [
+          {
+            "label": "Time series example",
+            "fill": "false",
+            "data": [
               {
-                "label": "Time series example",
-                "fill": "false",
-                "data": [
-                  {
-                    "x": "1695647820.0",
-                    "y": -29
-                  },
-                  {
-                    "x": "1695652740.0",
-                    "y": -34
-                  },
-                  {
-                    "x": "1695658140.0",
-                    "y": -62
-                  },
-                  {
-                    "x": "1695676620.0",
-                    "y": 1
-                  }
-                ]
+                "x": "1695647820.0",
+                "y": -29
+              },
+              {
+                "x": "1695652740.0",
+                "y": -34
+              },
+              {
+                "x": "1695658140.0",
+                "y": -62
+              },
+              {
+                "x": "1695676620.0",
+                "y": 1
               }
             ]
-          },
-          "options": {
-            "scales": {
-              "xAxes": [{
-                "type": "time",
-                "time": {
-                  "parser": "x",
-                  "displayFormats": {
-                    "day": "MMM DD"
-                  }
-                }
-              }]
-            }
           }
+        ]
+      },
+      "options": {
+        "scales": {
+          "xAxes": [{
+            "type": "time",
+            "time": {
+              "parser": "x",
+              "displayFormats": {
+                "day": "MMM DD"
+              }
+            }
+          }]
         }
+      }
+    }
 
 
-        print(qc.get_url())
+    print(qc.get_url())
 
     file = discord.File(image_path)
 
@@ -236,6 +257,7 @@ New players today: On registration
 """
 
 if __name__ == '__main__':
+
     print("Trying")
     create_quickchart('game_database.db')
 
