@@ -397,7 +397,15 @@ class HVZPanel:
         self.bot.db.add_row('persistent_panels', row_data)
 
     async def load(self, row: sqlalchemy.engine.Row) -> Union["HVZPanel", None]:
-        self.channel = self.bot.guild.get_channel(row['channel_id']) #TODO: This can fail silently, causing subsequent lines to fail
+        """
+        Accepts a database row originally created by save() and creates populates the Panel's data so it can
+        continue to be updated. Almost exclusively used to keep panels active through reboots
+        """
+        self.channel = self.bot.guild.get_channel(row['channel_id'])
+        if not self.channel:
+            logger.warning('Tried to load a persistent panel, but could not find the channel it was in. Removing it from the database.')
+            self.bot.db.delete_row('persistent_panels', 'message_id', row['message_id'])
+            return None
         try:
             self.message = await self.channel.fetch_message(row['message_id'])
         except discord.NotFound:
