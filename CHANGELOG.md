@@ -19,6 +19,8 @@ All noteable changes to this project will be documented in this file.
   but this can be changed with the new "column_type" field on each question. Valid types are listed in the documentation.
 - When the `silent_oz` config option is `True`, the Zombies element of panels (from `/post_panel`) and all game plots note that
   OZs are not included in  zombie counts. Tag announcements also note "There are now x zombies, apart from any OZs."
+- The command `/member remove_roles` was added, which removes one of the three game roles from all members on the server.
+  This is useful for cleaning up after a completed game.
 
 #### Minor Changes
 

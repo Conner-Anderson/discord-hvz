@@ -101,6 +101,7 @@ def create_game_plot(db: 'HvzDb', filepath=None) -> discord.File:
     return file
 
 def create_quickchart(filepath: Path) -> str:
+    # TODO: Add "zero tags" and "silent_oz" handling
     global LAST_GAME_PLOT_HASH
 
     image_path = "images/latest_gameplot.jpeg"
@@ -396,7 +397,7 @@ class HVZPanel:
         self.bot.db.add_row('persistent_panels', row_data)
 
     async def load(self, row: sqlalchemy.engine.Row) -> Union["HVZPanel", None]:
-        self.channel = self.bot.guild.get_channel(row['channel_id'])
+        self.channel = self.bot.guild.get_channel(row['channel_id']) #TODO: This can fail silently, causing subsequent lines to fail
         try:
             self.message = await self.channel.fetch_message(row['message_id'])
         except discord.NotFound:

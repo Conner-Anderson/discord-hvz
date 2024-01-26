@@ -106,7 +106,7 @@ def _add_indention(level: int, last=False):
         return output
     return '`' + output + '`'
 
-def divide_string(input: str, max_char: int = 1995) -> List:
+def divide_string(input: str, max_char: int = 1995) -> List[str]:
 
     input_lines = input.splitlines(True)
     buffer = ''

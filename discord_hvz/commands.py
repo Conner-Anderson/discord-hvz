@@ -8,7 +8,7 @@ from discord.commands import context
 from discord.ext import commands
 from loguru import logger
 
-from .utilities import generate_tag_tree, respond_paginated
+from .utilities import generate_tag_tree, respond_paginated, abbreviate_message
 from discord_hvz.config import config
 
 if TYPE_CHECKING:
@@ -175,6 +175,70 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
 
         await chatbotmanager.start_chatbot(ctx.interaction, "registration", member, override_config=True)
         await ctx.respond('Registration chatbot started in a DM', ephemeral=True)
+
+    @member_group.command(name='remove_roles')
+    async def member_remove_roles (
+            self,
+            ctx: discord.ApplicationContext,
+            role: Option(
+                str,
+                'Role to remove from all users on the server.',
+                choices = ['zombie', 'human', 'player']),
+            are_you_sure: Option(bool, 'Do you really want to remove all game roles from players?')
+    ):
+        """
+        Removes a game-related role from all users on the server.
+
+        Removes as many roles as able, even if some return an error. The changed members, or those who errored,
+        are all listed elegantly.
+        """
+
+        role_map: dict[str, discord.Role] = {
+            'zombie': self.bot.roles.zombie,
+            'human': self.bot.roles.human,
+            'player': self.bot.roles.player
+        }
+        selected_role = role_map[role]
+
+        if not are_you_sure:
+            await ctx.respond('Since this is a powerful command, you must submit it with the argument "are_you_sure" set to True.')
+            return
+
+        complete_members = []
+        forbidden_members = []
+        HTTP_members = []
+
+        for member in selected_role.members:
+            try:
+                await member.remove_roles(selected_role, reason='Role removed in bulk by a command.')
+                complete_members.append(member)
+            except discord.Forbidden as e:
+                forbidden_members.append(member)
+                logger.debug(e)
+            except discord.HTTPException as e:
+                HTTP_members.append(member)
+                logger.debug(e)
+
+        msg = ''
+        if complete_members:
+            msg += f"**Removed <@&{selected_role.id}>** from these members:\n"
+            for member in complete_members:
+                msg += f"<@{member.id}> "
+        if forbidden_members:
+            msg += f"\n**The bot was denied permission to remove <@&{selected_role.id}>** from these members:\n"
+            for member in forbidden_members:
+                msg += f"<@{member.id}> "
+        if HTTP_members:
+            msg += f"\n**There was an HTTP error while removing <@&{selected_role.id}>** from these members:\n"
+            for member in forbidden_members:
+                msg += f"<@{member.id}> "
+            msg += "\n**See the bot's log for more details.**"
+
+        msg = abbreviate_message(msg, max_char=1995)
+
+        await ctx.respond(msg, ephemeral=True)
+
+
 
     @tag_group.command(name='create')
     async def tag_create(self, ctx, member: discord.Member):
