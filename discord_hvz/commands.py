@@ -234,6 +234,9 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
                 msg += f"<@{member.id}> "
             msg += "\n**See the bot's log for more details.**"
 
+        if msg == '':
+            msg = 'There were no members with roles to remove.'
+
         msg = abbreviate_message(msg, max_char=1995)
 
         await ctx.respond(msg, ephemeral=True)
