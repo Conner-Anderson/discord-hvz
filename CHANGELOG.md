@@ -29,6 +29,8 @@ All noteable changes to this project will be documented in this file.
 - The default scripts no longer come with starting_process and ending_processor fields. 
   The correct processors are added to registration and tag_logging chatbots automatically if none are specified.
 - Useless processor removed from the default script
+- Completely switched systems for generating GamePlot images to avoid an infuriating dependency incompatibility with Raspberry Pis.
+  No longer uses Plotly, but instead uses the online service QuickChart.io to render charts.
 - Under-the-hood changes for developer sanity. He needs it.
 
 #### Breaking Changes
