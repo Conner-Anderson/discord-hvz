@@ -23,8 +23,10 @@ regex = "^2023.8.8"
 python-dotenv = "^1.0"
 pandas = "^1.5"
 pydantic-yaml = "^1.1"
+pydantic = "2.5.3"
 tzdata = "*"
 quickchart-io = "^2.0.0"
+requests = "^2.31"
 
 [tool.poetry.group.dev]
 optional = true
