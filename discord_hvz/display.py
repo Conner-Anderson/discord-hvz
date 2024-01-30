@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import requests
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -26,7 +27,15 @@ LAST_GAME_PLOT_URL = ""
 
 
 
-def create_quickchart(filepath: Path) -> str:
+def create_quickchart(filepath: Path) -> discord.File:
+    global LAST_GAME_PLOT_URL
+
+    image_folder = config.path_root / "plots"
+    if not image_folder.exists():
+        image_folder.mkdir()
+    image_path = image_folder / "latest_gameplot.jpeg"
+
+
     qc = QuickChart()
     qc.width = 1000
     qc.height = 600
@@ -117,7 +126,24 @@ def create_quickchart(filepath: Path) -> str:
     }
 
     url = qc.get_url()
-    return url
+
+    # Download the image from QuickPlot and save it. If the url hasn't changed, re-use the previous image.
+    if url != LAST_GAME_PLOT_URL or not image_path.exists():
+        with open(image_path, 'wb') as handle:
+            response = requests.get(url, stream=True)
+
+            if not response.ok:
+                logger.warning(response)
+
+            for block in response.iter_content(1024):
+                if not block:
+                    break
+                handle.write(block)
+
+
+    file = discord.File(image_path)
+    LAST_GAME_PLOT_URL = url
+    return file
 
 
 class PanelElement(ABC):
@@ -211,10 +237,10 @@ class GamePlotElement(PanelElement):
     def refresh_event(self):
         return 'on_role_change'
 
-    def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
-        url = create_quickchart(panel.bot.db.filepath)
-        embed.set_image(url=url)
-        # return file
+    def add(self, embed: discord.Embed, panel: "HVZPanel") -> discord.File:
+        file = create_quickchart(panel.bot.db.filepath)
+        embed.set_image(url=f'attachment://{file.filename}')
+        return file
 
 
 class TagTreeElement(PanelElement):
