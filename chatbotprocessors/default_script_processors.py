@@ -87,6 +87,7 @@ async def tag_logging_end(responses: Dict[str, Any], bot: HVZBot, target_member:
     await tagged_member.add_roles(bot.roles.zombie)
     await tagged_member.remove_roles(bot.roles.human)
     bot.db.edit_row('members', 'id', tagged_member.id, 'faction', 'zombie')
+    bot.dispatch('tag_changed')
     await bot.announce_tag(tagged_member, tagger_member, responses['tag_time'])
 
     # Try to make a useful console output, but don't worry if it fails.

@@ -289,6 +289,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         except ValueError as e:
             print("Got value error from delete_row")
             raise ValueError(f"There is no tag with an id of {tag_id}") from e
+        else:
+            self.bot.dispatch('tag_changed')
 
         msg = ''
         tagged_member = bot.guild.get_member(int(tag_row.tagged_id))
@@ -329,6 +331,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
 
         original_value = tag_row[attribute]
         bot.db.edit_row('tags', 'tag_id', tag_row.tag_id, attribute, value)
+        self.bot.dispatch('tag_changed')
         await ctx.respond(
             f'The value of {attribute} for tag {tag_row.tag_id} was changed from \"{original_value}\"" to \"{value}\"')
 
@@ -350,6 +353,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         tag_row = bot.db.get_tag(tag_id)
 
         bot.db.edit_row('tags', 'tag_id', tag_id, 'revoked_tag', True)
+        self.bot.dispatch('tag_changed')
 
         msg = ''
 
@@ -387,6 +391,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         tag_row = bot.db.get_tag(tag_id)
 
         bot.db.edit_row('tags', 'tag_id', tag_id, 'revoked_tag', False)
+        self.bot.dispatch('tag_changed')
 
         msg = ''
 

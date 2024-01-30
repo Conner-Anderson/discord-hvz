@@ -235,9 +235,10 @@ class TagsTodayElement(PanelElement):
 class GamePlotElement(PanelElement):
     @property
     def refresh_event(self):
-        return 'on_role_change'
+        return 'on_tag_changed'
 
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> discord.File:
+        logger.info("Adding GamePlotElement")
         file = create_quickchart(panel.bot.db.filepath)
         embed.set_image(url=f'attachment://{file.filename}')
         return file
@@ -246,7 +247,7 @@ class GamePlotElement(PanelElement):
 class TagTreeElement(PanelElement):
     @property
     def refresh_event(self) -> str:
-        return 'on_role_change'
+        return 'on_tag_changed'
 
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
         tree = generate_tag_tree(panel.bot.db, panel.bot)
