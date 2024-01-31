@@ -247,8 +247,15 @@ class TagTreeElement(PanelElement):
         return 'on_tag_changed'
 
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
-        tree = generate_tag_tree(panel.bot.db, panel.bot)
-        embed.description = tree[:4096]
+        tree_str = generate_tag_tree(panel.bot.db, panel.bot)
+        char_limit = 4096
+        if len(tree_str) > char_limit:
+            too_long_msg = "\nThe tag tree was trimmed for being too long."
+            while len(tree_str) > (char_limit - len(too_long_msg)):
+                tree_str = tree_str.rsplit('\n', 1)[0]
+            tree_str += too_long_msg
+
+        embed.description = tree_str[:char_limit]
 
 
 # Create a list of PanelElement classes available in the module
