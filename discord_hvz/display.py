@@ -33,7 +33,7 @@ def create_quickchart(filepath: Path) -> discord.File:
     image_folder = config.path_root / "plots"
     if not image_folder.exists():
         image_folder.mkdir()
-    image_path = image_folder / "latest_gameplot.jpeg"
+    image_path = image_folder / "latest_gameplot.png"
 
 
     qc = QuickChart()
@@ -71,62 +71,61 @@ def create_quickchart(filepath: Path) -> discord.File:
 
     if len(tags_df.index) == 0:  # If there are no tags
         qc.config['options']['title']['text'] = "No Tags Yet"
-        return qc.get_url()
+    else:
+        members_df = pd.read_sql_table('members', con=engine, columns=['registration_time', 'oz'])
+        tags_df = pd.read_sql_table('tags', con=engine, columns=['tag_time', 'revoked_tag'])
 
-    members_df = pd.read_sql_table('members', con=engine, columns=['registration_time', 'oz'])
+        def total_players(x):
+            total = (members_df.registration_time <= x.tag_time)
+            return total.sum()
 
-    def total_players(x):
-        total = (members_df.registration_time <= x.tag_time)
-        return total.sum()
+        def total_zombies(x):
+            '''
+            To be given a pandas series which is a single tag. Compares the tag to the dataframe of all tags,
+            counting how many precede it (including it). Excludes revoked tags
+            '''
+            total = (tags_df.tag_time <= x.tag_time) & (tags_df.revoked_tag == False)
+            return total.sum()
 
-    def total_zombies(x):
-        '''
-        To be given a pandas series which is a single tag. Compares the tag to the dataframe of all tags,
-        counting how many precede it (including it). Excludes revoked tags
-        '''
-        total = (tags_df.tag_time <= x.tag_time) & (tags_df.revoked_tag == False)
-        return total.sum()
+        def format_datapoint(timestamp, y):
+            return {
+                "x": timestamp.isoformat(),
+                "y": y
+            }
 
-    def format_datapoint(timestamp, y):
-        return {
-            "x": timestamp.isoformat(),
-            "y": y
+        oz_count = members_df['oz'].sum()
+
+        player_count_sr = tags_df.apply(total_players, axis=1)
+        tags_df = tags_df.assign(Player_Count=player_count_sr)
+        zombie_count_sr = tags_df.apply(total_zombies, axis=1) + oz_count
+        tags_df = tags_df.assign(Zombie_Count=zombie_count_sr)
+        tags_df['Human_Count'] = tags_df['Player_Count'] - tags_df['Zombie_Count']
+        tags_df.sort_values(by='tag_time', inplace=True)
+
+        zombie_series = [format_datapoint(x, y) for x, y in zip(tags_df['tag_time'], tags_df['Zombie_Count'])]
+        human_series = [format_datapoint(x, y) for x, y in zip(tags_df['tag_time'], tags_df['Human_Count'])]
+        # player_series = [format_datapoint(x, y) for x, y in zip(tags_df['tag_time'], tags_df['Player_Count'])]
+
+        qc.config['data'] = {
+            "datasets": [
+                {
+                    "label": "Zombie Count",
+                    "fill": "false",
+                    "data": zombie_series,
+                    "borderColor": "#13ad20",
+                    "backgroundColor": "#13ad20",
+                },
+                {
+                    "label": "Human Count",
+                    "fill": "false",
+                    "data": human_series,
+                    "borderColor": "#dbce14",
+                    "backgroundColor": "#dbce14",
+                },
+            ]
         }
 
-    oz_count = members_df['oz'].sum()
-
-    player_count_sr = tags_df.apply(total_players, axis=1)
-    tags_df = tags_df.assign(Player_Count=player_count_sr)
-    zombie_count_sr = tags_df.apply(total_zombies, axis=1) + oz_count
-    tags_df = tags_df.assign(Zombie_Count=zombie_count_sr)
-    tags_df['Human_Count'] = tags_df['Player_Count'] - tags_df['Zombie_Count']
-    tags_df.sort_values(by='tag_time', inplace=True)
-
-    zombie_series = [format_datapoint(x, y) for x, y in zip(tags_df['tag_time'], tags_df['Zombie_Count'])]
-    human_series = [format_datapoint(x, y) for x, y in zip(tags_df['tag_time'], tags_df['Human_Count'])]
-    # player_series = [format_datapoint(x, y) for x, y in zip(tags_df['tag_time'], tags_df['Player_Count'])]
-
-    qc.config['data'] = {
-        "datasets": [
-            {
-                "label": "Zombie Count",
-                "fill": "false",
-                "data": zombie_series,
-                "borderColor": "#13ad20",
-                "backgroundColor": "#13ad20",
-            },
-            {
-                "label": "Human Count",
-                "fill": "false",
-                "data": human_series,
-                "borderColor": "#dbce14",
-                "backgroundColor": "#dbce14",
-            },
-        ]
-    }
-
     url = qc.get_url()
-
     # Download the image from QuickPlot and save it. If the url hasn't changed, re-use the previous image.
     if url != LAST_GAME_PLOT_URL or not image_path.exists():
         with open(image_path, 'wb') as handle:
@@ -139,7 +138,6 @@ def create_quickchart(filepath: Path) -> discord.File:
                 if not block:
                     break
                 handle.write(block)
-
 
     file = discord.File(image_path)
     LAST_GAME_PLOT_URL = url
@@ -238,7 +236,6 @@ class GamePlotElement(PanelElement):
         return 'on_tag_changed'
 
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> discord.File:
-        logger.info("Adding GamePlotElement")
         file = create_quickchart(panel.bot.db.filepath)
         embed.set_image(url=f'attachment://{file.filename}')
         return file
