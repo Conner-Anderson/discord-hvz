@@ -8,17 +8,19 @@ from discord.commands import context
 from discord.ext import commands
 from loguru import logger
 
-from .utilities import generate_tag_tree, respond_paginated
+from .utilities import generate_tag_tree, respond_paginated, abbreviate_message
 from discord_hvz.config import config
 
 if TYPE_CHECKING:
     from main import HVZBot
     from discord_hvz.chatbot import ChatBotManager
 
+
 def dump(obj):
     """Prints the passed object in a very detailed form for debugging"""
     for attr in dir(obj):
         print("obj.%s = %r" % (attr, getattr(obj, attr)))
+
 
 DISCORD_MESSAGE_MAX_LENGTH = 2000
 
@@ -37,7 +39,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
 
     def __init__(self, bot: "HVZBot"):
         self.bot = bot
-        self. config_download_messages = []
+        self.config_download_messages = []
 
     member_group = SlashCommandGroup("member", "Commands for dealing with members.", guild_ids=guild_id_list)
     tag_group = SlashCommandGroup("tag", "Commands for dealing with tags.", guild_ids=guild_id_list)
@@ -176,6 +178,77 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         await chatbotmanager.start_chatbot(ctx.interaction, "registration", member, override_config=True)
         await ctx.respond('Registration chatbot started in a DM', ephemeral=True)
 
+    @member_group.command(name='remove_roles')
+    async def member_remove_roles(
+            self,
+            ctx: discord.ApplicationContext,
+            role: Option(
+                str,
+                'Role to remove from all users on the server.',
+                choices=['zombie', 'human', 'player']),
+            are_you_sure: Option(bool, 'Do you really want to remove all game roles from players?')
+    ):
+        """
+        Removes a game-related role from all users on the server.
+
+        Removes as many roles as able, even if some return an error. The changed members, or those who errored,
+        are all listed elegantly.
+        """
+
+        role_map: dict[str, discord.Role] = {
+            'zombie': self.bot.roles.zombie,
+            'human': self.bot.roles.human,
+            'player': self.bot.roles.player
+        }
+        selected_role = role_map[role]
+
+        if not are_you_sure:
+            await ctx.respond(
+                'Since this is a powerful command, you must submit it with the argument "are_you_sure" set to True.')
+            return
+        if not selected_role.members:
+            await ctx.respond('No members have this role.')
+            return
+        await ctx.response.defer()
+
+        complete_members = []
+        forbidden_members = []
+        HTTP_members = []
+
+        for member in selected_role.members:
+            try:
+                await member.remove_roles(selected_role, reason='Role removed in bulk by a command.')
+                complete_members.append(member)
+            except discord.Forbidden as e:
+                forbidden_members.append(member)
+                logger.debug(e)
+            except discord.HTTPException as e:
+                HTTP_members.append(member)
+                logger.debug(e)
+
+        msg = ''
+        debug_msg = '>>>---Action log for the remove_roles command---<<<'
+        categories = {
+            "Removed": {"members": complete_members, "message": "Removed"},
+            "Denied Permission": {"members": forbidden_members, "message": "The bot was denied permission to remove"},
+            "HTTP Error": {"members": HTTP_members, "message": "There was an HTTP error while removing"}
+        }
+
+        for category, data in categories.items():
+            members = data["members"]
+            if members:
+                msg += f"\n**{data['message']} <@&{selected_role.id}> from these members:**\n"
+                debug_msg += f"\n{data['message']} role called '{selected_role.name} from the following members.\n'"
+                for member in members[:5]:
+                    msg += f"<@{member.id}> "
+                if len(members) > 5:
+                    msg += f" + {len(members) - 5} others. Full list available in the bot's log file."
+                for member in members:
+                    debug_msg += f"{member.name}, "
+
+        logger.debug(debug_msg)
+        await ctx.respond(msg, ephemeral=True)
+
     @tag_group.command(name='create')
     async def tag_create(self, ctx, member: discord.Member):
         """
@@ -195,7 +268,6 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
 
         await chatbotmanager.start_chatbot(ctx.interaction, "tag_logging", member, override_config=True)
         await ctx.respond('Tag logging chatbot started in a DM', ephemeral=True)
-
 
     @tag_group.command(name='delete')
     async def tag_delete(
@@ -217,6 +289,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         except ValueError as e:
             print("Got value error from delete_row")
             raise ValueError(f"There is no tag with an id of {tag_id}") from e
+        else:
+            self.bot.dispatch('tag_changed')
 
         msg = ''
         tagged_member = bot.guild.get_member(int(tag_row.tagged_id))
@@ -257,6 +331,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
 
         original_value = tag_row[attribute]
         bot.db.edit_row('tags', 'tag_id', tag_row.tag_id, attribute, value)
+        self.bot.dispatch('tag_changed')
         await ctx.respond(
             f'The value of {attribute} for tag {tag_row.tag_id} was changed from \"{original_value}\"" to \"{value}\"')
 
@@ -278,6 +353,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         tag_row = bot.db.get_tag(tag_id)
 
         bot.db.edit_row('tags', 'tag_id', tag_id, 'revoked_tag', True)
+        self.bot.dispatch('tag_changed')
 
         msg = ''
 
@@ -315,6 +391,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         tag_row = bot.db.get_tag(tag_id)
 
         bot.db.edit_row('tags', 'tag_id', tag_id, 'revoked_tag', False)
+        self.bot.dispatch('tag_changed')
 
         msg = ''
 
@@ -346,8 +423,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         for tag in tags:
             time = tag.tag_time.strftime('at about %I:%M %p on %b %d')
             revoked = tag.revoked_tag
-            sub_string = f"{'REVOKED ' if revoked else ''}Tag {tag.tag_id}, <@{tag.tagger_id}> tagged <@{tag.tagged_id}>"\
-                f" {time}\n"
+            sub_string = f"{'REVOKED ' if revoked else ''}Tag {tag.tag_id}, <@{tag.tagger_id}> tagged <@{tag.tagged_id}>" \
+                         f" {time}\n"
             message += sub_string
 
         await respond_paginated(ctx, message)
@@ -373,7 +450,6 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             'tag_logging' Is the tag log button enabled? Default: True
             'silent_oz' Are OZ names omitted from tag announcements? Default: False
         """
-
 
         found_setting = getattr(config, setting, None)
 
@@ -420,8 +496,6 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
 
         await respond_paginated(ctx, tree)
 
-
-
     @slash_command(name='shutdown', description='Shuts down the bot.')
     async def shutdown(
             self,
@@ -445,7 +519,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
 
                 else:
                     await ctx.respond(
-                        'The bot did not shut down due to the following active chatbots. Use the "force" option to override. \n' + '\n'.join(chatbot_list)
+                        'The bot did not shut down due to the following active chatbots. Use the "force" option to override. \n' + '\n'.join(
+                            chatbot_list)
                     )
                     return
 
@@ -510,7 +585,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         message = await ctx.author.send(
             files=file_obj,
             content='Attached are the editable configuration files. Edit any of them, then *reply* to this message '
-            'with the edited files attached to update the bot\'s actual files.'
+                    'with the edited files attached to update the bot\'s actual files.'
         )
         self.config_download_messages.append(message.id)
         await ctx.respond("Replied in a Direct Message", ephemeral=True)
@@ -536,4 +611,3 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
             bytes = await attachment.read()
             with open(target_path, 'wb') as file:
                 file.write(bytes)
-

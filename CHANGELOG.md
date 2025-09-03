@@ -18,7 +18,14 @@ All noteable changes to this project will be documented in this file.
   field of questions will be added to the database on creation. By default, the database will store answers as strings,
   but this can be changed with the new "column_type" field on each question. Valid types are listed in the documentation.
 - When the `silent_oz` config option is `True`, the Zombies element of panels (from `/post_panel`) and all game plots note that
-  OZs are not included in  zombie counts. Tag announcements also note "There are now x zombies, apart from any OZs."
+  OZs are not included in zombie counts. Tag announcements also note "There are now x zombies, apart from any OZs."
+- The command `/member remove_roles` was added, which removes one of the three game roles from all members on the server.
+  This is useful for cleaning up after a completed game.
+- Chatbots that don't use the modal option interact with users through private threads. The thread is created on the channel the
+  chatbot button is pressed on. This change was made to avoid Discord's abuse monitoring system from flagging the bot for
+  sending too many direct messages at once.
+  - These threads are removed when the chatbot is completed, or after an hour. The bot knows which threads it created,
+    and so will never delete any other threads by mistake.
 
 #### Minor Changes
 
@@ -27,11 +34,15 @@ All noteable changes to this project will be documented in this file.
 - The default scripts no longer come with starting_process and ending_processor fields. 
   The correct processors are added to registration and tag_logging chatbots automatically if none are specified.
 - Useless processor removed from the default script
+- Completely switched systems for generating GamePlot images to avoid an infuriating dependency incompatibility with Raspberry Pis.
+  No longer uses Plotly, but instead uses the online service QuickChart.io to render charts.
 - Under-the-hood changes for developer sanity. He needs it.
 
 #### Breaking Changes
 
-<font color="red"> There are breaking changes. </font> 
+<font color="red"> There are breaking changes. </font>
+
+The bot now needs permission to create threads in general, and also for the specific channels chatbots are launched from.
 
 **It is recommended to not update to this version during an active game due to the annoying database changes below.**
 

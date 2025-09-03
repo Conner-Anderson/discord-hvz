@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import requests
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -8,8 +9,7 @@ from typing import TYPE_CHECKING, Dict, List, Union, Set
 
 import discord
 import pandas as pd
-import pandas.util
-import plotly.express as px
+from quickchart import QuickChart
 import sqlalchemy
 from discord.commands import slash_command, Option
 from loguru import logger
@@ -23,29 +23,68 @@ if TYPE_CHECKING:
 
 guild_id_list = [config.server_id]
 LAST_GAME_PLOT_HASH = None
+LAST_GAME_PLOT_URL = ""
 
-def create_game_plot(db: 'HvzDb', filepath=None) -> discord.File:
-    global LAST_GAME_PLOT_HASH
+
+
+def create_quickchart(filepath: Path) -> discord.File:
+    global LAST_GAME_PLOT_URL
+
     image_folder = config.path_root / "plots"
     if not image_folder.exists():
         image_folder.mkdir()
-    image_path = image_folder / "latest_gameplot.jpeg"
+    image_path = image_folder / "latest_gameplot.png"
 
-    if not filepath:
-        filepath: str = str(db.filepath)
+
+    qc = QuickChart()
+    qc.width = 1000
+    qc.height = 600
+    qc.config = {
+        "type": "line",
+        "stacked": "false",
+        "data": dict(),
+        "options": {
+            "title": {
+                "display": "true",
+                "text": "Players over Time" + (" (OZs counted as humans)" if config.silent_oz else ""),
+                "fontSize": 18,
+            },
+            "scales": {
+                "xAxes": [{
+                    "type": "time",
+                    "time": {
+                        # "unit": "day",
+                        "minUnit": "hour",
+                        "displayFormats": {
+                            "hour": "ddd, H:mm",
+                            "day": "ddd, MMM DD"
+                        }
+                    }
+                }]
+            }
+        }
+    }
+
     # TODO: Access the database in a more sustainable way
     engine = sqlalchemy.create_engine(f"sqlite+pysqlite:///{str(filepath)}")
-    tags_df = pd.read_sql_table('tags', con=engine, columns=['tag_time', 'revoked_tag'])
-    new_hash = pandas.util.hash_pandas_object(tags_df).sum()
 
-    if len(tags_df.index) == 0:
-        fig = px.line(tags_df, x="tag_time", y=["Zombie_Count", "Human_Count"], title='Error: There are no tags yet', markers=True)
-        fig.write_image(image_path, width=800, height=600, scale=1.5)
-        LAST_GAME_PLOT_HASH = new_hash
+    with engine.connect() as conn:
+        tags_df = pd.read_sql(
+            sql="SELECT tag_time, revoked_tag FROM tags",
+            con=conn
+        )
+        members_df = pd.read_sql(
+            sql="SELECT registration_time, oz FROM members",
+            con=conn
+        )
+        tags_df = pd.read_sql(
+            sql="SELECT tag_time, revoked_tag FROM tags",
+            con=conn
+        )
 
-
-    elif LAST_GAME_PLOT_HASH != new_hash or not image_path.exists():
-        members_df = pd.read_sql_table('members', con=engine, columns=['registration_time', 'oz'])
+    if len(tags_df.index) == 0:  # If there are no tags
+        qc.config['options']['title']['text'] = "No Tags Yet"
+    else:
 
         def total_players(x):
             total = (members_df.registration_time <= x.tag_time)
@@ -59,6 +98,13 @@ def create_game_plot(db: 'HvzDb', filepath=None) -> discord.File:
             total = (tags_df.tag_time <= x.tag_time) & (tags_df.revoked_tag == False)
             return total.sum()
 
+        def format_datapoint(timestamp, y):
+            iso_timestamp = datetime.fromisoformat(timestamp).isoformat()
+            return {
+                "x": iso_timestamp,
+                "y": y
+            }
+
         oz_count = members_df['oz'].sum()
 
         player_count_sr = tags_df.apply(total_players, axis=1)
@@ -68,34 +114,45 @@ def create_game_plot(db: 'HvzDb', filepath=None) -> discord.File:
         tags_df['Human_Count'] = tags_df['Player_Count'] - tags_df['Zombie_Count']
         tags_df.sort_values(by='tag_time', inplace=True)
 
-        title = "Players over Time" + (" (OZs counted as humans)" if config.silent_oz else "")
-        fig = px.line(tags_df, x="tag_time", y=["Zombie_Count", "Human_Count"], title=title, markers=True)
-        fig.update_layout(
-            xaxis_title = 'Tag Time',
-            yaxis_title = 'Player Count',
-            legend_title = 'Plots',
-            title_xanchor = 'auto'
-        )
-        fig.update_traces(
-            patch={'line_color': '#32C744'},
-            selector={'name': 'Zombie_Count'}
-        )
-        fig.update_traces(
-            patch={'line_color': '#F1C40F'},
-            selector={'name': 'Human_Count'}
-        )
-        fig.update_xaxes(
-            dtick=3600000 * 24,  # The big number is one hour
-            tickformat="%a %b %d",
-            ticks='outside',
-            ticklabelmode='period'
-        )
-        # fig.show()
+        zombie_series = [format_datapoint(x, y) for x, y in zip(tags_df['tag_time'], tags_df['Zombie_Count'])]
+        human_series = [format_datapoint(x, y) for x, y in zip(tags_df['tag_time'], tags_df['Human_Count'])]
+        # player_series = [format_datapoint(x, y) for x, y in zip(tags_df['tag_time'], tags_df['Player_Count'])]
 
-        fig.write_image(image_path, width=800, height=600, scale=1.5)
-        LAST_GAME_PLOT_HASH = new_hash
+        qc.config['data'] = {
+            "datasets": [
+                {
+                    "label": "Zombie Count",
+                    "fill": "false",
+                    "data": zombie_series,
+                    "borderColor": "#13ad20",
+                    "backgroundColor": "#13ad20",
+                },
+                {
+                    "label": "Human Count",
+                    "fill": "false",
+                    "data": human_series,
+                    "borderColor": "#dbce14",
+                    "backgroundColor": "#dbce14",
+                },
+            ]
+        }
+
+    url = qc.get_url()
+    # Download the image from QuickPlot and save it. If the url hasn't changed, re-use the previous image.
+    if url != LAST_GAME_PLOT_URL or not image_path.exists():
+        with open(image_path, 'wb') as handle:
+            response = requests.get(url, stream=True)
+
+            if not response.ok:
+                logger.warning(response)
+
+            for block in response.iter_content(1024):
+                if not block:
+                    break
+                handle.write(block)
 
     file = discord.File(image_path)
+    LAST_GAME_PLOT_URL = url
     return file
 
 
@@ -146,7 +203,6 @@ class PlayersTodayElement(PanelElement):
     def refresh_event(self):
         return 'on_role_change'
 
-
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
         try:
             rows = panel.bot.db.get_rows(
@@ -189,10 +245,10 @@ class TagsTodayElement(PanelElement):
 class GamePlotElement(PanelElement):
     @property
     def refresh_event(self):
-        return 'on_role_change'
+        return 'on_tag_changed'
 
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> discord.File:
-        file = create_game_plot(panel.bot.db)
+        file = create_quickchart(panel.bot.db.filepath)
         embed.set_image(url=f'attachment://{file.filename}')
         return file
 
@@ -200,17 +256,25 @@ class GamePlotElement(PanelElement):
 class TagTreeElement(PanelElement):
     @property
     def refresh_event(self) -> str:
-        return 'on_role_change'
+        return 'on_tag_changed'
 
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
-        tree = generate_tag_tree(panel.bot.db, panel.bot)
-        embed.description = tree[:4096]
+        tree_str = generate_tag_tree(panel.bot.db, panel.bot)
+        char_limit = 4096
+        if len(tree_str) > char_limit:
+            too_long_msg = "\nThe tag tree was trimmed for being too long."
+            while len(tree_str) > (char_limit - len(too_long_msg)):
+                tree_str = tree_str.rsplit('\n', 1)[0]
+            tree_str += too_long_msg
+
+        embed.description = tree_str[:char_limit]
 
 
 # Create a list of PanelElement classes available in the module
 # Needs to be here for the sake of the slash_command decorator.
 this_module = sys.modules[__name__]
-AVAILABLE_PANEL_ELEMENTS = [cls[1] for cls in getmembers(this_module, isclass) if issubclass(cls[1], PanelElement) and cls[1] is not PanelElement]
+AVAILABLE_PANEL_ELEMENTS = [cls[1] for cls in getmembers(this_module, isclass) if
+                            issubclass(cls[1], PanelElement) and cls[1] is not PanelElement]
 AVAILABLE_PANEL_ELEMENTS_STR = [element.__name__ for element in AVAILABLE_PANEL_ELEMENTS]
 
 
@@ -292,7 +356,16 @@ class HVZPanel:
         self.bot.db.add_row('persistent_panels', row_data)
 
     async def load(self, row: sqlalchemy.engine.Row) -> Union["HVZPanel", None]:
+        """
+        Accepts a database row originally created by save() and creates populates the Panel's data so it can
+        continue to be updated. Almost exclusively used to keep panels active through reboots
+        """
         self.channel = self.bot.guild.get_channel(row['channel_id'])
+        if not self.channel:
+            logger.warning(
+                'Tried to load a persistent panel, but could not find the channel it was in. Removing it from the database.')
+            self.bot.db.delete_row('persistent_panels', 'message_id', row['message_id'])
+            return None
         try:
             self.message = await self.channel.fetch_message(row['message_id'])
         except discord.NotFound:
@@ -370,7 +443,7 @@ class DisplayCog(discord.Cog, guild_ids=guild_id_list):
         await panel.send(ctx.channel, selections, live=not static)
         await ctx.respond('Embed posted', ephemeral=True)
 
-    @slash_command(description='Post a message with a graph of zombie and human populations over time.' )
+    @slash_command(description='Post a message with a graph of zombie and human populations over time.')
     async def game_plot(
             self,
             ctx: discord.ApplicationContext,
@@ -384,7 +457,7 @@ class DisplayCog(discord.Cog, guild_ids=guild_id_list):
     @discord.Cog.listener()
     async def on_ready(self):
         if self.readied:
-            return # Don't do this on_ready event more than once
+            return  # Don't do this on_ready event more than once
         self.readied = True
         # Load persistent panels from the database.
         rows = self.bot.db.get_table('persistent_panels')
@@ -411,8 +484,9 @@ class DisplayCog(discord.Cog, guild_ids=guild_id_list):
         self.delete_panel(payload.message_id)
         logger.debug(f'Removed panel with id: {payload.message_id}')
 
-def setup(bot): # this is called by Pycord to setup the cog
-    bot.add_cog(DisplayCog(bot)) # add the cog to the bot
+
+def setup(bot):  # this is called by Pycord to setup the cog
+    bot.add_cog(DisplayCog(bot))  # add the cog to the bot
 
 
 """

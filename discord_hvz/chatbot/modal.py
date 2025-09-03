@@ -31,10 +31,10 @@ class ChatbotModal(discord.ui.Modal):
 
     async def on_timeout(self) -> None:
         """When the modal times-out, this shuts down the chatbot and lets the user know."""
-        logger.info("Modal timed out for chatbot.")
-        self.chatbot.remove()
-        await self.original_interaction.followup.send("Chatbot timed out.", ephemeral=True)
 
+        await self.chatbot.remove()
+        # await self.original_interaction.followup.send("Chatbot timed out.", ephemeral=True)
+        # The timeout seems bothersome. Removing it for now.
     '''Method is called when a user submits the modal'''
 
     async def callback(self, interaction: discord.Interaction):
@@ -109,7 +109,7 @@ class ChatbotModal(discord.ui.Modal):
                     f'Chatbot "{self.chatbot.script.kind}" with {self.chatbot.chat_member.name} (Nickname: {self.chatbot.chat_member.nick}) completed successfully.'
                 )
             finally:
-                self.chatbot.remove()
+                await self.chatbot.remove()
 
             await interaction.response.send_message(msg, ephemeral=True)
 

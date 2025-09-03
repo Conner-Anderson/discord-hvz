@@ -8,23 +8,25 @@ license = "MIT"
 [tool.poetry.scripts]
 discord_hvz = "discord_hvz:main"
 main = "discord_hvz:main"
+display = "discord_hvz:display"
 
 
 [tool.poetry.dependencies]
 python = ">=3.9.7,<3.11"
-py-cord = "^2.2.0"
+py-cord = "^2.4.0"
 SQLAlchemy = "^1.4.32"
 loguru = "^0.7.0"
 google-api-python-client = "^2.42.0"
 google-auth-httplib2 = "^0.1.0"
 google-auth-oauthlib = "^1.0"
-regex = "^2023.8.8"
+regex = "^2024.5.15"
 python-dotenv = "^1.0"
-plotly = "^5.6.0"
-pandas = "^1.5"
-kaleido = "0.2.1"
+pandas = "2.1.4"
 pydantic-yaml = "^1.1"
+pydantic = "^2.5.3"
 tzdata = "*"
+quickchart-io = "^2.0.0"
+requests = "^2.31"
 
 [tool.poetry.group.dev]
 optional = true
