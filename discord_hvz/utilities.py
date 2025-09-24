@@ -65,10 +65,8 @@ def _tag_tree_loop(db: HvzDb, bot: HVZBot, table: List[sqlalchemy.engine.Row], l
         output += '\n'
         output += _add_indention(level, True if i == len(table) - 1 else False)
 
-        if bot.get_member(row.id):
-            output += f'<@{row.id}>'
-        else:
-            output += f'{row.name}'
+        # The below used to use Discord user formatting, but Discord fails to display them sometimes.
+        output += f'{row.name}'
         try:
             tags = db.get_rows('tags', 'tagger_id', row.id, exclusion_column_name='revoked_tag', exclusion_value=True)
         # If the player had no tags...
