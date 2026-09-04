@@ -1,41 +1,43 @@
-[tool.poetry]
+[project]
 name = "discord-hvz"
 version = "0.4.0"
 description = "A run-yourself Discord bot to manage Humans vs. Zombies games."
-authors = ["ConnerHAnderson <conneranderson.dev@gmail.com>"]
+authors = [{ name = "ConnerHAnderson", email = "conneranderson.dev@gmail.com" }]
+requires-python = ">=3.9.7,<3.11"
 license = "MIT"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+]
+dependencies = [
+    "py-cord>=2.4.0,<3",
+    "SQLAlchemy>=1.4.32,<2",
+    "loguru>=0.7.0,<0.8",
+    "google-api-python-client>=2.42.0,<3",
+    "google-auth-httplib2>=0.1.0,<0.2",
+    "google-auth-oauthlib>=1.0,<2",
+    "regex>=2024.5.15,<2025",
+    "python-dotenv>=1.0,<2",
+    "pandas==2.1.4",
+    "pydantic-yaml>=1.1,<2",
+    "pydantic>=2.5.3,<3",
+    "tzdata",
+    "quickchart-io>=2.0.0,<3",
+    "requests>=2.31,<3",
+]
 
-[tool.poetry.scripts]
+[project.scripts]
 discord_hvz = "discord_hvz:main"
 main = "discord_hvz:main"
 display = "discord_hvz:display"
 
-
-[tool.poetry.dependencies]
-python = ">=3.9.7,<3.11"
-py-cord = "^2.4.0"
-SQLAlchemy = "^1.4.32"
-loguru = "^0.7.0"
-google-api-python-client = "^2.42.0"
-google-auth-httplib2 = "^0.1.0"
-google-auth-oauthlib = "^1.0"
-regex = "^2024.5.15"
-python-dotenv = "^1.0"
-pandas = "2.1.4"
-pydantic-yaml = "^1.1"
-pydantic = "^2.5.3"
-tzdata = "*"
-quickchart-io = "^2.0.0"
-requests = "^2.31"
-
-[tool.poetry.group.dev]
-optional = true
-
-[tool.poetry.group.dev.dependencies]
-radon = "^5.1.0"
-line-profiler = "^3.5.1"
-pyinstaller = "^5.6.2"
+[dependency-groups]
+dev = [
+    "radon>=5.1.0,<6",
+    "line-profiler>=3.5.1,<4",
+    "pyinstaller>=5.6.2,<6",
+]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"

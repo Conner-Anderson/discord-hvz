@@ -2,7 +2,7 @@
 __pycache__
 .env
 venv
-discord_hvz/plots
+src/discord_hvz/plots
 credentials.json
 token.json
 hvzdb.db
@@ -19,6 +19,6 @@ build
 testbed.py
 .idea
 *.zip
-chatbotprocessors/custom_question_processors.py
+src/discord_hvz/chatbotprocessors/custom_question_processors.py
 /dist/
 /test.py

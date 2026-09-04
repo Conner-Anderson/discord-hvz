@@ -15,7 +15,7 @@ from loguru import logger
 from discord_hvz.config import config, ConfigError
 from discord_hvz.buttons import ButtonColor, HVZButton
 from discord_hvz.utilities import format_pydantic_errors
-import chatbotprocessors
+from discord_hvz import chatbotprocessors
 from discord_hvz import database
 
 if TYPE_CHECKING:
