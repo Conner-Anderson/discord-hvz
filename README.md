@@ -15,12 +15,9 @@ For *lots* more information, go to the documentation site:
 
 ## [Documentation](https://conner-anderson.github.io/discord-hvz-docs/)
 
-## Version 0.3.0 Released
+## Version 0.5.0
 
-This is the third official release and includes moderate changes based on real game testing at LeTourneau University. See the changelog in [Releases](https://github.com/Conner-Anderson/discord-hvz/releases).  
-Note: This version has not yet been tested in a real game. This will be done this fall (2023).
-
-
+Version 0.5.0 adds guest players without Discord accounts, trusted guest tag reporting, and improvements to error handling and shutdown. See the [changelog](CHANGELOG.md) for details and migration notes.
 
 ## Helping with Development
 The biggest way to help improve the bot is to submit bugs and features requests here on GitHub, 

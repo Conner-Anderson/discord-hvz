@@ -2,6 +2,41 @@
 
 All noteable changes to this project will be documented in this file.
 
+### 0.5.0 Minor Release
+
+#### Features
+
+- Added guest players: register and manage them with `/guest-admin`, and have trusted people report their tags with `/guest-tag`.
+  Guests participate in tag trees, panels, game plots, player totals, and Google Sheets exports.
+- Panels now refresh after tag changes. Tag trees report when Discord's length limit trims them, and game plots work before the first tag.
+- Administrators can download `config.yml` and `scripts.yml` with `/download_config`, edit them, and reply with the files to upload them.
+
+#### Bug Fixes
+
+- Improved shutdown, startup, chatbot, panel, plot, Sheets, and Discord error handling. The bot should recover or report configuration
+  and permission problems more reliably.
+- Tag and player state is now kept consistent across tag changes, including guest tags, revoked tags, and historical counts.
+- `/member remove_roles` handles empty roles and large servers more gracefully.
+
+#### Minor Changes
+
+- Game plots are sent as attachments instead of external image links. Pandas is pinned to 2.1.4 for compatibility.
+- Active chatbot conversations are cleaned up during shutdown without a shutdown message being sent to their users.
+- Updated dependencies, documentation, and regression tests.
+
+#### Breaking Changes
+
+<font color="yellow"> There are migration notes and behavior changes: </font>
+
+- **Source installations now require Python 3.10 and use uv.** Run `uv sync --locked` and `uv run discord_hvz` from the project folder.
+  Keep user files there, not in `src/discord_hvz`; update custom-code paths accordingly.
+- **No database reset is needed from 0.4.0.** Back up first. Startup adds guest and tag-reporter fields automatically; Sheets exports gain
+  corresponding columns, so move any handwritten notes to the right of exported data.
+- **Population totals now use registered database players, not Discord roles.** This includes guests and players who have left Discord.
+  With `silent_oz`, OZs count as humans in public totals and the historical graph.
+- Configure access to `/guest-admin` and `/guest-tag` in *Server Settings > Integrations > [Your Bot]*.
+- Custom `tag_logging_end` processors must use `players.prepare_tag`, `db.record_tag`, and `players.finish_tag` to support guests.
+
 ### 0.4.0 Minor Release
 
 #### Bug Fixes

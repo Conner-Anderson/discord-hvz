@@ -35,7 +35,7 @@ from discord_hvz.chatbot import script_models
 from discord_hvz.database import HvzDb
 
 # The latest Discord HvZ release this code is, or is based on.
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 
 
 def dump(obj):
