@@ -9,6 +9,7 @@ from loguru import logger
 
 from .utilities import generate_tag_tree, respond_paginated, abbreviate_message
 from discord_hvz.config import config
+from .players import player_label, sync_faction, is_guest
 
 if TYPE_CHECKING:
     from main import HVZBot
@@ -81,7 +82,11 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         except ValueError:
             await ctx.respond('That member is not in the database as a player, and so there is nothing to delete.')
             return
+        if is_guest(member_row) and any(member_row.id in (tag.tagger_id, tag.tagged_id)
+                                       for tag in bot.db.get_table('tags')):
+            raise ValueError('This guest has tag history and cannot be deleted. Rename them with /guest-admin rename instead.')
         bot.db.delete_row('members', 'id', str(member_id))
+        bot.dispatch('role_change')
 
         if member:
             await member.remove_roles(bot.roles.human)
@@ -141,9 +146,9 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         message = ''
         for member in members:
             name = ('\t' + member.name) if getattr(member, 'name') else ''
-            email = ('\t' + member.email) if getattr(member, 'email') else ''
+            email = ('\t' + member.email) if getattr(member, 'email', None) else ''
             nickname = ('\t' + member.nickname) if getattr(member, 'nickname') else ''
-            sub_string = f'<@!{member.id}>{name}{nickname}{email}\n'
+            sub_string = f'{player_label(self.bot, member.id)}{name}{nickname}{email}\n'
             message += sub_string
 
         await respond_paginated(ctx, message)
@@ -291,20 +296,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         else:
             self.bot.dispatch('tag_changed')
 
-        msg = ''
-        tagged_member = bot.guild.get_member(int(tag_row.tagged_id))
-        if tagged_member is None:
-            msg += f'Roles not changed since <@{tag_row.tagged_id}> ({tag_row.tagged_name}) is no longer on the server.'
-        else:
-            try:
-                existing_tag = bot.db.get_tag(tag_row.tagged_id, column='tagged_id', filter_revoked=True)
-                # Change to human if there are no previous tags on the tagged member
-                msg += (f'Left <@{tagged_member.id}> as zombie because <@{existing_tag.tagger_id}> '
-                        f'({existing_tag.tagger_name}) still tagged them in tag {existing_tag.tag_id}')
-            except ValueError:
-                await tagged_member.add_roles(bot.roles.human)
-                await tagged_member.remove_roles(bot.roles.zombie)
-                msg += f'Changed <@{tagged_member.id}> to human.'
+        faction = await sync_faction(bot, tag_row.tagged_id)
+        msg = f'{player_label(bot, tag_row.tagged_id)} is now {faction}.'
 
         msg = f'Tag {tag_id} deleted. ' + msg
         await ctx.respond(msg)
@@ -354,21 +347,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         bot.db.edit_row('tags', 'tag_id', tag_id, 'revoked_tag', True)
         self.bot.dispatch('tag_changed')
 
-        msg = ''
-
-        tagged_member = bot.guild.get_member(int(tag_row.tagged_id))
-        if tagged_member is None:
-            msg += f'Roles not changed since <@{tag_row.tagged_id}> ({tag_row.tagged_name}) is no longer on the server.'
-        else:
-            try:
-                existing_tag = bot.db.get_tag(tag_row.tagged_id, column='tagged_id', filter_revoked=True)
-                # Change to human if there are no previous tags on the tagged member
-                msg += (f'Left <@{tagged_member.id}> as zombie because <@{existing_tag.tagger_id}> '
-                        f'({existing_tag.tagger_name}) still tagged them in tag {existing_tag.tag_id}')
-            except ValueError:
-                await tagged_member.add_roles(bot.roles.human)
-                await tagged_member.remove_roles(bot.roles.zombie)
-                msg += f'Changed <@{tagged_member.id}> to human.'
+        faction = await sync_faction(bot, tag_row.tagged_id)
+        msg = f'{player_label(bot, tag_row.tagged_id)} is now {faction}.'
 
         msg = f'Tag {tag_id} revoked. ' + msg
         await ctx.respond(msg)
@@ -392,15 +372,8 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         bot.db.edit_row('tags', 'tag_id', tag_id, 'revoked_tag', False)
         self.bot.dispatch('tag_changed')
 
-        msg = ''
-
-        tagged_member = bot.guild.get_member(int(tag_row.tagged_id))
-        if tagged_member is None:
-            msg += f'Roles not changed since <@{tag_row.tagged_id}> ({tag_row.tagged_name}) is no longer on the server.'
-        else:
-            await tagged_member.add_roles(bot.roles.zombie)
-            await tagged_member.remove_roles(bot.roles.human)
-            msg += f'Changed <@{tagged_member.id}> to zombie.'
+        faction = await sync_faction(bot, tag_row.tagged_id)
+        msg = f'{player_label(bot, tag_row.tagged_id)} is now {faction}.'
 
         msg = f'Tag {tag_id} restored. ' + msg
         await ctx.respond(msg)
@@ -422,7 +395,7 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         for tag in tags:
             time = tag.tag_time.strftime('at about %I:%M %p on %b %d')
             revoked = tag.revoked_tag
-            sub_string = f"{'REVOKED ' if revoked else ''}Tag {tag.tag_id}, <@{tag.tagger_id}> tagged <@{tag.tagged_id}>" \
+            sub_string = f"{'REVOKED ' if revoked else ''}Tag {tag.tag_id}, {player_label(self.bot, tag.tagger_id)} tagged {player_label(self.bot, tag.tagged_id)}" \
                          f" {time}\n"
             message += sub_string
 

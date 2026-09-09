@@ -53,18 +53,13 @@ def generate_tag_code(input_text: str, bot: HVZBot) -> str:
 
 def tag_code_to_member_id(input_text: str, bot: HVZBot) -> str:
     try:
-        tagged_member_row: sqlalchemy.engine.Row = bot.db.get_member(input_text.upper(), column='Tag_Code')
+        tagged_member_row: sqlalchemy.engine.Row = bot.db.get_member(input_text.strip().upper(), column='Tag_Code')
     except ValueError:
         raise ValueError('This tag code didn\'t match a user')
 
-    tagged_member = bot.get_member(tagged_member_row.id)
-    logger.debug(f'ID: {tagged_member_row.id} Row: {tagged_member_row}')
-    if tagged_member is None:
-        raise ValueError(f'"{tagged_member_row.name}" is no longer on the Discord server. Contact them, then an Admin.')
-    if bot.roles.zombie in tagged_member.roles:
-        raise ValueError('The person you\'re tagging is already a zombie!')
-
-    return tagged_member.id
+    from discord_hvz.players import validate_victim
+    validate_victim(bot, tagged_member_row.id)
+    return tagged_member_row.id
 
 def tag_time(input_text: str, bot: HVZBot) -> datetime:
     given_tag_time: str = input_text

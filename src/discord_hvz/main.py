@@ -346,13 +346,11 @@ class HVZBot(discord.ext.commands.Bot):
         return result
 
     async def announce_tag(self, tagged_member: discord.Member, tagger_member: discord.Member, tag_time: datetime):
-
-        new_h = len(self.roles.human.members)
-        new_z = len(self.roles.zombie.members)
-
-        msg = f'<@{tagged_member.id}> has turned zombie!'
+        from .players import population_counts, player_label
+        new_h, new_z, _ = population_counts(self)
+        msg = f'{player_label(self, tagged_member.id)} has turned zombie!'
         if not config.silent_oz:
-            msg += f'\nTagged by <@{tagger_member.id}>'
+            msg += f'\nTagged by {player_label(self, tagger_member.id)}'
             msg += tag_time.strftime(' at about %I:%M %p')
             msg += f"\nThere are now {new_h} humans and {new_z} zombie{'s' if new_z > 1 else ''}."
         else:
@@ -391,6 +389,7 @@ def main():
         bot.load_extension('.commands', package = 'discord_hvz')
         bot.load_extension('.display', package = 'discord_hvz')
         bot.load_extension('.item_tracker', package = 'discord_hvz')
+        bot.load_extension('.guests', package = 'discord_hvz')
 
         bot.run(TOKEN)
 

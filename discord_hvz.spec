@@ -19,7 +19,8 @@ a = Analysis(
         "discord_hvz.buttons",
         "discord_hvz.chatbot",
         "discord_hvz.display",
-        "discord_hvz.item_tracker"
+        "discord_hvz.item_tracker",
+        "discord_hvz.guests"
     ],
     hookspath=[],
     hooksconfig={},

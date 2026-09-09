@@ -218,7 +218,19 @@ class ChatBot:
             except ValueError as e:
                 raise ResponseError(e)
 
-        self.bot.db.add_row(self.script.table, response_map)
+        from discord_hvz.chatbotprocessors.default_script_processors import tag_logging_end
+        if self.script.ending_processor is tag_logging_end:
+            from discord_hvz.players import finish_tag
+            response_map['reporter_id'] = self.chat_member.id
+            try:
+                self.bot.db.record_tag(response_map)
+            except ValueError as error:
+                raise ResponseError(error) from error
+            await finish_tag(self.bot, response_map)
+        else:
+            self.bot.db.add_row(self.script.table, response_map)
+            if self.script.table == 'members':
+                self.bot.dispatch('role_change')
 
     @classmethod
     def create_review_string(cls, responses: dict[int, Response], script: ScriptDatas) -> str:

@@ -27,12 +27,14 @@ if TYPE_CHECKING:
 REQUIRED_COLUMNS = {
     'members': {
         'id': 'Integer',
+        'name': 'String',
         'discord_name': 'String',
         'nickname': 'String',
         'registration_time': 'DateTime',
         'faction': 'String',
         'tag_code': 'String',
-        'oz': 'Boolean'
+        'oz': 'Boolean',
+        'is_guest': 'Boolean',
     },
     'tags': {
         'tag_id': 'incrementing_integer',
@@ -46,7 +48,8 @@ REQUIRED_COLUMNS = {
         'tagged_discord_name': 'String',
         'tag_time': 'DateTime',
         'report_time': 'DateTime',
-        'revoked_tag': 'Boolean'
+        'revoked_tag': 'Boolean',
+        'reporter_id': 'Integer',
     }
 }
 
@@ -59,6 +62,7 @@ async def registration_end(responses: Dict[str, Any], bot: HVZBot, target_member
     responses['nickname'] = target_member.nick
     responses['registration_time'] = datetime.now(tz=config.timezone)
     responses['oz'] = False
+    responses['is_guest'] = False
     responses['tag_code'] = make_tag_code(bot.db)
 
     await target_member.add_roles(bot.roles.player)
@@ -67,35 +71,8 @@ async def registration_end(responses: Dict[str, Any], bot: HVZBot, target_member
     return responses
 
 async def tag_logging_end(responses: Dict[str, Any], bot: HVZBot, target_member: discord.Member) -> Dict[str, Any]:
-
-    tagged_member = bot.get_member(responses['tagged_id'])
-    tagged_member_row = bot.db.get_member(tagged_member)
-    tagger_member = target_member
-    tagger_member_row = bot.db.get_member(tagger_member)
-
-    responses['tagged_name'] = tagged_member_row.name
-    responses['tagged_discord_name'] = tagged_member.name
-    responses['tagged_nickname'] = tagged_member.nick
-    responses['tagger_id'] = tagger_member.id
-    responses['tagger_name'] = tagger_member_row.name
-    responses['tagger_discord_name'] = tagger_member.name
-    responses['tagger_nickname'] = tagger_member.nick
-    responses['report_time'] = datetime.now(tz=config.timezone)
-    responses['revoked_tag'] = False
-
-
-    await tagged_member.add_roles(bot.roles.zombie)
-    await tagged_member.remove_roles(bot.roles.human)
-    bot.db.edit_row('members', 'id', tagged_member.id, 'faction', 'zombie')
-    bot.dispatch('tag_changed')
-    await bot.announce_tag(tagged_member, tagger_member, responses['tag_time'])
-
-    # Try to make a useful console output, but don't worry if it fails.
-    try:
-        logger.info(f'{tagger_member.name} tagged {tagged_member.name}.')
-    except Exception as e:
-        logger.warning(e)
-
+    from discord_hvz.players import prepare_tag
+    responses.update(prepare_tag(bot, target_member.id, responses['tagged_id'], responses['tag_time']))
     return responses
 
 async def registration_start(member: discord.Member, bot: HVZBot) -> None:

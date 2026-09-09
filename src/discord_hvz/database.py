@@ -93,6 +93,20 @@ class HvzDb:
     
     def __post_init__(self):
         self.engine = create_engine(f"sqlite+pysqlite:///{str(self.filepath)}", future=True)
+        # Add built-in fields without requiring an existing game to be reset.
+        inspector = sqlalchemy.inspect(self.engine)
+        additions = {
+            'members': {'is_guest': 'BOOLEAN NOT NULL DEFAULT 0', 'name': 'TEXT'},
+            'tags': {'reporter_id': 'INTEGER'},
+        }
+        with self.engine.begin() as conn:
+            for table_name, columns in additions.items():
+                if not inspector.has_table(table_name):
+                    continue
+                existing = {column['name'] for column in inspector.get_columns(table_name)}
+                for name, declaration in columns.items():
+                    if name not in existing:
+                        conn.exec_driver_sql(f'ALTER TABLE {table_name} ADD COLUMN {name} {declaration}')
 
         if not self.filepath.exists():
             logger.warning(
@@ -194,6 +208,8 @@ class HvzDb:
         :param table:
         :return:
         """
+        if self.sheet_interface is None:
+            return
         try:
             if isinstance(table, Table): table_name = table.name
             else: table_name = table
@@ -243,6 +259,38 @@ class HvzDb:
             result = conn.execute(table.insert().values(row))
             self._table_updated(table)
             return result
+
+    def add_guest(self, name, tag_code, registration_time, oz=False):
+        table = self.tables['members']
+        with self.engine.begin() as conn:
+            # Reserve a negative ID atomically; Discord snowflakes are positive.
+            conn.exec_driver_sql('BEGIN IMMEDIATE')
+            lowest = conn.execute(select(sqlalchemy.func.min(table.c.id))).scalar()
+            guest_id = min(lowest or 0, 0) - 1
+            conn.execute(table.insert().values(
+                id=guest_id, name=name, is_guest=True, tag_code=tag_code,
+                registration_time=registration_time, faction='zombie' if oz else 'human',
+                oz=oz, discord_name=None, nickname=None,
+            ))
+        self._table_updated(table)
+        return self.get_member(guest_id)
+
+    def record_tag(self, data):
+        """Commit the tag and its victim's faction together, rejecting double submissions."""
+        members = self.tables['members']
+        with self.engine.begin() as conn:
+            conn.exec_driver_sql('BEGIN IMMEDIATE')
+            victim = conn.execute(select(members).where(members.c.id == data['tagged_id'])).first()
+            if victim is None:
+                raise ValueError('That player is no longer registered.')
+            if victim.faction == 'zombie':
+                raise ValueError('The person you are tagging is already a zombie.')
+            result = conn.execute(self.tables['tags'].insert().values(data))
+            conn.execute(members.update().where(members.c.id == victim.id).values(faction='zombie'))
+            tag_id = result.inserted_primary_key[0]
+        self._table_updated('members')
+        self._table_updated('tags')
+        return tag_id
 
     def get_member(self, value: discord.abc.User | int, column: str = None) -> Row:
         """

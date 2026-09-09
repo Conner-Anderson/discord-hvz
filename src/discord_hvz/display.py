@@ -16,6 +16,7 @@ from loguru import logger
 
 from .utilities import pool_function, have_lists_changed, generate_tag_tree
 from .config import config
+from .players import population_counts
 
 if TYPE_CHECKING:
     from database import HvzDb
@@ -70,15 +71,11 @@ def create_quickchart(filepath: Path) -> discord.File:
 
     with engine.connect() as conn:
         tags_df = pd.read_sql(
-            sql="SELECT tag_time, revoked_tag FROM tags",
+            sql="SELECT tag_time, revoked_tag, tagged_id FROM tags",
             con=conn
         )
         members_df = pd.read_sql(
-            sql="SELECT registration_time, oz FROM members",
-            con=conn
-        )
-        tags_df = pd.read_sql(
-            sql="SELECT tag_time, revoked_tag FROM tags",
+            sql="SELECT id, registration_time, oz FROM members",
             con=conn
         )
 
@@ -95,8 +92,11 @@ def create_quickchart(filepath: Path) -> discord.File:
             To be given a pandas series which is a single tag. Compares the tag to the dataframe of all tags,
             counting how many precede it (including it). Excludes revoked tags
             '''
-            total = (tags_df.tag_time <= x.tag_time) & (tags_df.revoked_tag == False)
-            return total.sum()
+            infected = tags_df.loc[(tags_df.tag_time <= x.tag_time) & (tags_df.revoked_tag == False), 'tagged_id']
+            zombies = members_df.id.isin(infected) | members_df.oz.fillna(False).astype(bool)
+            if config.silent_oz:
+                zombies &= ~members_df.oz.fillna(False).astype(bool)
+            return (zombies & (members_df.registration_time <= x.tag_time)).sum()
 
         def format_datapoint(timestamp, y):
             iso_timestamp = datetime.fromisoformat(timestamp).isoformat()
@@ -105,11 +105,9 @@ def create_quickchart(filepath: Path) -> discord.File:
                 "y": y
             }
 
-        oz_count = members_df['oz'].sum()
-
         player_count_sr = tags_df.apply(total_players, axis=1)
         tags_df = tags_df.assign(Player_Count=player_count_sr)
-        zombie_count_sr = tags_df.apply(total_zombies, axis=1) + oz_count
+        zombie_count_sr = tags_df.apply(total_zombies, axis=1)
         tags_df = tags_df.assign(Zombie_Count=zombie_count_sr)
         tags_df['Human_Count'] = tags_df['Player_Count'] - tags_df['Zombie_Count']
         tags_df.sort_values(by='tag_time', inplace=True)
@@ -168,7 +166,7 @@ class HumanElement(PanelElement):
         return 'on_role_change'
 
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
-        human_count = len(panel.bot.roles.human.members)
+        human_count = population_counts(panel.bot)[0]
         embed.add_field(name='Humans', value=str(human_count))
 
 
@@ -178,7 +176,7 @@ class ZombieElement(PanelElement):
         return 'on_role_change'
 
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
-        count = len(panel.bot.roles.zombie.members)
+        count = population_counts(panel.bot)[1]
         value = str(count) + (" (no OZ)" if config.silent_oz else "")
         embed.add_field(name='Zombies', value=value)
 
@@ -189,7 +187,7 @@ class PlayerElement(PanelElement):
         return 'on_role_change'
 
     def add(self, embed: discord.Embed, panel: "HVZPanel") -> None:
-        count = len(panel.bot.roles.player.members)
+        count = population_counts(panel.bot)[2]
         embed.add_field(name='Players', value=str(count))
 
 
@@ -205,7 +203,6 @@ class PlayersTodayElement(PanelElement):
                 search_column_name='registration_time',
                 lower_value=datetime.now(tz=config.timezone) - timedelta(days=1),
                 upper_value=datetime.now(tz=config.timezone)
-
             )
             count = len(rows)
         except ValueError:
@@ -228,7 +225,8 @@ class TagsTodayElement(PanelElement):
                 table='tags',
                 search_column_name='tag_time',
                 lower_value=datetime.now(tz=config.timezone) - timedelta(days=1),
-                upper_value=datetime.now(tz=config.timezone)
+                upper_value=datetime.now(tz=config.timezone),
+                exclusion_column_name='revoked_tag', exclusion_value=True,
             )
             count = len(rows)
         except ValueError:

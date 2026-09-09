@@ -117,7 +117,7 @@ class SheetsInterface:
         for y, row in enumerate(table):
             values.append([])
             for x, column in enumerate(column_order):
-                cell = row[column]
+                cell = row._mapping[column]
                 if isinstance(cell, datetime):
                     cell = cell.isoformat()
 

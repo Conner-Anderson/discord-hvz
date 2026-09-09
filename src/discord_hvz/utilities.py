@@ -22,9 +22,9 @@ log = logger
 def make_tag_code(db: HvzDb):
     code_set = (string.ascii_uppercase + string.digits).translate(str.maketrans('', '', '0125IOUDQVSZ'))
 
-    tag_code = ''
     # Try generating the code three times. If it can't do it in three, something's wrong
     for i in range(3):
+        tag_code = ''
         for n in range(6):
             tag_code += code_set[random.randint(0, len(code_set) - 1)]
         try:
@@ -59,16 +59,18 @@ def generate_tag_tree(db: HvzDb, bot: HVZBot) -> str:
     return _tag_tree_loop(db, bot, oz_table, 0)
 
 
-def _tag_tree_loop(db: HvzDb, bot: HVZBot, table: List[sqlalchemy.engine.Row], level: int) -> str:
+def _tag_tree_loop(db: HvzDb, bot: HVZBot, table: List[sqlalchemy.engine.Row], level: int, ancestors=None) -> str:
+    from .players import player_label
+    ancestors = ancestors or set()
     output = ''
     for i, row in enumerate(table):
         output += '\n'
         output += _add_indention(level, True if i == len(table) - 1 else False)
 
-        if bot.get_member(row.id):
-            output += f'<@{row.id}>'
-        else:
-            output += f'{row.name}'
+        output += player_label(bot, row.id)
+        if row.id in ancestors:
+            output += ' (cycle in tag records)'
+            continue
         try:
             tags = db.get_rows('tags', 'tagger_id', row.id, exclusion_column_name='revoked_tag', exclusion_value=True)
         # If the player had no tags...
@@ -84,7 +86,7 @@ def _tag_tree_loop(db: HvzDb, bot: HVZBot, table: List[sqlalchemy.engine.Row], l
             for tag_row in tags:
                 tagged_members.append(db.get_member(tag_row.tagged_id))
 
-            output += _tag_tree_loop(db, bot, tagged_members, level + 1)
+            output += _tag_tree_loop(db, bot, tagged_members, level + 1, ancestors | {row.id})
 
     return output
 
@@ -154,7 +156,7 @@ def _get_ozs(bot: "HVZBot", db: HvzDb) -> List[sqlalchemy.engine.Row]:
     :param db:
     :return:
     """
-    tags = db.get_table('tags')
+    tags = [tag for tag in db.get_table('tags') if not tag.revoked_tag]
     set_of_all_zombies = set()
     oz_member_rows = []
 
@@ -162,17 +164,14 @@ def _get_ozs(bot: "HVZBot", db: HvzDb) -> List[sqlalchemy.engine.Row]:
     for tag in tags:
         set_of_all_zombies.add(int(tag.tagger_id))
 
-    # Adds anyone with the zombie role. The only new ids added should be from OZs who have made no tags.
-    for zombie_member in bot.roles.zombie.members:
-        set_of_all_zombies.add(zombie_member.id)
+    # Include guest original zombies, who cannot have a Discord role.
+    for member in db.get_table('members'):
+        if member.faction == 'zombie' or member.oz:
+            set_of_all_zombies.add(member.id)
 
     for tagger_id in set_of_all_zombies:
-        try:
-            # If a zombie has been tagged, do nothing.
-            db.get_rows('tags', 'tagged_id', tagger_id)
+        if any(tag.tagged_id == tagger_id for tag in tags):
             continue
-        except ValueError:
-            pass
         try:
             # If a zombie has not been tagged, add them to the OZ list
             oz_member_rows.append(db.get_member(tagger_id))
