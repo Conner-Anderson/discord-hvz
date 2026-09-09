@@ -140,16 +140,11 @@ def create_quickchart(filepath: Path) -> discord.File:
     url = qc.get_url()
     # Download the image from QuickPlot and save it. If the url hasn't changed, re-use the previous image.
     if url != LAST_GAME_PLOT_URL or not image_path.exists():
-        with open(image_path, 'wb') as handle:
-            response = requests.get(url, stream=True)
-
-            if not response.ok:
-                logger.warning(response)
-
-            for block in response.iter_content(1024):
-                if not block:
-                    break
-                handle.write(block)
+        # Only replace the cached plot after a complete, successful download.
+        with requests.get(url, timeout=(5, 15)) as response:
+            response.raise_for_status()
+            image_data = response.content
+        image_path.write_bytes(image_data)
 
     file = discord.File(image_path)
     LAST_GAME_PLOT_URL = url
@@ -321,7 +316,13 @@ class HVZPanel:
         kwargs = {'embed': embed}
         if file:
             kwargs.update({'file': file})
-        await self.message.edit(**kwargs)
+        try:
+            await self.message.edit(**kwargs)
+        except discord.NotFound:
+            logger.warning('A live panel message was deleted. Removing it from the database.')
+            self.cog.delete_panel(self.message.id)
+        except discord.HTTPException as error:
+            logger.warning(f'Could not refresh panel {self.message.id}; will try again on the next update: {error}')
 
     def create_embed(self) -> (discord.Embed, discord.File):
         embed = discord.Embed(title='Game Status')
@@ -330,6 +331,10 @@ class HVZPanel:
         for element in self.elements:
             try:
                 file = element.add(embed=embed, panel=self)
+            except requests.RequestException as error:
+                logger.warning(f'Could not download the game plot: {error}')
+                embed.add_field(name='Game Plot', value='Temporarily unavailable. Please try again later.')
+                continue
             except Exception as e:
                 logger.exception(e)
                 raise e
@@ -371,6 +376,10 @@ class HVZPanel:
         except discord.NotFound:
             logger.warning('Could not find panel message. Removing it from the database.')
             self.bot.db.delete_row('persistent_panels', 'message_id', row['message_id'])
+            return None
+
+        except discord.HTTPException as error:
+            logger.warning(f'Could not load panel {row["message_id"]}; keeping it for the next startup: {error}')
             return None
 
         self.load_elements(row['elements'].split(','))

@@ -208,7 +208,7 @@ class PoolItem:
             return False
 
     def start(self, wait_seconds: Union[int, float]) -> None:
-        self.task = asyncio.create_task(do_after_wait(self.function, wait_seconds, *self.args, **self.kwargs))
+        self.task = schedule_delayed(self.function, wait_seconds, *self.args, **self.kwargs)
 
 
 pool_items: List[PoolItem] = []
@@ -237,6 +237,24 @@ def pool_function(function: callable, wait_seconds: Union[float, int], *args, **
 
     pool_items.append(item)
     item.start(wait_seconds)
+
+
+delayed_tasks = set()
+
+
+def schedule_delayed(func: callable, delay: float, *args, **kwargs):
+    task = asyncio.create_task(do_after_wait(func, delay, *args, **kwargs))
+    delayed_tasks.add(task)
+    task.add_done_callback(delayed_tasks.discard)
+    return task
+
+
+async def cancel_delayed_tasks():
+    tasks = [task for task in delayed_tasks if task is not asyncio.current_task()]
+    for task in tasks:
+        task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+    pool_items.clear()
 
 
 async def do_after_wait(func: callable, delay: float, *args, **kwargs):

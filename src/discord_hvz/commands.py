@@ -1,5 +1,4 @@
 # from __future__ import annotations
-import time
 from typing import Union, TYPE_CHECKING, Optional, List
 
 import discord
@@ -478,8 +477,11 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         except ValueError:
             await ctx.respond('You aren\'t registered for the game.', ephemeral=True)
         except Exception as e:
-            await ctx.author.send('Sorry, something went wrong with that command. Derp.')
             logger.exception(e)
+            try:
+                await ctx.author.send('Sorry, something went wrong with that command. Derp.')
+            except discord.HTTPException as response_error:
+                logger.warning(f'Could not deliver the command error by DM: {response_error}')
 
     @slash_command(name='tag_tree')
     async def tag_tree(self, ctx: context.ApplicationContext):
@@ -527,7 +529,6 @@ class AdminCommandsCog(commands.Cog, guild_ids=guild_id_list):
         await ctx.respond('Shutting Down')
         logger.critical('Shutting Down\n. . .\n\n')
         await bot.close()
-        time.sleep(1)
 
     @slash_command(name='oz')
     async def oz(

@@ -8,7 +8,7 @@ from ruamel.yaml import YAML
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
-from pydantic import BaseModel, AfterValidator, PlainValidator, Field, \
+from pydantic import BaseModel, ConfigDict, AfterValidator, PlainValidator, Field, \
     model_validator, PrivateAttr, field_serializer
 from pydantic_core import PydanticCustomError
 from pydantic_yaml import parse_yaml_raw_as, to_yaml_str
@@ -133,8 +133,7 @@ class HVZConfig(BaseModel):
     _filepath: Path = PrivateAttr(default=CONFIG_PATH)
     _script_path: Path = PrivateAttr(default=PATH_ROOT / "scripts.yml")
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @model_validator(mode='after')
     def check_config(self) -> HVZConfig:
@@ -161,7 +160,7 @@ class HVZConfig(BaseModel):
 
         if self.server_id == 767126786617114635:
             logger.warning(f"The 'server_id' setting in {self._filepath.name} is still default. Change this to yours.")
-        if self.sheet_id == '1fLYdmc_sp-Rx25794zmPekp48I02lbctyqiLvaLDIwQ':
+        if self.google_sheet_export and self.sheet_id == '1fLYdmc_sp-Rx25794zmPekp48I02lbctyqiLvaLDIwQ':
             logger.warning(
                 f"The 'sheet_id' setting in {self._filepath.name} is still default. Change that of your target Google Sheet, or set 'google_sheet_export' to false.")
 

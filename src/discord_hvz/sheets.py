@@ -137,11 +137,11 @@ class SheetsInterface:
 
 
         # Erases all columns up to the number of columns that could be written.
-        self.spreadsheets.values().clear(spreadsheetId=self.sheet_id, range=range).execute()
 
         body = {'values': values}
 
         try:
+            self.spreadsheets.values().clear(spreadsheetId=self.sheet_id, range=range).execute()
             result = self.spreadsheets.values().update(spreadsheetId=self.sheet_id, range=range,
                                                        valueInputOption='USER_ENTERED', body=body).execute()
         except Exception as e:
@@ -157,9 +157,8 @@ class SheetsInterface:
             result = self.spreadsheets.values().get(spreadsheetId=self.sheet_id,
                                                     range='\'%s\'!%s' % (sheet_name, range)).execute()
         except Exception as e:
-            s = str(e).split('Details: ')
             logger.error('Error when excecuting read_sheet() with arguments \"%s\" and \"%s\"  ----> %s' % (
-                sheet_name, range, s[1]))
+                sheet_name, range, e))
             return 0
         else:
             return result.get('values', 0)

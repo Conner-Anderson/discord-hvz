@@ -1,14 +1,15 @@
 from __future__ import annotations
-from typing import Dict, List, Any, Union, TYPE_CHECKING
+from typing import Dict, List, Any, Callable, Union, TYPE_CHECKING
 from typing_extensions import Annotated
 
 from pathlib import Path
 
-from pydantic import BaseModel, BeforeValidator, PlainValidator, ValidationError, Field, \
-    model_validator, field_validator, RootModel, FieldValidationInfo, ValidationInfo
+from pydantic import BaseModel, ConfigDict, BeforeValidator, PlainValidator, ValidationError, Field, \
+    model_validator, field_validator, RootModel, ValidationInfo
 from pydantic_core import PydanticCustomError
 from pydantic_yaml import parse_yaml_raw_as
 from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 
 from loguru import logger
 
@@ -76,8 +77,8 @@ def validate_button_color(x: Any) -> str:
         raise ValueError(f"Must be able to transform the given button color into text.") from e
 
 
-QuestionProcessor = Annotated[callable, PlainValidator(validate_question_processor)]
-ScriptProcessor = Annotated[callable, PlainValidator(validate_script_processor)]
+QuestionProcessor = Annotated[Callable, PlainValidator(validate_question_processor)]
+ScriptProcessor = Annotated[Callable, PlainValidator(validate_script_processor)]
 ButtonColor = Annotated[ButtonColor, BeforeValidator(validate_button_color)]
 DatabaseType = Annotated[database.ValidColumnType, PlainValidator(validate_database_type)]
 
@@ -94,10 +95,7 @@ class QuestionDatas(BaseModel):
     processor: QuestionProcessor = Field(default=None)
     button_options: Dict[str, ButtonColor] = None
 
-    class Config:
-        frozen = False
-        str_strip_whitespace = True
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(frozen=False, str_strip_whitespace=True, arbitrary_types_allowed=True)
 
 
     @field_validator("column", mode="after")
@@ -157,12 +155,10 @@ class ScriptDatas(BaseModel):
     postable_button_label: str = Field(default=None)
     questions: List[QuestionDatas]
 
-    class Config:
-        frozen = False
-        str_strip_whitespace = True
+    model_config = ConfigDict(frozen=False, str_strip_whitespace=True)
 
     @model_validator(mode='after')
-    def check_questions_2(self, info: FieldValidationInfo) -> ScriptDatas:
+    def check_questions_2(self, info: ValidationInfo) -> ScriptDatas:
         x = self.questions
         if self.modal:
             if len(x) > 5:
@@ -254,14 +250,14 @@ class ScriptFile(RootModel):
 
     @field_validator('root', mode='before')
     @classmethod
-    def inject_kind(cls, root: Dict[str, Dict], info: FieldValidationInfo):
+    def inject_kind(cls, root: Dict[str, Dict], info: ValidationInfo):
         for kind, chatbot in root.items():
             chatbot['kind'] = kind
         return root
 
     @field_validator('root', mode='after')
     @classmethod
-    def check_script(cls, root: Dict[str, ScriptDatas], info: FieldValidationInfo) -> Any:
+    def check_script(cls, root: Dict[str, ScriptDatas], info: ValidationInfo) -> Any:
         found_tables = []
         for kind, data in root.items():
             if data.table in found_tables:
@@ -306,18 +302,17 @@ class ScriptFile(RootModel):
         return schema
 
 def load_model(filepath: Path) -> ScriptFile:
-    with open(filepath) as fp:
-        yaml_string = fp.read()
     try:
+        with open(filepath) as fp:
+            yaml_string = fp.read()
         model = parse_yaml_raw_as(ScriptFile, yaml_string)
     except ValidationError as e:
         msg = f"There were errors reading the scripts file, {filepath.name}: \n" \
               + format_pydantic_errors(e, CUSTOM_MESSAGES) \
               + "For help with scripts, see the documentation at https://conner-anderson.github.io/discord-hvz-docs/latest/customized_chatbots/"
         raise ConfigError(msg) from e
-    # TODO: Check how exception handling works with this stuff
-    except Exception as e:
-        logger.exception(e)
+    except (OSError, UnicodeError, YAMLError) as e:
+        raise ConfigError(f'Could not read scripts file {filepath.name}: {e}') from e
     else:
         return model
 

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Callable, Awaitable
 from typing import TYPE_CHECKING
@@ -13,7 +11,7 @@ from loguru import logger
 
 from discord_hvz.config import config, ConfigError, ConfigChecker
 from discord_hvz.buttons import HVZButton
-from ..utilities import do_after_wait
+from ..utilities import schedule_delayed
 from discord_hvz import utilities
 
 from . import modal
@@ -342,8 +340,11 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
                 await interaction.response.send_message(response_msg, ephemeral=True)
 
     async def remove_chatbot(self, chatbot_id: int | ChatBot, delay: float | None = None):
+        chatbot = self.active_chatbots.get(int(chatbot_id))
 
         async def remove():
+            if self.active_chatbots.get(int(chatbot_id)) is not chatbot:
+                return  # A later conversation may have replaced this one during the delay.
             try:
                 removed_chatbot = self.active_chatbots.pop(int(chatbot_id))
             except KeyError:
@@ -352,7 +353,7 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             if removed_chatbot.thread:
                 await self.thread_manager.delete_thread(removed_chatbot.thread.id)
         if delay:
-            asyncio.create_task(do_after_wait(remove, delay=delay))
+            schedule_delayed(remove, delay=delay)
         else:
             await remove()
 
@@ -412,10 +413,17 @@ class ChatBotManager(commands.Cog, guild_ids=guild_id_list):
             chatbot.processing = True
             completed = await chatbot.receive(response_text, interaction=interaction)
         except Exception as e:
-            await chatbot.thread.send(
-                f'The chatbot had a critical error. You will need to retry from the beginning.')
-            await self.remove_chatbot(chatbot, delay=30.0)
             logger.exception(e)
+            try:
+                message = 'The chatbot had a critical error. You will need to retry from the beginning.'
+                if interaction is not None:
+                    await interaction.respond(message, ephemeral=True)
+                elif chatbot.thread is not None:
+                    await chatbot.thread.send(message)
+            except discord.HTTPException as response_error:
+                logger.warning(f'Could not deliver the chatbot error response: {response_error}')
+            finally:
+                await self.remove_chatbot(chatbot, delay=30.0)
             return
 
         if completed:

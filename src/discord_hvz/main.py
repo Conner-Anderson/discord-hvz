@@ -6,12 +6,12 @@ import functools
 import asyncio
 import logging
 import sys
-import time
 from datetime import datetime
 from os import getenv
 from typing import Dict, Union, Any, Type
 
 import discord
+import aiohttp
 import loguru
 from discord import Guild
 from discord.ext import commands
@@ -82,11 +82,33 @@ class DiscordSink:
     def __init__(self, channel: discord.channel, bot: HVZBot):
         self.channel = channel
         self.bot = bot
+        self.tasks = set()
+        self.closed = False
 
     def write(self, message):
+        if self.closed or self.bot.is_closed() or self.bot.loop.is_closed():
+            return
         # Send log messages to the Discord channel
         msg = utilities.abbreviate_message(message, 2000)
-        self.bot.loop.create_task(self.channel.send(msg))
+        task = self.bot.loop.create_task(self.send(msg))
+        self.tasks.add(task)
+        task.add_done_callback(self.tasks.discard)
+
+    async def send(self, message):
+        try:
+            await self.channel.send(message)
+        except (discord.HTTPException, aiohttp.ClientError, OSError, asyncio.TimeoutError) as error:
+            # Keep delivery failures local; sending them to this sink would recurse.
+            logger.bind(skip_discord=True).warning(f'Could not send a log message to Discord: {error}')
+        except Exception:
+            logger.bind(skip_discord=True).exception('Unexpected failure sending a log message to Discord.')
+
+    async def close(self):
+        self.closed = True
+        tasks = list(self.tasks)
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 @dataclasses.dataclass
 class BotChannels:
@@ -144,6 +166,11 @@ class HVZBot(discord.ext.commands.Bot):
         script_file_model = script_models.load_model(config.script_path)
         self.db = HvzDb(database_config = script_file_model.get_database_schema())
         self.readied = False
+        self._discord_sink = None
+        self._discord_sink_id = None
+        self._connection_task = None
+        self._close_lock = asyncio.Lock()
+        self.startup_failed = False
 
         intents = discord.Intents.all()
         super().__init__(
@@ -185,13 +212,8 @@ class HVZBot(discord.ext.commands.Bot):
                 else:
                     raise ConfigError(f'This bot is not on any server matching the "server_id" set in config.yml. Either the ID is set wrong, or the bot account has not joined the server.')
 
-                # Updates the cache with all members and channels and roles
-                await self.guild.fetch_members(limit=500).flatten()
-                await self.guild.fetch_channels()
-                await self.guild.fetch_roles()
-
-
-
+                # Pycord populates these caches before ready. Set them before
+                # yielding so the other ready listeners can safely use them.
                 self.roles = BotRoles(
                     zombie=self.str_to_role(config.role_names.zombie),
                     human=self.str_to_role(config.role_names.human),
@@ -206,7 +228,12 @@ class HVZBot(discord.ext.commands.Bot):
                 if config.channel_names.bot_output:
                     logger_channel = discord.utils.find(lambda c: c.name.lower() == config.channel_names.bot_output, self.guild.channels)
                     if logger_channel and isinstance(logger_channel, discord.TextChannel):
-                        logger.add(DiscordSink(channel=logger_channel, bot=self), level="INFO")
+                        if self._discord_sink is None:
+                            self._discord_sink = DiscordSink(channel=logger_channel, bot=self)
+                            self._discord_sink_id = logger.add(
+                                self._discord_sink, level="INFO",
+                                filter=lambda record: not record['extra'].get('skip_discord', False),
+                            )
                         self.channels.bot_output = logger_channel
                     else:
                         logger.warning(f"A bot output channel was specified in {config.filepath.name}" 
@@ -215,15 +242,15 @@ class HVZBot(discord.ext.commands.Bot):
 
                 log.success(
                     f'Discord-HvZ Bot launched correctly! Logged in as: {self.user.name} ------------------------------------------')
-            except StartupError as e:
+            except (StartupError, ConfigError, ValueError, discord.HTTPException) as e:
+                self.startup_failed = True
                 logger.error(f'The bot failed to start because of this error: \n{e}')
                 await self.close()
-                time.sleep(1)
             except Exception as e:
+                self.startup_failed = True
                 log.error('Bot startup failed.')
                 log.exception(e)
                 await self.close()
-                time.sleep(1)
 
         @self.event
         async def on_error(event: str, *args, **kwargs):
@@ -254,10 +281,12 @@ class HVZBot(discord.ext.commands.Bot):
 
                 getattr(log.opt(exception=trace), log_level)(
                     f'{error.__class__.__name__} exception in command {ctx.command}: {error}')
-                print(type(error))
 
 
-            await ctx.respond(f'The command at least partly failed: {error}')
+            try:
+                await ctx.respond(utilities.abbreviate_message(f'The command at least partly failed: {error}', 2000))
+            except (discord.HTTPException, aiohttp.ClientError, OSError, asyncio.TimeoutError) as response_error:
+                logger.warning(f'Could not deliver the error response for command {ctx.command}: {response_error}')
 
         @self.listen()
         @self.check_event
@@ -277,6 +306,25 @@ class HVZBot(discord.ext.commands.Bot):
             if not before.nick == after.nick:
                 self.db.edit_row('members', 'id', after.id, 'nickname', after.nick)
                 log.debug(f'{after.name} changed their nickname.')
+
+    async def start(self, token, *, reconnect=True):
+        self._connection_task = asyncio.create_task(super().start(token, reconnect=reconnect))
+        await self._connection_task
+
+    async def close(self):
+        # Stop log delivery before Pycord closes its HTTP session and event loop.
+        async with self._close_lock:
+            if self._discord_sink_id is not None:
+                logger.remove(self._discord_sink_id)
+                self._discord_sink_id = None
+            if self._discord_sink is not None:
+                await self._discord_sink.close()
+            # The gateway must stop before its underlying HTTP session closes.
+            if self._connection_task is not None and not self._connection_task.done():
+                self._connection_task.cancel()
+                await asyncio.gather(self._connection_task, return_exceptions=True)
+            await utilities.cancel_delayed_tasks()
+            await super().close()
 
     def get_member(self, user_id: int):
         user_id = int(user_id)
@@ -361,10 +409,17 @@ def main():
     except Exception as e:
         logger.exception(e)
     else:
-        logger.success('The bot has shut down normally.')
+        if bot.startup_failed:
+            logger.error('The bot stopped because startup failed.')
+        else:
+            logger.success('The bot has shut down normally.')
     finally:
-        logger.info('Press Enter to close.')
-        input()
+        if sys.stdin is not None and sys.stdin.isatty():
+            logger.info('Press Enter to close.')
+            try:
+                input()
+            except (EOFError, KeyboardInterrupt):
+                pass
 
 if __name__ == "__main__":
     main()
